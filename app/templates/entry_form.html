@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}{{ entry_date.strftime('%d %b %Y') }}{% endblock %}
+{% block page_title %}{{ 'Edit' if entry else 'Add' }} entry{% endblock %}
+
+{% block content %}
+<section class="card card-narrow">
+  <div class="card-heading">
+    <h2>{{ entry_date.strftime('%A, %d %B %Y') }}</h2>
+    <a href="{{ url_for('main.history', year=entry_date.year, month=entry_date.month) }}" class="link">&larr; Back to history</a>
+  </div>
+
+  <form method="post" class="form" id="entry-form">
+    <div class="field-row">
+      <label class="field">
+        <span>Login time</span>
+        <input type="time" name="login_time" value="{{ entry.login_time.strftime('%H:%M') if entry and entry.login_time else '' }}">
+      </label>
+      <label class="field">
+        <span>Logout time</span>
+        <input type="time" name="logout_time" value="{{ entry.logout_time.strftime('%H:%M') if entry and entry.logout_time else '' }}">
+      </label>
+    </div>
+    <p class="hint">If logout is earlier than login, STM assumes the shift crossed midnight.</p>
+
+    <div class="breaks-block">
+      <div class="card-heading">
+        <span>Breaks</span>
+        <button type="button" class="btn btn-ghost btn-sm" id="add-break">+ Add break</button>
+      </div>
+      <div id="break-rows">
+        {% for b in (entry.breaks if entry else []) %}
+        <div class="field-row break-row-input">
+          <label class="field">
+            <span>Break start</span>
+            <input type="time" name="break_start" value="{{ b.break_start.strftime('%H:%M') if b.break_start else '' }}">
+          </label>
+          <label class="field">
+            <span>Break end</span>
+            <input type="time" name="break_end" value="{{ b.break_end.strftime('%H:%M') if b.break_end else '' }}">
+          </label>
+          <button type="button" class="btn btn-icon remove-break" aria-label="Remove break">&times;</button>
+        </div>
+        {% endfor %}
+        <div class="field-row break-row-input">
+          <label class="field">
+            <span>Break start</span>
+            <input type="time" name="break_start">
+          </label>
+          <label class="field">
+            <span>Break end</span>
+            <input type="time" name="break_end">
+          </label>
+          <button type="button" class="btn btn-icon remove-break" aria-label="Remove break">&times;</button>
+        </div>
+      </div>
+    </div>
+
+    <label class="field">
+      <span>Notes <em>(optional)</em></span>
+      <textarea name="notes" rows="2" placeholder="What did you work on?">{{ (entry.notes if entry else '') or '' }}</textarea>
+    </label>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">Save entry</button>
+      {% if entry %}
+      <button type="submit" form="delete-form" class="btn btn-danger-ghost">Delete entry</button>
+      {% endif %}
+    </div>
+  </form>
+
+  {% if entry %}
+  <form method="post" action="{{ url_for('main.delete_entry', date_str=entry_date.isoformat()) }}" id="delete-form"
+        onsubmit="return confirm('Delete this entry? This cannot be undone.');"></form>
+  {% endif %}
+</section>
+
+<template id="break-row-template">
+  <div class="field-row break-row-input">
+    <label class="field">
+      <span>Break start</span>
+      <input type="time" name="break_start">
+    </label>
+    <label class="field">
+      <span>Break end</span>
+      <input type="time" name="break_end">
+    </label>
+    <button type="button" class="btn btn-icon remove-break" aria-label="Remove break">&times;</button>
+  </div>
+</template>
+{% endblock %}

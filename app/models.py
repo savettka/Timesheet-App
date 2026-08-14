@@ -1,0 +1,77 @@
+from datetime import datetime
+
+from flask_login import UserMixin
+from werkzeug.security import check_password_hash, generate_password_hash
+
+from app import db
+
+DEFAULT_WORKDAYS = "0,1,2,3,4,5"  # Monday .. Saturday (Python weekday(): Mon=0 .. Sun=6)
+
+
+class User(UserMixin, db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)
+    display_name = db.Column(db.String(120), nullable=True)
+
+    daily_target_hours = db.Column(db.Float, nullable=False, default=8.0)
+    weekly_target_hours = db.Column(db.Float, nullable=False, default=48.0)
+    workdays = db.Column(db.String(20), nullable=False, default=DEFAULT_WORKDAYS)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    entries = db.relationship(
+        "TimeEntry", backref="user", lazy=True, cascade="all, delete-orphan"
+    )
+
+    def set_password(self, raw_password):
+        self.password_hash = generate_password_hash(raw_password)
+
+    def check_password(self, raw_password):
+        return check_password_hash(self.password_hash, raw_password)
+
+    def workday_set(self):
+        return {int(d) for d in self.workdays.split(",") if d != ""}
+
+    def target_hours_for_weekday(self, weekday):
+        return self.daily_target_hours if weekday in self.workday_set() else 0.0
+
+
+class TimeEntry(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+
+    date = db.Column(db.Date, nullable=False)
+    login_time = db.Column(db.Time, nullable=True)
+    logout_time = db.Column(db.Time, nullable=True)
+    notes = db.Column(db.String(500), nullable=True)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    breaks = db.relationship(
+        "BreakSegment",
+        backref="entry",
+        lazy=True,
+        cascade="all, delete-orphan",
+        order_by="BreakSegment.break_start",
+    )
+
+    __table_args__ = (db.UniqueConstraint("user_id", "date", name="uq_user_date"),)
+
+    def is_open(self):
+        return self.login_time is not None and self.logout_time is None
+
+    def open_break(self):
+        for b in self.breaks:
+            if b.break_end is None:
+                return b
+        return None
+
+
+class BreakSegment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    entry_id = db.Column(db.Integer, db.ForeignKey("time_entry.id"), nullable=False)
+
+    break_start = db.Column(db.Time, nullable=False)
+    break_end = db.Column(db.Time, nullable=True)

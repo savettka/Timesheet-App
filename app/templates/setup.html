@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Set up STM{% endblock %}
+{% block auth_content %}
+<div class="auth-card">
+  <div class="auth-brand">
+    <span class="brand-mark large">S</span>
+    <h1>Welcome to STM</h1>
+    <p>Let's set up your account. This is a one-time step &mdash; STM is built for a single user (you).</p>
+  </div>
+  <form method="post" class="form">
+    <label class="field">
+      <span>Username</span>
+      <input type="text" name="username" value="{{ username or '' }}" required autofocus autocomplete="username">
+    </label>
+    <label class="field">
+      <span>Display name <em>(optional)</em></span>
+      <input type="text" name="display_name" value="{{ display_name or '' }}" placeholder="e.g. Pulkit">
+    </label>
+    <label class="field">
+      <span>Password</span>
+      <input type="password" name="password" required minlength="6" autocomplete="new-password">
+    </label>
+    <label class="field">
+      <span>Confirm password</span>
+      <input type="password" name="confirm_password" required minlength="6" autocomplete="new-password">
+    </label>
+    <button type="submit" class="btn btn-primary btn-block">Create account &amp; continue</button>
+  </form>
+</div>
+{% endblock %}

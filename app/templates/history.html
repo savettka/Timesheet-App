@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}History{% endblock %}
+{% block page_title %}History{% endblock %}
+
+{% block content %}
+<section class="card">
+  <div class="card-heading month-nav">
+    <a class="btn btn-icon" href="{{ url_for('main.history', year=prev_year, month=prev_month) }}" aria-label="Previous month">&larr;</a>
+    <h2>{{ month_name }} {{ year }}</h2>
+    <a class="btn btn-icon" href="{{ url_for('main.history', year=next_year, month=next_month) }}" aria-label="Next month">&rarr;</a>
+  </div>
+
+  <div class="stat-row month-summary">
+    <div class="stat">
+      <span class="stat-value">{{ fmt_hours(month_total) }}</span>
+      <span class="stat-label">Worked this month</span>
+    </div>
+    <div class="stat">
+      <span class="stat-value">{{ fmt_hours(month_target) }}</span>
+      <span class="stat-label">Target this month</span>
+    </div>
+    <div class="stat">
+      <span class="stat-value {{ 'stat-positive' if (month_total - month_target) >= 0 else 'stat-negative' }}">{{ fmt_hours(month_total - month_target) }}</span>
+      <span class="stat-label">Balance</span>
+    </div>
+  </div>
+
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Day</th>
+          <th>Login</th>
+          <th>Logout</th>
+          <th>Break</th>
+          <th>Total</th>
+          <th>Target</th>
+          <th>Balance</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        {% set balance = row.worked_hours - row.target_hours %}
+        <tr class="{{ 'row-today' if row.date == today }} {{ 'row-rest' if row.target_hours == 0 and not row.entry and not row.is_future }} {{ 'row-future' if row.is_future }}">
+          <td>{{ row.date.strftime('%d %b') }}</td>
+          <td class="muted">{{ row.date.strftime('%a') }}</td>
+          <td>{{ fmt_time(row.entry.login_time) if row.entry else '&mdash;' | safe }}</td>
+          <td>{{ fmt_time(row.entry.logout_time) if row.entry and row.entry.logout_time else '&mdash;' | safe }}</td>
+          <td>
+            {%- if row.entry and row.entry.breaks -%}
+              {{ row.entry.breaks|length }} brk
+            {%- else -%}
+              &mdash;
+            {%- endif -%}
+          </td>
+          <td><strong>{{ fmt_hours(row.worked_hours) if row.entry else '&mdash;' | safe }}</strong></td>
+          <td class="muted">{{ fmt_hours(row.target_hours) if not row.is_future else '&mdash;' | safe }}</td>
+          <td class="{{ 'stat-positive' if balance >= 0 else 'stat-negative' }}">{{ fmt_hours(balance) if (row.entry or row.target_hours) and not row.is_future else '&mdash;' | safe }}</td>
+          <td class="table-action">
+            <a href="{{ url_for('main.edit_entry', date_str=row.date.isoformat()) }}" class="link">{{ 'Edit' if row.entry else 'Add' }}</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
