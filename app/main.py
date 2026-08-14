@@ -6,7 +6,7 @@ from flask_login import current_user, login_required
 
 from app import db
 from app import logic
-from app.models import BreakSegment, TimeEntry
+from app.models import BreakSegment, TimeEntry, User
 
 main_bp = Blueprint("main", __name__)
 
@@ -53,7 +53,7 @@ def build_dashboard_context():
     weekly = logic.weekly_totals(user, entries_by_date, reference_date, now=now)
 
     today_entry = entries_by_date.get(date.today())
-    today_target = logic.entry_target_hours(user, date.today())
+    today_target = logic.target_hours_for(user, date.today(), today_entry)
     today_worked = logic.entry_total_hours(today_entry, now=now) if today_entry else 0.0
 
     suggestion = None
@@ -61,7 +61,7 @@ def build_dashboard_context():
         worked_today_in_week = logic.entry_total_hours(open_entry, now=now)
         weekly_before_today = weekly["worked_hours"] - worked_today_in_week
         reached, suggested_dt, still_needed = logic.suggested_logout(
-            open_entry, weekly_before_today, user.weekly_target_hours, now=now
+            open_entry, weekly_before_today, weekly["target_hours"], now=now
         )
         suggestion = {
             "reached": reached,
@@ -259,8 +259,15 @@ def history(year=None, month=None):
         is_future = d > today
         entry = entries_by_date.get(d)
         # A day you haven't reached yet can't owe hours -- only count a target
-        # once the day has actually arrived (matches how the weekly target works).
-        target = 0.0 if is_future else logic.entry_target_hours(current_user, d)
+        # once the day has actually arrived, unless it already carries an
+        # explicit override (e.g. pre-booked leave), which the user set on
+        # purpose and should show up right away.
+        if entry is not None:
+            target = logic.target_hours_for(current_user, d, entry)
+        elif is_future:
+            target = 0.0
+        else:
+            target = logic.entry_target_hours(current_user, d)
         worked = logic.entry_total_hours(entry, now=now) if entry else 0.0
         rows.append(
             {
@@ -305,11 +312,24 @@ def edit_entry(date_str):
         return redirect(url_for("main.history"))
 
     entry = TimeEntry.query.filter_by(user_id=current_user.id, date=entry_date).first()
+    default_target = logic.entry_target_hours(current_user, entry_date)
 
     if request.method == "POST":
         login_t = parse_time_field(request.form.get("login_time"))
         logout_t = parse_time_field(request.form.get("logout_time"))
         notes = (request.form.get("notes") or "").strip() or None
+
+        target_override_raw = (request.form.get("target_override") or "").strip()
+        target_override = None
+        if target_override_raw:
+            try:
+                target_override = max(0.0, float(target_override_raw))
+            except ValueError:
+                flash("Standard hours for this day must be a number.", "error")
+                return render_template(
+                    "entry_form.html", entry=entry, entry_date=entry_date, default_target=default_target
+                )
+        leave_label = (request.form.get("leave_label") or "").strip() or None
 
         break_starts = request.form.getlist("break_start")
         break_ends = request.form.getlist("break_end")
@@ -321,6 +341,8 @@ def edit_entry(date_str):
         entry.login_time = login_t
         entry.logout_time = logout_t
         entry.notes = notes
+        entry.target_override = target_override
+        entry.leave_label = leave_label
 
         entry.breaks.clear()
         for bs, be in zip(break_starts, break_ends):
@@ -337,7 +359,9 @@ def edit_entry(date_str):
         flash(f"Saved entry for {entry_date.strftime('%d %b %Y')}.", "success")
         return redirect(url_for("main.history", year=entry_date.year, month=entry_date.month))
 
-    return render_template("entry_form.html", entry=entry, entry_date=entry_date)
+    return render_template(
+        "entry_form.html", entry=entry, entry_date=entry_date, default_target=default_target
+    )
 
 
 @main_bp.route("/entry/<date_str>/delete", methods=["POST"])
@@ -405,6 +429,46 @@ def settings():
                 db.session.commit()
                 flash("Password changed.", "success")
 
+        elif form_type == "add_user":
+            new_username = (request.form.get("new_username") or "").strip()
+            new_display_name = (request.form.get("new_display_name") or "").strip()
+            new_password = request.form.get("new_user_password", "")
+            new_confirm = request.form.get("new_user_confirm", "")
+
+            if not new_username or not new_password:
+                flash("Username and password are required.", "error")
+            elif User.query.filter_by(username=new_username).first():
+                flash("That username is already taken.", "error")
+            elif len(new_password) < 6:
+                flash("Password must be at least 6 characters.", "error")
+            elif new_password != new_confirm:
+                flash("Passwords do not match.", "error")
+            else:
+                new_user = User(
+                    username=new_username,
+                    display_name=new_display_name or new_username,
+                    daily_target_hours=user.daily_target_hours,
+                    weekly_target_hours=user.weekly_target_hours,
+                    workdays=user.workdays,
+                )
+                new_user.set_password(new_password)
+                db.session.add(new_user)
+                db.session.commit()
+                flash(f"Added {new_user.display_name} as a new user.", "success")
+
+        elif form_type == "remove_user":
+            target_id = request.form.get("user_id", type=int)
+            if target_id == user.id:
+                flash("You can't remove your own account.", "error")
+            else:
+                target = db.session.get(User, target_id) if target_id else None
+                if target:
+                    label = target.display_name or target.username
+                    db.session.delete(target)
+                    db.session.commit()
+                    flash(f"Removed {label}.", "success")
+
         return redirect(url_for("main.settings"))
 
-    return render_template("settings.html", user=user)
+    all_users = User.query.order_by(User.username).all()
+    return render_template("settings.html", user=user, all_users=all_users)

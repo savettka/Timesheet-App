@@ -42,9 +42,16 @@
       </thead>
       <tbody>
         {% for row in rows %}
+        {% set is_leave = row.entry and row.entry.target_override is not none %}
+        {% set show_target = not row.is_future or is_leave %}
         {% set balance = row.worked_hours - row.target_hours %}
-        <tr class="{{ 'row-today' if row.date == today }} {{ 'row-rest' if row.target_hours == 0 and not row.entry and not row.is_future }} {{ 'row-future' if row.is_future }}">
-          <td>{{ row.date.strftime('%d %b') }}</td>
+        <tr class="{{ 'row-today' if row.date == today }} {{ 'row-rest' if row.target_hours == 0 and not row.entry and not row.is_future }} {{ 'row-future' if row.is_future }} {{ 'row-leave' if is_leave }}">
+          <td>
+            {{ row.date.strftime('%d %b') }}
+            {%- if is_leave %}
+              <span class="leave-badge">{{ row.entry.leave_label or 'Leave' }}</span>
+            {%- endif %}
+          </td>
           <td class="muted">{{ row.date.strftime('%a') }}</td>
           <td>{{ fmt_time(row.entry.login_time) if row.entry else '&mdash;' | safe }}</td>
           <td>{{ fmt_time(row.entry.logout_time) if row.entry and row.entry.logout_time else '&mdash;' | safe }}</td>
@@ -56,8 +63,8 @@
             {%- endif -%}
           </td>
           <td><strong>{{ fmt_hours(row.worked_hours) if row.entry else '&mdash;' | safe }}</strong></td>
-          <td class="muted">{{ fmt_hours(row.target_hours) if not row.is_future else '&mdash;' | safe }}</td>
-          <td class="{{ 'stat-positive' if balance >= 0 else 'stat-negative' }}">{{ fmt_hours(balance) if (row.entry or row.target_hours) and not row.is_future else '&mdash;' | safe }}</td>
+          <td class="muted">{{ fmt_hours(row.target_hours) if show_target else '&mdash;' | safe }}</td>
+          <td class="{{ 'stat-positive' if balance >= 0 else 'stat-negative' }}">{{ fmt_hours(balance) if (row.entry or row.target_hours) and show_target else '&mdash;' | safe }}</td>
           <td class="table-action">
             <a href="{{ url_for('main.edit_entry', date_str=row.date.isoformat()) }}" class="link">{{ 'Edit' if row.entry else 'Add' }}</a>
           </td>

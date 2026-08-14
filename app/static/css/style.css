@@ -405,7 +405,15 @@ table { border-collapse: collapse; width: 100%; }
 .week-day.is-today { border-color: var(--accent); background: var(--accent-soft); }
 .week-day-label { font-size: 11px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.04em; }
 .week-day-num { font-family: var(--font-display); font-weight: 700; font-size: 15px; }
-.week-day-hours { font-size: 10.5px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.week-day-hours {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .week-day.has-entry .week-day-hours { color: var(--success); font-weight: 600; }
 
 /* ==========================================================================
@@ -427,8 +435,11 @@ table { border-collapse: collapse; width: 100%; }
    Tables
    ========================================================================== */
 
-.table-scroll { overflow-x: auto; }
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .mini-table, .data-table { font-size: 13.5px; }
+.data-table { min-width: 640px; }
+.mini-table td, .mini-table th { white-space: nowrap; }
+.data-table td, .data-table th { white-space: nowrap; }
 .mini-table th, .data-table th {
   text-align: left;
   color: var(--text-faint);
@@ -501,6 +512,43 @@ textarea { resize: vertical; }
 .break-row-input { align-items: flex-end; margin-bottom: 10px; }
 .break-row-input .btn-icon { margin-bottom: 2px; }
 
+.leave-block { padding-bottom: 4px; }
+
+.leave-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  padding: 2px 9px;
+  border-radius: var(--radius-pill);
+  background: var(--warning-soft);
+  color: var(--warning);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  vertical-align: middle;
+}
+.data-table .row-leave td:first-child { font-weight: 600; }
+
+.week-day.is-leave { background: var(--warning-soft); }
+.week-day.is-leave .week-day-hours { color: var(--warning); font-weight: 600; }
+
+/* ---------- team members ---------- */
+
+.user-list { display: flex; flex-direction: column; gap: 2px; margin-bottom: 20px; }
+.user-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 4px;
+  border-bottom: 1px solid var(--card-border);
+}
+.user-row:last-child { border-bottom: none; }
+.user-row-info { display: flex; flex-direction: column; flex: 1; min-width: 0; gap: 1px; }
+.user-row-name { font-size: 14px; font-weight: 600; }
+.user-row-name em { font-weight: 400; font-style: normal; color: var(--text-faint); }
+.user-row-username { font-size: 12.5px; }
+.user-add-form { border-top: 1px solid var(--card-border); padding-top: 18px; }
+
 /* ==========================================================================
    Flash messages
    ========================================================================== */
@@ -560,9 +608,35 @@ textarea { resize: vertical; }
   .content { padding: 20px 16px 48px; }
   .topbar { padding: 14px 16px; }
   .field-row { flex-direction: column; }
+  /* align-items: flex-end bottom-aligns the remove button next to inputs in
+     the desktop row layout; once the row stacks into a column it would
+     instead shrink each field to content width and right-align it, so
+     switch back to a normal full-width stretch here. */
+  .break-row-input { align-items: stretch; }
+  .break-row-input .remove-break { align-self: flex-end; }
+}
+
+@media (max-width: 600px) {
+  .card { padding: 20px 18px; border-radius: var(--radius-md); }
+  .card-clock { padding: 26px 18px; }
+  .card-heading {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .card-heading h2 { font-size: 16px; }
+  .month-nav { flex-direction: row; align-items: center; }
+  .week-days { gap: 6px; }
+  .week-day { padding: 8px 2px; }
+  .week-day-num { font-size: 14px; }
+  .btn-row { flex-direction: column; }
+  .break-row-input { gap: 8px; }
+  .checkbox-row { gap: 6px; }
+  .checkbox-chip { padding: 7px 12px; font-size: 12.5px; }
 }
 
 @media (max-width: 480px) {
   .stat-row { flex-wrap: wrap; gap: 14px 22px; }
   #live-timer-value { font-size: 38px; }
+  .week-day-hours { font-size: 9.5px; }
 }

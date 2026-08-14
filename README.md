@@ -17,18 +17,27 @@ This mirrors the logic in the original spreadsheet:
 - Once your running total for the week reaches the weekly target, STM tells you your
   target is complete — if you're still punched in, it shows a suggested logout time so
   you can leave early instead of working a full extra day.
+- **Leave / holiday days**: any day can have its target overridden (e.g. 0 for a day
+  off, half your usual target for a half day) from that day's Edit screen. The weekly
+  target adjusts down (or up) to match, so a day of leave doesn't leave you owing extra
+  hours later in the week.
 
 ## Features
 
 - Live **Punch in / Start break / End break / Punch out** buttons, plus an option to
   enter a different time for any punch (for when you forget to punch live).
 - **History** — a full month view of every day, with an **Add/Edit** screen to enter or
-  correct all 4 times (and multiple breaks) for any date by hand.
+  correct all 4 times (and multiple breaks) for any date by hand, or mark it as leave/a
+  holiday with a custom target.
 - **Dashboard** — today's hours, this week's progress bar toward your target, and a
   suggested logout time once you're close to (or past) the weekly target.
-- **Settings** — change daily/weekly targets, workdays, display name, and password.
-- Modern UI with a **light/dark mode toggle** (remembers your choice).
-- Single-user login (you set your username/password the first time you open the app).
+- **Settings** — change daily/weekly targets, workdays, display name, and password, and
+  add or remove **team members**: each person gets their own login and their own
+  punches/history/targets, fully isolated from everyone else's.
+- Modern UI with a **light/dark mode toggle** (remembers your choice), tuned for both
+  desktop and mobile.
+- Login required from the first visit — the first account you create is yours; add more
+  people from **Settings → Team members** afterwards.
 
 ## Project structure
 

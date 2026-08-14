@@ -22,6 +22,24 @@
     </div>
     <p class="hint">If logout is earlier than login, STM assumes the shift crossed midnight.</p>
 
+    <div class="leave-block">
+      <div class="field-row">
+        <label class="field">
+          <span>Standard hours for this day</span>
+          <input type="number" step="0.5" min="0" name="target_override" placeholder="{{ default_target|round(1) }} (default)"
+                 value="{{ entry.target_override if entry and entry.target_override is not none else '' }}">
+        </label>
+        <label class="field">
+          <span>Reason <em>(optional)</em></span>
+          <input type="text" name="leave_label" placeholder="e.g. Annual leave, Sick day, Bank holiday"
+                 value="{{ (entry.leave_label if entry else '') or '' }}">
+        </label>
+      </div>
+      <p class="hint">Leave blank to use your normal target ({{ default_target|round(1) }}h). Set to 0 for a full day
+        off, or e.g. {{ (default_target / 2)|round(1) }} for a half day &mdash; it'll reduce what you owe that
+        week to match.</p>
+    </div>
+
     <div class="breaks-block">
       <div class="card-heading">
         <span>Breaks</span>

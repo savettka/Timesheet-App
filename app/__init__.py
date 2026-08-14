@@ -1,5 +1,6 @@
 import os
 
+import sqlalchemy as sa
 from flask import Flask
 from flask_login import LoginManager
 from flask_sqlalchemy import SQLAlchemy
@@ -7,6 +8,31 @@ from flask_sqlalchemy import SQLAlchemy
 db = SQLAlchemy()
 login_manager = LoginManager()
 login_manager.login_view = "auth.login"
+
+
+def _run_light_migrations():
+    """Add columns introduced after a database already exists.
+
+    db.create_all() only creates missing *tables*, so an existing SQLite
+    file from an earlier version of the app needs its new columns added
+    by hand. This is a no-op on a fresh install (create_all already wrote
+    the current schema) and a no-op on repeat runs (columns already exist).
+    """
+    inspector = sa.inspect(db.engine)
+    if "time_entry" not in inspector.get_table_names():
+        return
+
+    existing_columns = {c["name"] for c in inspector.get_columns("time_entry")}
+    statements = []
+    if "target_override" not in existing_columns:
+        statements.append("ALTER TABLE time_entry ADD COLUMN target_override FLOAT")
+    if "leave_label" not in existing_columns:
+        statements.append("ALTER TABLE time_entry ADD COLUMN leave_label VARCHAR(60)")
+
+    if statements:
+        with db.engine.begin() as conn:
+            for statement in statements:
+                conn.execute(sa.text(statement))
 
 
 def create_app(config_object="config.Config"):
@@ -37,6 +63,7 @@ def create_app(config_object="config.Config"):
 
     with app.app_context():
         db.create_all()
+        _run_light_migrations()
 
     @app.context_processor
     def inject_globals():
