@@ -46,6 +46,11 @@ class TimeEntry(db.Model):
     logout_time = db.Column(db.Time, nullable=True)
     notes = db.Column(db.String(500), nullable=True)
 
+    # When set, replaces the usual weekday-based target for this specific date
+    # (e.g. 0 for a day off, half the daily target for a half day).
+    target_override = db.Column(db.Float, nullable=True)
+    leave_label = db.Column(db.String(60), nullable=True)
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

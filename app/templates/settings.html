@@ -77,5 +77,57 @@
       </div>
     </form>
   </section>
+
+  <section class="card">
+    <div class="card-heading"><h2>Team members</h2></div>
+    <p class="hint">Everyone gets their own login and their own punches, targets, and history &mdash;
+      nothing is shared between accounts.</p>
+
+    <div class="user-list">
+      {% for u in all_users %}
+      <div class="user-row">
+        <span class="avatar">{{ (u.display_name or u.username)[:1]|upper }}</span>
+        <div class="user-row-info">
+          <span class="user-row-name">{{ u.display_name or u.username }}{% if u.id == user.id %} <em>(you)</em>{% endif %}</span>
+          <span class="user-row-username muted">{{ u.username }}</span>
+        </div>
+        {% if u.id != user.id %}
+        <form method="post" onsubmit="return confirm('Remove {{ (u.display_name or u.username)|e }}? This deletes all of their punches too.');">
+          <input type="hidden" name="form_type" value="remove_user">
+          <input type="hidden" name="user_id" value="{{ u.id }}">
+          <button type="submit" class="btn btn-danger-ghost btn-sm">Remove</button>
+        </form>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+
+    <form method="post" class="form user-add-form">
+      <input type="hidden" name="form_type" value="add_user">
+      <div class="field-row">
+        <label class="field">
+          <span>Username</span>
+          <input type="text" name="new_username" required autocomplete="off">
+        </label>
+        <label class="field">
+          <span>Display name <em>(optional)</em></span>
+          <input type="text" name="new_display_name">
+        </label>
+      </div>
+      <div class="field-row">
+        <label class="field">
+          <span>Password</span>
+          <input type="password" name="new_user_password" required minlength="6" autocomplete="new-password">
+        </label>
+        <label class="field">
+          <span>Confirm password</span>
+          <input type="password" name="new_user_confirm" required minlength="6" autocomplete="new-password">
+        </label>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Add user</button>
+      </div>
+    </form>
+  </section>
 </div>
 {% endblock %}

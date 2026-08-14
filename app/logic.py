@@ -75,7 +75,17 @@ def entry_total_hours(entry, now=None):
 
 
 def entry_target_hours(user, entry_date):
+    """The default, weekday-based target for a date (ignores any override)."""
     return user.target_hours_for_weekday(entry_date.weekday())
+
+
+def target_hours_for(user, entry_date, entry=None):
+    """The effective target for a date: an explicit override on the entry
+    (e.g. 0 for a day off, half the daily target for a half day) if one is
+    set, otherwise the normal weekday-based default."""
+    if entry is not None and entry.target_override is not None:
+        return entry.target_override
+    return entry_target_hours(user, entry_date)
 
 
 def week_bounds(any_date):
@@ -98,9 +108,16 @@ def weekly_totals(user, entries_by_date, any_date, now=None):
     days = week_dates(any_date)
     rows = []
     worked_total = 0.0
+    # A day-off/half-day override shifts the weekly target by exactly the
+    # difference from that day's usual target, so e.g. a full day of leave
+    # on an 8h day relieves 8h from what's owed that week.
+    target_delta = 0.0
     for d in days:
         entry = entries_by_date.get(d)
-        target = entry_target_hours(user, d)
+        default_target = entry_target_hours(user, d)
+        target = target_hours_for(user, d, entry)
+        if entry is not None and entry.target_override is not None:
+            target_delta += target - default_target
         worked = entry_total_hours(entry, now=now) if entry else 0.0
         worked_total += worked
         rows.append(
@@ -113,7 +130,7 @@ def weekly_totals(user, entries_by_date, any_date, now=None):
             }
         )
 
-    target_total = user.weekly_target_hours
+    target_total = max(0.0, user.weekly_target_hours + target_delta)
     remaining = max(0.0, target_total - worked_total)
     return {
         "week_start": days[0],
