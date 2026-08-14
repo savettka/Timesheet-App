@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block page_title %}Settings{% endblock %}
+
+{% block content %}
+<div class="grid grid-secondary">
+  <section class="card">
+    <div class="card-heading"><h2>Hours &amp; targets</h2></div>
+    <p class="hint">This is the same rule your spreadsheet used: 8h/day on workdays, 0h on your rest day, 48h/week total &mdash; all adjustable here.</p>
+    <form method="post" class="form">
+      <input type="hidden" name="form_type" value="targets">
+      <div class="field-row">
+        <label class="field">
+          <span>Daily target (hours)</span>
+          <input type="number" step="0.25" min="0" name="daily_target_hours" value="{{ user.daily_target_hours }}">
+        </label>
+        <label class="field">
+          <span>Weekly target (hours)</span>
+          <input type="number" step="0.5" min="0" name="weekly_target_hours" value="{{ user.weekly_target_hours }}">
+        </label>
+      </div>
+      <fieldset class="field">
+        <span>Workdays</span>
+        <div class="checkbox-row">
+          {% set day_names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] %}
+          {% set active = user.workday_set() %}
+          {% for i in range(7) %}
+          <label class="checkbox-chip">
+            <input type="checkbox" name="workdays" value="{{ i }}" {{ 'checked' if i in active }}>
+            <span>{{ day_names[i] }}</span>
+          </label>
+          {% endfor %}
+        </div>
+      </fieldset>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Save targets</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card">
+    <div class="card-heading"><h2>Profile</h2></div>
+    <form method="post" class="form">
+      <input type="hidden" name="form_type" value="profile">
+      <label class="field">
+        <span>Display name</span>
+        <input type="text" name="display_name" value="{{ user.display_name or '' }}">
+      </label>
+      <label class="field">
+        <span>Username</span>
+        <input type="text" value="{{ user.username }}" disabled>
+      </label>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Save profile</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card">
+    <div class="card-heading"><h2>Change password</h2></div>
+    <form method="post" class="form">
+      <input type="hidden" name="form_type" value="password">
+      <label class="field">
+        <span>Current password</span>
+        <input type="password" name="current_password" required autocomplete="current-password">
+      </label>
+      <label class="field">
+        <span>New password</span>
+        <input type="password" name="new_password" required minlength="6" autocomplete="new-password">
+      </label>
+      <label class="field">
+        <span>Confirm new password</span>
+        <input type="password" name="confirm_password" required minlength="6" autocomplete="new-password">
+      </label>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Update password</button>
+      </div>
+    </form>
+  </section>
+</div>
+{% endblock %}

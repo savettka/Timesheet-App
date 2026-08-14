@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Sign in{% endblock %}
+{% block auth_content %}
+<div class="auth-card">
+  <div class="auth-brand">
+    <span class="brand-mark large">S</span>
+    <h1>STM</h1>
+    <p>Sign in to punch in and track your hours.</p>
+  </div>
+  <form method="post" class="form">
+    <label class="field">
+      <span>Username</span>
+      <input type="text" name="username" required autofocus autocomplete="username">
+    </label>
+    <label class="field">
+      <span>Password</span>
+      <input type="password" name="password" required autocomplete="current-password">
+    </label>
+    <button type="submit" class="btn btn-primary btn-block">Sign in</button>
+  </form>
+</div>
+{% endblock %}

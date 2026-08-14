@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="grid grid-hero">
+
+  <section class="card card-clock"
+    id="clock-card"
+    data-logged-in="{{ 'true' if open_entry else 'false' }}"
+    data-on-break="{{ 'true' if open_break else 'false' }}"
+    data-login-iso="{{ open_entry.date.isoformat() ~ 'T' ~ open_entry.login_time.strftime('%H:%M:%S') if open_entry else '' }}"
+    data-break-start-iso="{{ open_entry.date.isoformat() ~ 'T' ~ open_break.break_start.strftime('%H:%M:%S') if open_break else '' }}"
+    data-closed-break-seconds="{{ open_entry_closed_break_seconds }}">
+
+    <div class="clock-status">
+      {% if open_break %}
+        <span class="status-pill status-break">On break</span>
+        <p class="status-detail">Since {{ fmt_time(open_break.break_start) }}</p>
+      {% elif open_entry %}
+        <span class="status-pill status-in">Logged in</span>
+        <p class="status-detail">Since {{ fmt_time(open_entry.login_time) }}{% if open_entry.date != today %} &middot; {{ open_entry.date.strftime('%d %b') }}{% endif %}</p>
+      {% else %}
+        <span class="status-pill status-out">Not logged in</span>
+        <p class="status-detail">Ready when you are</p>
+      {% endif %}
+    </div>
+
+    <div class="live-timer">
+      <span id="live-timer-value">{{ fmt_hours(today_worked) }}</span>
+      <span class="live-timer-label">worked today (net of breaks)</span>
+    </div>
+
+    <div class="clock-actions">
+      {% if open_break %}
+        <form method="post" action="{{ url_for('main.punch_break_end') }}" class="punch-form">
+          <button type="submit" class="btn btn-primary btn-lg">End break</button>
+        </form>
+        <details class="custom-time">
+          <summary>Use a different time</summary>
+          <form method="post" action="{{ url_for('main.punch_break_end') }}" class="inline-form">
+            <input type="time" name="time" required>
+            <button type="submit" class="btn btn-ghost">End break at this time</button>
+          </form>
+        </details>
+      {% elif open_entry %}
+        <div class="btn-row">
+          <form method="post" action="{{ url_for('main.punch_break_start') }}" class="punch-form">
+            <button type="submit" class="btn btn-secondary btn-lg">Start break</button>
+          </form>
+          <form method="post" action="{{ url_for('main.punch_out') }}" class="punch-form">
+            <button type="submit" class="btn btn-danger btn-lg">Punch out</button>
+          </form>
+        </div>
+        <details class="custom-time">
+          <summary>Use a different time</summary>
+          <div class="custom-time-grid">
+            <form method="post" action="{{ url_for('main.punch_break_start') }}" class="inline-form">
+              <input type="time" name="time" required>
+              <button type="submit" class="btn btn-ghost">Break started</button>
+            </form>
+            <form method="post" action="{{ url_for('main.punch_out') }}" class="inline-form">
+              <input type="time" name="time" required>
+              <button type="submit" class="btn btn-ghost">Punched out</button>
+            </form>
+          </div>
+        </details>
+      {% else %}
+        <form method="post" action="{{ url_for('main.punch_in') }}" class="punch-form">
+          <button type="submit" class="btn btn-primary btn-lg">Punch in</button>
+        </form>
+        <details class="custom-time">
+          <summary>Use a different time</summary>
+          <form method="post" action="{{ url_for('main.punch_in') }}" class="inline-form">
+            <input type="time" name="time" required>
+            <button type="submit" class="btn btn-ghost">Logged in at this time</button>
+          </form>
+        </details>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="card card-week">
+    <div class="card-heading">
+      <h2>This week</h2>
+      <span class="muted">{{ weekly.week_start.strftime('%d %b') }} &ndash; {{ weekly.week_end.strftime('%d %b') }}</span>
+    </div>
+
+    <div class="progress-wrap">
+      <div class="progress-track">
+        <div class="progress-fill" id="weekly-progress-fill" style="width: {{ weekly.progress_pct }}%"></div>
+      </div>
+      <div class="progress-figures">
+        <span id="weekly-worked-fig"><strong>{{ fmt_hours(weekly.worked_hours) }}</strong> worked</span>
+        <span id="weekly-target-fig">of {{ fmt_hours(weekly.target_hours) }} target</span>
+      </div>
+    </div>
+
+    {% if weekly.complete %}
+      <div class="banner banner-success" id="weekly-banner">
+        🎉 You've hit your {{ weekly.target_hours | round(1) }}h weekly target{% if open_entry %} &mdash; you can log out any time{% endif %}.
+      </div>
+    {% elif suggestion %}
+      <div class="banner banner-info" id="weekly-banner">
+        {{ fmt_hours(weekly.remaining_hours) }} left this week. At this pace, punch out around
+        <strong>{{ suggestion.suggested_time }}</strong> today to hit your target.
+      </div>
+    {% else %}
+      <div class="banner banner-muted" id="weekly-banner">
+        {{ fmt_hours(weekly.remaining_hours) }} left to reach your weekly target.
+      </div>
+    {% endif %}
+
+    <div class="week-days">
+      {% for row in weekly.rows %}
+        <a href="{{ url_for('main.edit_entry', date_str=row.date.isoformat()) }}" class="week-day {{ 'is-today' if row.date == today }} {{ 'has-entry' if row.entry }}">
+          <span class="week-day-label">{{ row.date.strftime('%a') }}</span>
+          <span class="week-day-num">{{ row.date.day }}</span>
+          <span class="week-day-hours">{{ fmt_hours(row.worked_hours) if row.entry else ('rest' if row.target_hours == 0 else '&mdash;') | safe }}</span>
+        </a>
+      {% endfor %}
+    </div>
+  </section>
+
+</div>
+
+<div class="grid grid-secondary">
+  <section class="card">
+    <div class="card-heading">
+      <h2>Today</h2>
+    </div>
+    <div class="stat-row">
+      <div class="stat">
+        <span class="stat-value">{{ fmt_hours(today_worked) }}</span>
+        <span class="stat-label">Worked (no break)</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value">{{ fmt_hours(today_target) }}</span>
+        <span class="stat-label">Target</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value {{ 'stat-positive' if (today_worked - today_target) >= 0 else 'stat-negative' }}">{{ fmt_hours(today_worked - today_target) }}</span>
+        <span class="stat-label">Balance</span>
+      </div>
+    </div>
+    {% if today_entry and today_entry.breaks %}
+    <div class="break-list">
+      <span class="muted">Breaks today</span>
+      {% for b in today_entry.breaks %}
+        <div class="break-row">
+          <span>{{ fmt_time(b.break_start) }} &rarr; {{ fmt_time(b.break_end) if b.break_end else 'ongoing' }}</span>
+        </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <div class="card-heading">
+      <h2>Recent entries</h2>
+      <a href="{{ url_for('main.history') }}" class="link">View history &rarr;</a>
+    </div>
+    <table class="mini-table">
+      <thead>
+        <tr><th>Date</th><th>In</th><th>Out</th><th>Total</th></tr>
+      </thead>
+      <tbody>
+        {% for e in recent_entries %}
+        <tr onclick="window.location='{{ url_for('main.edit_entry', date_str=e.date.isoformat()) }}'">
+          <td>{{ e.date.strftime('%d %b') }}</td>
+          <td>{{ fmt_time(e.login_time) }}</td>
+          <td>{{ fmt_time(e.logout_time) if e.logout_time else '&mdash;' | safe }}</td>
+          <td>{{ fmt_hours(entry_total_hours(e)) }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="muted">No entries yet. Punch in above to get started.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.STM_STATUS_URL = "{{ url_for('main.api_status') }}";
+</script>
+{% endblock %}
