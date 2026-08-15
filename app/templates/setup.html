@@ -1,10 +1,12 @@
 {% extends "base.html" %}
+{% from "partials/logo.html" import stm_logo %}
 {% block title %}Set up STM{% endblock %}
 {% block auth_content %}
 <div class="auth-card">
   <div class="auth-brand">
-    <span class="brand-mark large">S</span>
+    {{ stm_logo('logo-mark logo-lg') }}
     <h1>Welcome to STM</h1>
+    <span class="logo-tagline">Time Tracking App</span>
     <p>Let's set up your account. This is a one-time step &mdash; STM is built for a single user (you).</p>
   </div>
   <form method="post" class="form">

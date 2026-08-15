@@ -1,10 +1,11 @@
 <!doctype html>
+{% from "partials/logo.html" import stm_logo %}
 <html lang="en" data-theme="light">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}STM{% endblock %} · STM</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect rx=%2222%22 width=%22100%22 height=%22100%22 fill=%22%236366f1%22/><text x=%2250%22 y=%2266%22 font-size=%2248%22 font-family=%22Arial%22 fill=%22white%22 text-anchor=%22middle%22>S</text></svg>">
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/stm-logo.svg') }}">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
@@ -25,7 +26,7 @@
   <div class="app-shell">
     <aside class="sidebar">
       <div class="brand">
-        <span class="brand-mark">S</span>
+        {{ stm_logo('logo-mark') }}
         <span class="brand-name">STM</span>
       </div>
       <nav class="nav">

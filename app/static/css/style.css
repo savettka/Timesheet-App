@@ -123,22 +123,27 @@ table { border-collapse: collapse; width: 100%; }
   gap: 10px;
   padding: 4px 8px 28px;
 }
-.brand-mark {
+/* The mark inherits `color`, so it picks up the theme's ink automatically
+   -- near-black on light, near-white on dark -- the way the original
+   monochrome artwork is meant to sit on a page. */
+.logo-mark {
   width: 34px;
   height: 34px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 17px;
-  box-shadow: var(--shadow-sm);
+  flex-shrink: 0;
+  color: var(--text);
+  display: block;
 }
-.brand-mark.large { width: 56px; height: 56px; font-size: 26px; border-radius: 16px; margin: 0 auto 14px; }
+.logo-mark.logo-lg { width: 64px; height: 64px; margin: 0 auto 12px; }
 .brand-name { font-family: var(--font-display); font-weight: 700; font-size: 19px; letter-spacing: 0.02em; }
+.logo-tagline {
+  display: block;
+  margin-top: 6px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
 
 .nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
 .nav-link {
@@ -594,8 +599,8 @@ input[type="number"] { -moz-appearance: textfield; }
   box-shadow: var(--shadow-lg);
 }
 .auth-brand { text-align: center; margin-bottom: 26px; }
-.auth-brand h1 { font-size: 22px; margin-bottom: 8px; }
-.auth-brand p { color: var(--text-muted); font-size: 13.5px; line-height: 1.5; }
+.auth-brand h1 { font-size: 22px; }
+.auth-brand p { margin-top: 14px; color: var(--text-muted); font-size: 13.5px; line-height: 1.5; }
 
 /* ==========================================================================
    Responsive
