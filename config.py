@@ -21,3 +21,7 @@ class Config:
         "DATABASE_URL", f"sqlite:///{os.path.join(BASE_DIR, 'instance', 'stm.db')}"
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+
+    # Profile pictures get downscaled to a small square on upload, so the
+    # only reason to accept a large file is the original phone photo.
+    MAX_CONTENT_LENGTH = 8 * 1024 * 1024  # 8 MB

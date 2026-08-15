@@ -14,6 +14,15 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     display_name = db.Column(db.String(120), nullable=True)
 
+    # Only admins can add or remove accounts, or see that other accounts
+    # exist at all. The first account created (the one that runs setup)
+    # becomes the admin.
+    is_admin = db.Column(db.Boolean, nullable=False, default=False)
+
+    # Filename of the uploaded profile picture, relative to
+    # app/static/uploads/avatars/. None means "show initials instead".
+    avatar_filename = db.Column(db.String(120), nullable=True)
+
     daily_target_hours = db.Column(db.Float, nullable=False, default=8.0)
     weekly_target_hours = db.Column(db.Float, nullable=False, default=48.0)
     workdays = db.Column(db.String(20), nullable=False, default=DEFAULT_WORKDAYS)
@@ -39,6 +48,14 @@ class User(UserMixin, db.Model):
 
     def target_hours_for_weekday(self, weekday):
         return self.daily_target_hours if weekday in self.workday_set() else 0.0
+
+    @property
+    def initials(self):
+        source = (self.display_name or self.username).strip()
+        parts = [p for p in source.split() if p]
+        if len(parts) >= 2:
+            return (parts[0][0] + parts[1][0]).upper()
+        return source[:1].upper() if source else "?"
 
 
 class TimeEntry(db.Model):

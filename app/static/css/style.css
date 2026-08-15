@@ -223,7 +223,11 @@ table { border-collapse: collapse; width: 100%; }
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
   color: white; display: flex; align-items: center; justify-content: center;
   font-weight: 700; font-size: 14px;
+  flex-shrink: 0;
 }
+/* Uploaded photo: same circle, but the image fills it instead of initials. */
+.avatar-photo { object-fit: cover; background: var(--bg-soft); }
+.avatar-xl { width: 76px; height: 76px; font-size: 27px; }
 
 .content { padding: 28px 32px 64px; max-width: 1180px; width: 100%; margin: 0 auto; }
 
@@ -549,6 +553,46 @@ input[type="number"] { -moz-appearance: textfield; }
 .week-day.is-leave .week-day-hours { color: var(--warning); font-weight: 600; }
 
 /* ---------- team members ---------- */
+
+/* ---------- profile picture upload ---------- */
+
+.avatar-field {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding-bottom: 18px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid var(--card-border);
+}
+.avatar-field-controls { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-width: 0; }
+.avatar-field-label { font-size: 13px; font-weight: 600; color: var(--text-muted); }
+.avatar-field .hint { margin-top: 0; }
+/* The native file input is unstyleable across browsers, so it's hidden and
+   driven by its <label>, which can be styled like every other button. */
+.file-input {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+.file-input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+.role-badge-sm { padding: 1px 7px; font-size: 10px; margin-left: 4px; }
 
 .user-list { display: flex; flex-direction: column; gap: 2px; margin-bottom: 20px; }
 .user-row {

@@ -1,5 +1,6 @@
 <!doctype html>
 {% from "partials/logo.html" import stm_logo %}
+{% from "partials/avatar.html" import avatar %}
 <html lang="en" data-theme="light">
 <head>
   <meta charset="utf-8">
@@ -64,7 +65,7 @@
         <div class="topbar-title">{% block page_title %}Dashboard{% endblock %}</div>
         <div class="topbar-user">
           <span class="user-name">{{ current_user.display_name or current_user.username }}</span>
-          <span class="avatar">{{ (current_user.display_name or current_user.username)[:1]|upper }}</span>
+          {{ avatar(current_user) }}
         </div>
       </header>
 

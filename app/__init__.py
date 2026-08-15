@@ -33,6 +33,12 @@ def _run_light_migrations():
         user_columns = {c["name"] for c in inspector.get_columns("user")}
         if "saturday_login_hint" not in user_columns:
             statements.append("ALTER TABLE user ADD COLUMN saturday_login_hint TIME")
+        if "is_admin" not in user_columns:
+            statements.append(
+                "ALTER TABLE user ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT 0"
+            )
+        if "avatar_filename" not in user_columns:
+            statements.append("ALTER TABLE user ADD COLUMN avatar_filename VARCHAR(120)")
 
     if "break_segment" in table_names:
         # create_all() only adds indexes for tables it creates, so an existing
@@ -46,6 +52,23 @@ def _run_light_migrations():
         with db.engine.begin() as conn:
             for statement in statements:
                 conn.execute(sa.text(statement))
+
+    # A database that predates roles has every account non-admin, which would
+    # lock everyone out of user management. Promote the first account created
+    # -- the one that ran setup and owns the install -- so ownership lands
+    # with the original user rather than whoever was added later.
+    if "user" in table_names:
+        with db.engine.begin() as conn:
+            has_admin = conn.execute(
+                sa.text("SELECT 1 FROM user WHERE is_admin = 1 LIMIT 1")
+            ).first()
+            if not has_admin:
+                conn.execute(
+                    sa.text(
+                        "UPDATE user SET is_admin = 1 WHERE id = "
+                        "(SELECT MIN(id) FROM user)"
+                    )
+                )
 
 
 def create_app(config_object="config.Config"):
@@ -77,6 +100,14 @@ def create_app(config_object="config.Config"):
     with app.app_context():
         db.create_all()
         _run_light_migrations()
+
+    @app.errorhandler(413)
+    def too_large(_error):
+        # Without this, an oversized photo returns a bare browser error page.
+        from flask import flash, redirect, url_for
+
+        flash("That image is too large -- please pick one under 8 MB.", "error")
+        return redirect(url_for("main.settings"))
 
     @app.context_processor
     def inject_globals():
