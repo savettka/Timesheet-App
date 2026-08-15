@@ -104,7 +104,18 @@
         .catch(function () { /* silent - keep last known state */ });
     }
 
-    setInterval(refresh, 30000);
+    // Only poll while the tab is actually being looked at. A dashboard left
+    // open in a background tab all day would otherwise keep hitting the
+    // server every 30s for a screen nobody is reading -- wasted requests,
+    // and wasted CPU allowance on a small host.
+    setInterval(function () {
+      if (!document.hidden) refresh();
+    }, 30000);
+
+    // Coming back to the tab shouldn't mean waiting up to 30s for fresh numbers.
+    document.addEventListener("visibilitychange", function () {
+      if (!document.hidden) refresh();
+    });
   }
 
   // ---------------------------------------------------------- break rows
