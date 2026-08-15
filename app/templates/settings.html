@@ -69,6 +69,11 @@
         <input type="text" name="display_name" value="{{ user.display_name or '' }}">
       </label>
       <label class="field">
+        <span>Email address <em>(for sign-in codes)</em></span>
+        <input type="email" name="email" value="{{ user.email or '' }}"
+               autocomplete="email" placeholder="you@example.com">
+      </label>
+      <label class="field">
         <span>Username</span>
         <input type="text" value="{{ user.username }}" disabled>
       </label>
@@ -124,11 +129,18 @@
           <span class="user-row-username muted">{{ u.username }}</span>
         </div>
         {% if u.id != user.id %}
-        <form method="post" onsubmit="return confirm('Remove {{ (u.display_name or u.username)|e }}? This deletes all of their punches too.');">
-          <input type="hidden" name="form_type" value="remove_user">
-          <input type="hidden" name="user_id" value="{{ u.id }}">
-          <button type="submit" class="btn btn-danger-ghost btn-sm">Remove</button>
-        </form>
+        <div class="user-row-actions">
+          <form method="post" onsubmit="return confirm('Reset {{ (u.display_name or u.username)|e }}\'s password? Their current one stops working immediately.');">
+            <input type="hidden" name="form_type" value="reset_password">
+            <input type="hidden" name="user_id" value="{{ u.id }}">
+            <button type="submit" class="btn btn-ghost btn-sm">Reset password</button>
+          </form>
+          <form method="post" onsubmit="return confirm('Remove {{ (u.display_name or u.username)|e }}? This deletes all of their punches too.');">
+            <input type="hidden" name="form_type" value="remove_user">
+            <input type="hidden" name="user_id" value="{{ u.id }}">
+            <button type="submit" class="btn btn-danger-ghost btn-sm">Remove</button>
+          </form>
+        </div>
         {% endif %}
       </div>
       {% endfor %}
@@ -146,6 +158,10 @@
           <input type="text" name="new_display_name">
         </label>
       </div>
+      <label class="field">
+        <span>Email address <em>(optional, for sign-in codes)</em></span>
+        <input type="email" name="new_email" autocomplete="off" placeholder="them@example.com">
+      </label>
       <div class="field-row">
         <label class="field">
           <span>Password</span>

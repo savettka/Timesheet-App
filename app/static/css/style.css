@@ -481,7 +481,7 @@ table { border-collapse: collapse; width: 100%; }
 fieldset.field { border: none; padding: 0; margin: 0; }
 
 input[type="text"], input[type="password"], input[type="number"],
-input[type="time"], input[type="date"], textarea, select {
+input[type="time"], input[type="date"], input[type="email"], textarea, select {
   -webkit-appearance: none;
   appearance: none;
   border: 1px solid var(--card-border);
@@ -607,6 +607,7 @@ input[type="number"] { -moz-appearance: textfield; }
 .user-row-name { font-size: 14px; font-weight: 600; }
 .user-row-name em { font-weight: 400; font-style: normal; color: var(--text-faint); }
 .user-row-username { font-size: 12.5px; }
+.user-row-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 .user-add-form { border-top: 1px solid var(--card-border); padding-top: 18px; }
 
 /* ==========================================================================
@@ -645,6 +646,19 @@ input[type="number"] { -moz-appearance: textfield; }
 .auth-brand { text-align: center; margin-bottom: 26px; }
 .auth-brand h1 { font-size: 22px; }
 .auth-brand p { margin-top: 14px; color: var(--text-muted); font-size: 13.5px; line-height: 1.5; }
+.auth-alt { margin-top: 18px; text-align: center; font-size: 13.5px; }
+.auth-alt-sep { color: var(--text-faint); margin: 0 6px; }
+
+/* The code field: wide, spaced digits so a 6-digit code is easy to read back. */
+.code-input {
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 26px !important;
+  font-weight: 700;
+  letter-spacing: 0.32em;
+  text-indent: 0.32em;  /* re-centres text that letter-spacing pushes left */
+  font-variant-numeric: tabular-nums;
+}
 
 /* ==========================================================================
    Responsive

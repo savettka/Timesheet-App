@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% from "partials/logo.html" import stm_logo %}
+{% block title %}Enter your code{% endblock %}
+{% block auth_content %}
+<div class="auth-card">
+  <div class="auth-brand">
+    {{ stm_logo('logo-mark logo-lg') }}
+    <h1>Check your email</h1>
+    <span class="logo-tagline">Time Tracking App</span>
+    <p>If <strong>{{ email }}</strong> has an STM account, a 6-digit code is on its way.
+      It expires in 10 minutes.</p>
+  </div>
+  <form method="post" class="form">
+    <label class="field">
+      <span>6-digit code</span>
+      <input type="text" name="code" required autofocus class="code-input"
+             inputmode="numeric" autocomplete="one-time-code"
+             pattern="[0-9 ]*" maxlength="7" placeholder="000000">
+    </label>
+    <button type="submit" class="btn btn-primary btn-block">Sign in</button>
+  </form>
+  <p class="auth-alt">
+    <a href="{{ url_for('auth.request_code') }}" class="link">Send a new code</a>
+    <span class="auth-alt-sep">·</span>
+    <a href="{{ url_for('auth.login') }}" class="link">Use a password</a>
+  </p>
+</div>
+{% endblock %}
