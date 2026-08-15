@@ -1,6 +1,18 @@
 import os
+import time
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+
+# STM has no per-user timezone setting -- every datetime.now()/date.today()
+# call in the app uses the server's local clock. PythonAnywhere (and most
+# hosts) default that to UTC, which silently shifts every punch, login
+# stamp, and suggested logout time by however far the server is from the
+# user's real timezone. Pin it here so "now" in the app matches the user's
+# actual wall clock instead of the host's.
+TIMEZONE = os.environ.get("TIMEZONE", "Asia/Kolkata")
+os.environ["TZ"] = TIMEZONE
+if hasattr(time, "tzset"):
+    time.tzset()
 
 
 class Config:
