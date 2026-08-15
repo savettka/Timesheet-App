@@ -1,5 +1,6 @@
 import calendar
 import os
+import secrets
 import uuid
 from datetime import date, datetime, timedelta
 
@@ -45,6 +46,17 @@ def get_entries_for_range(user_id, start_date, end_date):
         TimeEntry.date <= end_date,
     ).all()
     return {e.date: e for e in entries}
+
+
+def generate_temp_password(length=12):
+    """A readable one-off password for an admin-initiated reset.
+
+    Uses `secrets` rather than `random` so the value can't be predicted from
+    other generated passwords, and drops characters that get misread when
+    someone reads a password out loud or copies it by hand (0/O, 1/l/I).
+    """
+    alphabet = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+    return "".join(secrets.choice(alphabet) for _ in range(length))
 
 
 def avatar_dir():
@@ -495,6 +507,19 @@ def settings():
             display_name = (request.form.get("display_name") or "").strip()
             user.display_name = display_name or user.username
 
+            # Lowercased so a code request matches regardless of how the
+            # address was typed, and checked for uniqueness so one address
+            # can never resolve to two accounts.
+            email = (request.form.get("email") or "").strip().lower() or None
+            if email != user.email:
+                clash = User.query.filter(
+                    User.email == email, User.id != user.id
+                ).first() if email else None
+                if clash:
+                    flash("That email address is already used by another account.", "error")
+                    return redirect(url_for("main.settings"))
+                user.email = email
+
             if request.form.get("remove_avatar"):
                 delete_avatar_file(user.avatar_filename)
                 user.avatar_filename = None
@@ -538,6 +563,7 @@ def settings():
                 abort(403)
             new_username = (request.form.get("new_username") or "").strip()
             new_display_name = (request.form.get("new_display_name") or "").strip()
+            new_email = (request.form.get("new_email") or "").strip().lower() or None
             new_password = request.form.get("new_user_password", "")
             new_confirm = request.form.get("new_user_confirm", "")
 
@@ -545,6 +571,8 @@ def settings():
                 flash("Username and password are required.", "error")
             elif User.query.filter_by(username=new_username).first():
                 flash("That username is already taken.", "error")
+            elif new_email and User.query.filter_by(email=new_email).first():
+                flash("That email address is already used by another account.", "error")
             elif len(new_password) < 6:
                 flash("Password must be at least 6 characters.", "error")
             elif new_password != new_confirm:
@@ -553,6 +581,7 @@ def settings():
                 new_user = User(
                     username=new_username,
                     display_name=new_display_name or new_username,
+                    email=new_email,
                     daily_target_hours=user.daily_target_hours,
                     weekly_target_hours=user.weekly_target_hours,
                     workdays=user.workdays,
@@ -561,6 +590,27 @@ def settings():
                 db.session.add(new_user)
                 db.session.commit()
                 flash(f"Added {new_user.display_name} as a new user.", "success")
+
+        elif form_type == "reset_password":
+            if not user.is_admin:
+                abort(403)
+            target_id = request.form.get("user_id", type=int)
+            if target_id == user.id:
+                # The admin changes their own password the normal way, where
+                # it's confirmed with the current one.
+                flash("Use 'Change password' to set your own password.", "error")
+            else:
+                target = db.session.get(User, target_id) if target_id else None
+                if target:
+                    temp_password = generate_temp_password()
+                    target.set_password(temp_password)
+                    db.session.commit()
+                    label = target.display_name or target.username
+                    flash(
+                        f"New password for {label}: {temp_password} — share it with them "
+                        "now, it isn't shown again. Ask them to change it in Settings.",
+                        "success",
+                    )
 
         elif form_type == "remove_user":
             if not user.is_admin:

@@ -31,13 +31,47 @@ This mirrors the logic in the original spreadsheet:
   holiday with a custom target.
 - **Dashboard** — today's hours, this week's progress bar toward your target, and a
   suggested logout time once you're close to (or past) the weekly target.
-- **Settings** — change daily/weekly targets, workdays, display name, and password, and
-  add or remove **team members**: each person gets their own login and their own
-  punches/history/targets, fully isolated from everyone else's.
+- **Settings** — change daily/weekly targets, workdays, display name, profile picture
+  and password.
+- **Team members (admin only)** — the first account created owns the install. Only it
+  can add people, reset their passwords, or remove them; everyone else never even sees
+  that other accounts exist. Each person's punches, history and targets are their own.
+- **Sign in with an emailed code** (optional) — see "Sign-in codes by email" below.
 - Modern UI with a **light/dark mode toggle** (remembers your choice), tuned for both
-  desktop and mobile.
-- Login required from the first visit — the first account you create is yours; add more
-  people from **Settings → Team members** afterwards.
+  desktop and mobile, and a proper home-screen icon on iOS and Android.
+
+## Sign-in codes by email (optional)
+
+Off by default. With it configured, the login page also offers "Email me a sign-in
+code": a 6-digit code is emailed and can be used instead of a password.
+
+Set these environment variables (or add them to the WSGI file before the app is
+imported), then reload the web app:
+
+```
+SMTP_USERNAME = your.address@gmail.com
+SMTP_PASSWORD = your-16-character-app-password
+MAIL_FROM     = your.address@gmail.com   # optional, defaults to SMTP_USERNAME
+```
+
+`SMTP_PASSWORD` must be a Google **App Password**, not your normal Gmail password:
+turn on 2-Step Verification on the Google account, then create one under
+Google Account → Security → App passwords. Gmail is the default host because
+PythonAnywhere's free tier only permits outbound mail to Google's servers; on a paid
+plan set `SMTP_HOST` / `SMTP_PORT` (and `SMTP_USE_SSL=1` for port 465) for any provider.
+
+Each user needs their email address filled in under **Settings → Profile** before they
+can receive a code.
+
+How the codes are kept safe:
+
+- generated with Python's `secrets` module, so they can't be predicted from earlier codes
+- stored only as a hash, so a leaked database exposes no usable codes
+- valid for 10 minutes, single-use, and replaced (not added to) when a new one is issued
+- dead after 5 wrong guesses, which is what makes a 6-digit code impractical to guess
+- one code per address per minute, and a cap per device per hour
+- the same response whether or not the address has an account, so the form can't be used
+  to discover who is registered
 
 ## Project structure
 

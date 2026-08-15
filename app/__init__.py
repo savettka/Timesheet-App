@@ -39,6 +39,13 @@ def _run_light_migrations():
             )
         if "avatar_filename" not in user_columns:
             statements.append("ALTER TABLE user ADD COLUMN avatar_filename VARCHAR(120)")
+        if "email" not in user_columns:
+            # Added without UNIQUE: SQLite can't add a unique column in place.
+            # The unique index below does the same job on an existing table.
+            statements.append("ALTER TABLE user ADD COLUMN email VARCHAR(200)")
+            statements.append(
+                "CREATE UNIQUE INDEX IF NOT EXISTS ix_user_email ON user (email)"
+            )
 
     if "break_segment" in table_names:
         # create_all() only adds indexes for tables it creates, so an existing

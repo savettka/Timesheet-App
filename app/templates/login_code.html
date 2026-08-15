@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% from "partials/logo.html" import stm_logo %}
+{% block title %}Sign in with a code{% endblock %}
+{% block auth_content %}
+<div class="auth-card">
+  <div class="auth-brand">
+    {{ stm_logo('logo-mark logo-lg') }}
+    <h1>STM</h1>
+    <span class="logo-tagline">Time Tracking App</span>
+    <p>Enter your email address and we'll send you a sign-in code.</p>
+  </div>
+  <form method="post" class="form">
+    <label class="field">
+      <span>Email address</span>
+      <input type="email" name="email" required autofocus autocomplete="email"
+             inputmode="email" placeholder="you@example.com">
+    </label>
+    <button type="submit" class="btn btn-primary btn-block">Email me a code</button>
+  </form>
+  <p class="auth-alt">
+    <a href="{{ url_for('auth.login') }}" class="link">Sign in with a password instead</a>
+  </p>
+</div>
+{% endblock %}

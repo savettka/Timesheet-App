@@ -23,6 +23,11 @@ class User(UserMixin, db.Model):
     # app/static/uploads/avatars/. None means "show initials instead".
     avatar_filename = db.Column(db.String(120), nullable=True)
 
+    # Where sign-in codes are sent. Stored lowercased so lookups are
+    # case-insensitive; unique so a code request can only ever match one
+    # account.
+    email = db.Column(db.String(200), unique=True, nullable=True, index=True)
+
     daily_target_hours = db.Column(db.Float, nullable=False, default=8.0)
     weekly_target_hours = db.Column(db.Float, nullable=False, default=48.0)
     workdays = db.Column(db.String(20), nullable=False, default=DEFAULT_WORKDAYS)
@@ -35,6 +40,9 @@ class User(UserMixin, db.Model):
 
     entries = db.relationship(
         "TimeEntry", backref="user", lazy=True, cascade="all, delete-orphan"
+    )
+    login_codes = db.relationship(
+        "LoginCode", backref="user", lazy=True, cascade="all, delete-orphan"
     )
 
     def set_password(self, raw_password):
@@ -106,3 +114,52 @@ class BreakSegment(db.Model):
 
     break_start = db.Column(db.Time, nullable=False)
     break_end = db.Column(db.Time, nullable=True)
+
+
+class LoginCode(db.Model):
+    """A one-time code emailed to a user so they can sign in without a password.
+
+    The code itself is never stored -- only a hash of it -- so reading the
+    database gives an attacker nothing usable. Each code is single-use, expires
+    quickly, and dies after a handful of wrong guesses, which is what stops a
+    six-digit code (a million combinations) from being brute-forced.
+    """
+
+    MAX_ATTEMPTS = 5
+    LIFETIME_MINUTES = 10
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(
+        db.Integer, db.ForeignKey("user.id"), nullable=False, index=True
+    )
+
+    code_hash = db.Column(db.String(255), nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    attempts = db.Column(db.Integer, nullable=False, default=0)
+    used_at = db.Column(db.DateTime, nullable=True)
+
+    def is_usable(self, now=None):
+        now = now or datetime.utcnow()
+        return (
+            self.used_at is None
+            and self.attempts < self.MAX_ATTEMPTS
+            and now < self.expires_at
+        )
+
+    def verify(self, submitted_code):
+        """Check a submitted code, counting the attempt either way.
+
+        Returns True only for a correct code on a still-usable record. The
+        attempt is recorded before the comparison so a caller that crashes
+        mid-check can't be used to get unlimited free guesses.
+        """
+        if not self.is_usable():
+            return False
+        self.attempts += 1
+        # check_password_hash compares in constant time, so a wrong code can't
+        # be narrowed down by how long the check took.
+        if check_password_hash(self.code_hash, submitted_code):
+            self.used_at = datetime.utcnow()
+            return True
+        return False

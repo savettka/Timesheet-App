@@ -20,5 +20,10 @@
     </label>
     <button type="submit" class="btn btn-primary btn-block">Sign in</button>
   </form>
+  {% if code_login_available %}
+  <p class="auth-alt">
+    <a href="{{ url_for('auth.request_code') }}" class="link">Email me a sign-in code instead</a>
+  </p>
+  {% endif %}
 </div>
 {% endblock %}
