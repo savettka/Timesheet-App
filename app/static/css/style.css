@@ -76,8 +76,9 @@
    Reset & base
    ========================================================================== */
 
-*, *::before, *::after { box-sizing: border-box; }
+*, *::before, *::after { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { height: 100%; }
+html { -webkit-text-size-adjust: 100%; }
 body {
   margin: 0;
   font-family: var(--font-body);
@@ -472,6 +473,8 @@ fieldset.field { border: none; padding: 0; margin: 0; }
 
 input[type="text"], input[type="password"], input[type="number"],
 input[type="time"], input[type="date"], textarea, select {
+  -webkit-appearance: none;
+  appearance: none;
   border: 1px solid var(--card-border);
   background: var(--bg-soft);
   color: var(--text);
@@ -488,6 +491,14 @@ input:focus, textarea:focus, select:focus {
 }
 input:disabled { opacity: 0.6; }
 textarea { resize: vertical; }
+
+/* Hide the native number-input spinner so it matches the other pill inputs. */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] { -moz-appearance: textfield; }
 
 .checkbox-row { display: flex; flex-wrap: wrap; gap: 8px; }
 .checkbox-chip {
@@ -617,6 +628,13 @@ textarea { resize: vertical; }
 }
 
 @media (max-width: 600px) {
+  /* iOS Safari zooms the whole page in on focus if an input's font is
+     under 16px -- keep inputs at 16px on phones so tapping a field doesn't
+     suddenly zoom and shift the whole layout. */
+  input[type="text"], input[type="password"], input[type="number"],
+  input[type="time"], input[type="date"], textarea, select {
+    font-size: 16px;
+  }
   .card { padding: 20px 18px; border-radius: var(--radius-md); }
   .card-clock { padding: 26px 18px; }
   .card-heading {

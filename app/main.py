@@ -65,9 +65,13 @@ def build_dashboard_context():
         )
         suggestion = {
             "reached": reached,
-            "suggested_time": suggested_dt.strftime("%H:%M") if suggested_dt else None,
+            "suggested_time": logic.fmt_suggested_datetime(suggested_dt, open_entry.date),
             "still_needed_hours": still_needed,
         }
+
+    saturday = logic.saturday_plan(
+        user, entries_by_date, week_start, weekly["target_hours"], date.today(), now=now
+    )
 
     open_break = open_entry.open_break() if open_entry else None
     open_entry_closed_break_seconds = (
@@ -90,6 +94,7 @@ def build_dashboard_context():
         "today_target": today_target,
         "today_worked": today_worked,
         "suggestion": suggestion,
+        "saturday": saturday,
         "recent_entries": recent_entries,
         "now": now,
         "fmt_hours": logic.fmt_hours,
@@ -145,6 +150,11 @@ def api_status():
             * 3600
         ),
         "suggestion": ctx["suggestion"],
+        "saturday": (
+            {**ctx["saturday"], "saturday_date": ctx["saturday"]["saturday_date"].isoformat()}
+            if ctx["saturday"]
+            else None
+        ),
         "server_time": now.strftime("%H:%M:%S"),
     }
     return jsonify(payload)
@@ -404,6 +414,7 @@ def settings():
             user.daily_target_hours = max(0.0, daily)
             user.weekly_target_hours = max(0.0, weekly)
             user.workdays = ",".join(sorted(set(workdays))) if workdays else ""
+            user.saturday_login_hint = parse_time_field(request.form.get("saturday_login_hint"))
             db.session.commit()
             flash("Targets updated.", "success")
 

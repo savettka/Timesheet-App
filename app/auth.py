@@ -1,5 +1,5 @@
 from flask import Blueprint, flash, redirect, render_template, request, url_for
-from flask_login import login_required, login_user, logout_user
+from flask_login import current_user, login_required, login_user, logout_user
 
 from app import db
 from app.models import User
@@ -9,6 +9,8 @@ auth_bp = Blueprint("auth", __name__)
 
 @auth_bp.route("/setup", methods=["GET", "POST"])
 def setup():
+    if current_user.is_authenticated:
+        return redirect(url_for("main.dashboard"))
     if User.query.first() is not None:
         return redirect(url_for("auth.login"))
 
@@ -43,6 +45,8 @@ def setup():
 
 @auth_bp.route("/login", methods=["GET", "POST"])
 def login():
+    if current_user.is_authenticated:
+        return redirect(url_for("main.dashboard"))
     if User.query.first() is None:
         return redirect(url_for("auth.setup"))
 
