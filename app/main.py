@@ -1,7 +1,19 @@
 import calendar
+import os
+import uuid
 from datetime import date, datetime, timedelta
 
-from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
+from flask import (
+    Blueprint,
+    abort,
+    current_app,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
 from flask_login import current_user, login_required
 
 from app import db
@@ -9,6 +21,10 @@ from app import logic
 from app.models import BreakSegment, TimeEntry, User
 
 main_bp = Blueprint("main", __name__)
+
+AVATAR_SUBDIR = os.path.join("uploads", "avatars")
+AVATAR_PIXELS = 256
+ALLOWED_AVATAR_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
 
 
 # ---------------------------------------------------------------- helpers
@@ -29,6 +45,63 @@ def get_entries_for_range(user_id, start_date, end_date):
         TimeEntry.date <= end_date,
     ).all()
     return {e.date: e for e in entries}
+
+
+def avatar_dir():
+    path = os.path.join(current_app.static_folder, AVATAR_SUBDIR)
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
+def delete_avatar_file(filename):
+    """Remove a stored avatar, ignoring one that's already gone."""
+    if not filename:
+        return
+    # Guard against a stored value ever containing a path -- only ever
+    # delete inside the avatars directory.
+    safe = os.path.basename(filename)
+    try:
+        os.remove(os.path.join(avatar_dir(), safe))
+    except OSError:
+        pass
+
+
+def save_avatar(file_storage):
+    """Validate, square-crop and store an uploaded profile picture.
+
+    Returns (filename, error_message); exactly one of the two is None.
+    Re-encoding through Pillow both shrinks the phone-sized photos people
+    actually upload and guarantees the stored file really is an image.
+    """
+    filename = (file_storage.filename or "").strip()
+    if not filename:
+        return None, None
+
+    ext = os.path.splitext(filename)[1].lower()
+    if ext not in ALLOWED_AVATAR_EXTENSIONS:
+        return None, "Profile picture must be a PNG, JPG, GIF or WEBP image."
+
+    try:
+        from PIL import Image, ImageOps
+    except ImportError:
+        return None, (
+            "Image support isn't installed on the server yet. Run "
+            "'pip install -r requirements.txt' and reload the web app."
+        )
+
+    try:
+        image = Image.open(file_storage.stream)
+        image = ImageOps.exif_transpose(image)  # honour phone photo rotation
+        image = image.convert("RGB")
+        image = ImageOps.fit(
+            image, (AVATAR_PIXELS, AVATAR_PIXELS), method=Image.LANCZOS, centering=(0.5, 0.4)
+        )
+    except Exception:
+        return None, "That file doesn't look like an image we can read."
+
+    stored_name = f"{uuid.uuid4().hex}.jpg"
+    image.save(os.path.join(avatar_dir(), stored_name), "JPEG", quality=85, optimize=True)
+    return stored_name, None
 
 
 def parse_time_field(value):
@@ -421,6 +494,24 @@ def settings():
         elif form_type == "profile":
             display_name = (request.form.get("display_name") or "").strip()
             user.display_name = display_name or user.username
+
+            if request.form.get("remove_avatar"):
+                delete_avatar_file(user.avatar_filename)
+                user.avatar_filename = None
+                db.session.commit()
+                flash("Profile picture removed.", "success")
+                return redirect(url_for("main.settings"))
+
+            upload = request.files.get("avatar")
+            if upload and upload.filename:
+                stored_name, error = save_avatar(upload)
+                if error:
+                    flash(error, "error")
+                    return redirect(url_for("main.settings"))
+                # Only drop the old file once the new one is safely written.
+                delete_avatar_file(user.avatar_filename)
+                user.avatar_filename = stored_name
+
             db.session.commit()
             flash("Profile updated.", "success")
 
@@ -441,6 +532,10 @@ def settings():
                 flash("Password changed.", "success")
 
         elif form_type == "add_user":
+            # Hiding the form isn't access control -- a non-admin can still
+            # post this by hand, so the check has to live here.
+            if not user.is_admin:
+                abort(403)
             new_username = (request.form.get("new_username") or "").strip()
             new_display_name = (request.form.get("new_display_name") or "").strip()
             new_password = request.form.get("new_user_password", "")
@@ -468,6 +563,8 @@ def settings():
                 flash(f"Added {new_user.display_name} as a new user.", "success")
 
         elif form_type == "remove_user":
+            if not user.is_admin:
+                abort(403)
             target_id = request.form.get("user_id", type=int)
             if target_id == user.id:
                 flash("You can't remove your own account.", "error")
@@ -475,11 +572,14 @@ def settings():
                 target = db.session.get(User, target_id) if target_id else None
                 if target:
                     label = target.display_name or target.username
+                    delete_avatar_file(target.avatar_filename)
                     db.session.delete(target)
                     db.session.commit()
                     flash(f"Removed {label}.", "success")
 
         return redirect(url_for("main.settings"))
 
-    all_users = User.query.order_by(User.username).all()
+    # Non-admins are never sent the list, so other accounts aren't merely
+    # hidden in the markup -- they never reach the page.
+    all_users = User.query.order_by(User.username).all() if user.is_admin else []
     return render_template("settings.html", user=user, all_users=all_users)

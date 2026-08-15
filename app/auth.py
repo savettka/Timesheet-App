@@ -32,7 +32,10 @@ def setup():
             flash(error, "error")
             return render_template("setup.html", username=username, display_name=display_name)
 
-        user = User(username=username, display_name=display_name or username)
+        # Whoever runs setup owns the install and manages everyone else.
+        user = User(
+            username=username, display_name=display_name or username, is_admin=True
+        )
         user.set_password(password)
         db.session.add(user)
         db.session.commit()

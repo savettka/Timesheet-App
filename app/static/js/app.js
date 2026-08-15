@@ -142,11 +142,30 @@
     });
   }
 
+  // ------------------------------------------------- profile picture picker
+  function initAvatarPicker() {
+    var input = document.getElementById("avatar-input");
+    var label = document.getElementById("avatar-filename");
+    if (!input || !label) return;
+
+    var original = label.textContent;
+    input.addEventListener("change", function () {
+      if (!input.files || !input.files.length) {
+        label.textContent = original;
+        return;
+      }
+      // Confirm the pick, since the file dialog gives no other feedback
+      // until the form is actually saved.
+      label.textContent = input.files[0].name + " — press Save profile";
+    });
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     initTheme();
     initHamburger();
     initLiveTimer();
     initStatusPoll();
     initBreakRows();
+    initAvatarPicker();
   });
 })();

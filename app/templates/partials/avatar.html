@@ -1,0 +1,13 @@
+{#
+  A user's avatar: their uploaded photo when they have one, otherwise
+  their initials on the brand gradient.
+#}
+{% macro avatar(user, class="avatar") %}
+  {%- if user.avatar_filename -%}
+    <img class="{{ class }} avatar-photo"
+         src="{{ url_for('static', filename='uploads/avatars/' ~ user.avatar_filename) }}"
+         alt="{{ user.display_name or user.username }}">
+  {%- else -%}
+    <span class="{{ class }}">{{ user.initials }}</span>
+  {%- endif -%}
+{% endmacro %}
