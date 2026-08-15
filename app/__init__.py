@@ -34,6 +34,14 @@ def _run_light_migrations():
         if "saturday_login_hint" not in user_columns:
             statements.append("ALTER TABLE user ADD COLUMN saturday_login_hint TIME")
 
+    if "break_segment" in table_names:
+        # create_all() only adds indexes for tables it creates, so an existing
+        # database needs this one added explicitly.
+        statements.append(
+            "CREATE INDEX IF NOT EXISTS ix_break_segment_entry_id "
+            "ON break_segment (entry_id)"
+        )
+
     if statements:
         with db.engine.begin() as conn:
             for statement in statements:

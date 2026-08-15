@@ -80,7 +80,12 @@ class TimeEntry(db.Model):
 
 class BreakSegment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    entry_id = db.Column(db.Integer, db.ForeignKey("time_entry.id"), nullable=False)
+    # Indexed: every dashboard/history render loads the breaks for each entry
+    # on screen, and without this SQLite scans every break row in the table
+    # (all users, all history) once per entry.
+    entry_id = db.Column(
+        db.Integer, db.ForeignKey("time_entry.id"), nullable=False, index=True
+    )
 
     break_start = db.Column(db.Time, nullable=False)
     break_end = db.Column(db.Time, nullable=True)
