@@ -18,6 +18,10 @@ class User(UserMixin, db.Model):
     weekly_target_hours = db.Column(db.Float, nullable=False, default=48.0)
     workdays = db.Column(db.String(20), nullable=False, default=DEFAULT_WORKDAYS)
 
+    # Optional "usual" Saturday start time, used only to project a Saturday
+    # logout clock-time before Saturday actually starts (Settings).
+    saturday_login_hint = db.Column(db.Time, nullable=True)
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     entries = db.relationship(

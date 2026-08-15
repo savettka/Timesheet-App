@@ -144,6 +144,97 @@ def weekly_totals(user, entries_by_date, any_date, now=None):
     }
 
 
+def saturday_plan(user, entries_by_date, week_start, weekly_target_total, today, now=None):
+    """A forward-looking plan for when Saturday's shift can end, visible on
+    any day of the week (not just Saturday itself) so it can be planned for
+    in advance.
+
+    Assumes the plan holds for every remaining weekday up to Friday (hits
+    the normal/overridden target for today and any day still to come, keeps
+    whatever actually happened on days already passed), then works out how
+    much of the weekly target is left for Saturday. Once Saturday itself
+    has actually started, switches to the exact live figure instead of a
+    projection.
+
+    Returns ``None`` if Saturday isn't a target day at all (e.g. the user
+    doesn't work Saturdays and hasn't overridden it).
+    """
+    now = now or datetime.now()
+    saturday_date = week_start + timedelta(days=5)
+    sunday_date = week_start + timedelta(days=6)
+    saturday_entry = entries_by_date.get(saturday_date)
+
+    if target_hours_for(user, saturday_date, saturday_entry) <= 0:
+        return None
+
+    banked = 0.0
+    for d in week_dates(week_start):
+        if d in (saturday_date, sunday_date):
+            continue
+        entry = entries_by_date.get(d)
+        if d < today:
+            banked += entry_total_hours(entry, now=now) if entry else 0.0
+        else:
+            # Today or a day still to come: assume the plan holds.
+            banked += target_hours_for(user, d, entry)
+    if sunday_date < today:
+        sunday_entry = entries_by_date.get(sunday_date)
+        banked += entry_total_hours(sunday_entry, now=now) if sunday_entry else 0.0
+
+    remaining_for_saturday = max(0.0, weekly_target_total - banked)
+
+    if saturday_entry and saturday_entry.login_time and not saturday_entry.logout_time:
+        reached, suggested_dt, still_needed = suggested_logout(
+            saturday_entry, banked, weekly_target_total, now=now
+        )
+        return {
+            "mode": "live",
+            "saturday_date": saturday_date,
+            "reached": reached,
+            "suggested_time": fmt_suggested_datetime(suggested_dt, saturday_date),
+            "still_needed_hours": still_needed,
+        }
+
+    if saturday_entry and saturday_entry.logout_time:
+        worked = entry_total_hours(saturday_entry)
+        return {
+            "mode": "done",
+            "saturday_date": saturday_date,
+            "worked_hours": worked,
+            "week_complete": (banked + worked) >= weekly_target_total,
+        }
+
+    projected_dt = None
+    if remaining_for_saturday > 0 and user.saturday_login_hint:
+        login_dt = datetime.combine(saturday_date, user.saturday_login_hint)
+        projected_dt = login_dt + timedelta(hours=remaining_for_saturday)
+
+    return {
+        "mode": "projection",
+        "saturday_date": saturday_date,
+        "remaining_hours": remaining_for_saturday,
+        "projected_time": fmt_suggested_datetime(projected_dt, saturday_date),
+        "has_login_hint": bool(user.saturday_login_hint),
+        "reached": remaining_for_saturday <= 0,
+    }
+
+
+def fmt_suggested_datetime(dt, reference_date=None):
+    """Format a suggested clock-out datetime for display, spelling out the
+    date whenever it falls on a different day than ``reference_date``.
+
+    Without this, a logout time that spills into tomorrow (e.g. someone is
+    badly behind on hours) would render as a bare "HH:MM" and read as
+    "later today" when it's actually a day or more away.
+    """
+    if dt is None:
+        return None
+    reference_date = reference_date or dt.date()
+    if dt.date() == reference_date:
+        return dt.strftime("%H:%M")
+    return dt.strftime("%H:%M on %a %d %b")
+
+
 def suggested_logout(open_entry, weekly_before_today, weekly_target_hours, now=None):
     """For a currently open (punched-in) entry, suggest a logout time that
     would exactly hit the weekly target, given hours already banked earlier

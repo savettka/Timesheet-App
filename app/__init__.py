@@ -19,15 +19,20 @@ def _run_light_migrations():
     the current schema) and a no-op on repeat runs (columns already exist).
     """
     inspector = sa.inspect(db.engine)
-    if "time_entry" not in inspector.get_table_names():
-        return
-
-    existing_columns = {c["name"] for c in inspector.get_columns("time_entry")}
+    table_names = inspector.get_table_names()
     statements = []
-    if "target_override" not in existing_columns:
-        statements.append("ALTER TABLE time_entry ADD COLUMN target_override FLOAT")
-    if "leave_label" not in existing_columns:
-        statements.append("ALTER TABLE time_entry ADD COLUMN leave_label VARCHAR(60)")
+
+    if "time_entry" in table_names:
+        entry_columns = {c["name"] for c in inspector.get_columns("time_entry")}
+        if "target_override" not in entry_columns:
+            statements.append("ALTER TABLE time_entry ADD COLUMN target_override FLOAT")
+        if "leave_label" not in entry_columns:
+            statements.append("ALTER TABLE time_entry ADD COLUMN leave_label VARCHAR(60)")
+
+    if "user" in table_names:
+        user_columns = {c["name"] for c in inspector.get_columns("user")}
+        if "saturday_login_hint" not in user_columns:
+            statements.append("ALTER TABLE user ADD COLUMN saturday_login_hint TIME")
 
     if statements:
         with db.engine.begin() as conn:

@@ -32,6 +32,13 @@
           {% endfor %}
         </div>
       </fieldset>
+      <label class="field">
+        <span>Usual Saturday login time <em>(optional)</em></span>
+        <input type="time" name="saturday_login_hint"
+               value="{{ user.saturday_login_hint.strftime('%H:%M') if user.saturday_login_hint else '' }}">
+      </label>
+      <p class="hint">Set this so the dashboard can show an actual clock-out time for Saturday, planned
+        from earlier in the week &mdash; not just once you've punched in.</p>
       <div class="form-actions">
         <button type="submit" class="btn btn-primary">Save targets</button>
       </div>
