@@ -116,6 +116,24 @@ def create_app(config_object="config.Config"):
         flash("That image is too large -- please pick one under 8 MB.", "error")
         return redirect(url_for("main.settings"))
 
+    @app.url_defaults
+    def add_static_version(endpoint, values):
+        """Stamp every static URL with the file's modification time.
+
+        Browsers cache CSS and JS hard, so after a deploy the page keeps
+        using the old stylesheet until someone force-refreshes. Changing
+        the file changes the URL, which makes the browser fetch it again
+        on its own.
+        """
+        if endpoint != "static" or "filename" not in values:
+            return
+        try:
+            values["v"] = int(
+                os.stat(os.path.join(app.static_folder, values["filename"])).st_mtime
+            )
+        except OSError:
+            pass  # missing file - let the request 404 on its own terms
+
     @app.context_processor
     def inject_globals():
         from datetime import date

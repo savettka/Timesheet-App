@@ -100,10 +100,21 @@
       <div class="banner banner-success" id="weekly-banner">
         🎉 You've hit your {{ weekly.target_hours | round(1) }}h weekly target{% if open_entry %} &mdash; you can log out any time{% endif %}.
       </div>
-    {% elif suggestion %}
+    {% elif suggestion and suggestion.lands_today %}
       <div class="banner banner-info" id="weekly-banner">
         {{ fmt_hours(weekly.remaining_hours) }} left this week. At this pace, punch out around
         <strong>{{ suggestion.suggested_time }}</strong> today to hit your target.
+      </div>
+    {% elif suggestion and not suggestion.today_target_met %}
+      <div class="banner banner-info" id="weekly-banner">
+        {{ fmt_hours(weekly.remaining_hours) }} left this week &mdash; more than today can cover.
+        Punch out around <strong>{{ suggestion.today_time }}</strong> to finish today's
+        {{ suggestion.today_target_fmt }}.
+      </div>
+    {% elif suggestion %}
+      <div class="banner banner-info" id="weekly-banner">
+        Today's hours are done. {{ fmt_hours(weekly.remaining_hours) }} left this week &mdash;
+        see the Saturday plan below.
       </div>
     {% else %}
       <div class="banner banner-muted" id="weekly-banner">

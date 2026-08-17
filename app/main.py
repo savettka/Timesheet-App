@@ -148,10 +148,21 @@ def build_dashboard_context():
         reached, suggested_dt, still_needed = logic.suggested_logout(
             open_entry, weekly_before_today, weekly["target_hours"], now=now
         )
+        # A suggested clock-out that lands on a later day is arithmetic, not
+        # advice -- it assumes working straight through without ever logging
+        # out. Early in the week that is always the case, so fall back to
+        # today's own standard hours, which is a target today can actually meet.
+        lands_today = suggested_dt is not None and suggested_dt.date() == now.date()
+        today_remaining = today_target - today_worked
+        today_dt = now + timedelta(hours=today_remaining) if today_remaining > 0 else None
         suggestion = {
             "reached": reached,
+            "lands_today": lands_today,
             "suggested_time": logic.fmt_suggested_datetime(suggested_dt, open_entry.date),
             "still_needed_hours": still_needed,
+            "today_target_met": today_remaining <= 0,
+            "today_time": logic.fmt_suggested_datetime(today_dt, open_entry.date),
+            "today_target_fmt": logic.fmt_hours(today_target),
         }
 
     saturday = logic.saturday_plan(

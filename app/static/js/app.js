@@ -92,9 +92,16 @@
             if (data.weekly_complete) {
               banner.className = "banner banner-success";
               banner.textContent = "🎉 You've hit your weekly target" + (data.is_logged_in ? " — you can log out any time." : ".");
-            } else if (data.suggestion && !data.suggestion.reached) {
+            } else if (data.suggestion && !data.suggestion.reached && data.suggestion.lands_today) {
               banner.className = "banner banner-info";
               banner.innerHTML = data.weekly_remaining_fmt + " left this week. At this pace, punch out around <strong>" + data.suggestion.suggested_time + "</strong> today to hit your target.";
+            } else if (data.suggestion && !data.suggestion.reached && !data.suggestion.today_target_met) {
+              // The weekly figure can't be reached today, so aim at today's own hours.
+              banner.className = "banner banner-info";
+              banner.innerHTML = data.weekly_remaining_fmt + " left this week — more than today can cover. Punch out around <strong>" + data.suggestion.today_time + "</strong> to finish today's " + data.suggestion.today_target_fmt + ".";
+            } else if (data.suggestion && !data.suggestion.reached) {
+              banner.className = "banner banner-info";
+              banner.textContent = "Today's hours are done. " + data.weekly_remaining_fmt + " left this week — see the Saturday plan below.";
             } else {
               banner.className = "banner banner-muted";
               banner.textContent = data.weekly_remaining_fmt + " left to reach your weekly target.";
