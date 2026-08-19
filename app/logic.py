@@ -236,6 +236,17 @@ def saturday_plan(user, entries_by_date, week_start, weekly_target_total, today,
     }
 
 
+def fmt_clock(value):
+    """A time of day on a 12-hour clock: 9:05 AM, 12:30 PM, 6:00 PM.
+
+    Written out rather than using %I/%p so there's no leading zero and no
+    dependence on the machine's locale.
+    """
+    hour = value.hour % 12 or 12
+    suffix = "AM" if value.hour < 12 else "PM"
+    return f"{hour}:{value.minute:02d} {suffix}"
+
+
 def fmt_suggested_datetime(dt, reference_date=None):
     """Format a suggested clock-out datetime for display, spelling out the
     date whenever it falls on a different day than ``reference_date``.
@@ -248,8 +259,8 @@ def fmt_suggested_datetime(dt, reference_date=None):
         return None
     reference_date = reference_date or dt.date()
     if dt.date() == reference_date:
-        return dt.strftime("%H:%M")
-    return dt.strftime("%H:%M on %a %d %b")
+        return fmt_clock(dt)
+    return f"{fmt_clock(dt)} on {dt.strftime('%a %d %b')}"
 
 
 def suggested_logout(
@@ -295,4 +306,4 @@ def fmt_hours(value):
 
 
 def fmt_time(t):
-    return t.strftime("%H:%M") if t else "--:--"
+    return fmt_clock(t) if t else "--:--"
