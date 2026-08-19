@@ -36,6 +36,12 @@ class User(UserMixin, db.Model):
     # logout clock-time before Saturday actually starts (Settings).
     saturday_login_hint = db.Column(db.Time, nullable=True)
 
+    # The break normally taken, used to push suggested clock-out times later
+    # so they hold even before the break has been recorded. These never touch
+    # recorded hours -- those always come from breaks actually logged.
+    weekday_break_minutes = db.Column(db.Integer, nullable=False, default=60)
+    saturday_break_minutes = db.Column(db.Integer, nullable=False, default=30)
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     entries = db.relationship(
@@ -56,6 +62,14 @@ class User(UserMixin, db.Model):
 
     def target_hours_for_weekday(self, weekday):
         return self.daily_target_hours if weekday in self.workday_set() else 0.0
+
+    def expected_break_hours_for(self, weekday):
+        """The break normally taken on this weekday, in hours. Saturday (5)
+        and Sunday (6) use the shorter weekend allowance."""
+        minutes = (
+            self.saturday_break_minutes if weekday >= 5 else self.weekday_break_minutes
+        )
+        return max(0, minutes or 0) / 60.0
 
     @property
     def initials(self):

@@ -74,6 +74,19 @@ def entry_total_hours(entry, now=None):
     return max(0.0, raw - brk)
 
 
+def unrecorded_break_hours(user, entry_date, entry=None, now=None):
+    """How much of the day's usual break is still to come.
+
+    A clock-out suggestion has to allow for the break that will be taken but
+    hasn't been logged yet, or it lands an hour early. Break time already
+    recorded counts against the allowance, so the suggestion doesn't jump
+    later the moment a real break is logged.
+    """
+    expected = user.expected_break_hours_for(entry_date.weekday())
+    taken = entry_break_hours(entry, now=now) if entry is not None else 0.0
+    return max(0.0, expected - taken)
+
+
 def entry_target_hours(user, entry_date):
     """The default, weekday-based target for a date (ignores any override)."""
     return user.target_hours_for_weekday(entry_date.weekday())
@@ -185,7 +198,7 @@ def saturday_plan(user, entries_by_date, week_start, weekly_target_total, today,
 
     if saturday_entry and saturday_entry.login_time and not saturday_entry.logout_time:
         reached, suggested_dt, still_needed = suggested_logout(
-            saturday_entry, banked, weekly_target_total, now=now
+            saturday_entry, banked, weekly_target_total, now=now, user=user
         )
         return {
             "mode": "live",
@@ -205,9 +218,13 @@ def saturday_plan(user, entries_by_date, week_start, weekly_target_total, today,
         }
 
     projected_dt = None
+    saturday_break = unrecorded_break_hours(user, saturday_date, saturday_entry, now=now)
     if remaining_for_saturday > 0 and user.saturday_login_hint:
         login_dt = datetime.combine(saturday_date, user.saturday_login_hint)
-        projected_dt = login_dt + timedelta(hours=remaining_for_saturday)
+        # Sitting at the desk for the work plus the usual Saturday break.
+        projected_dt = login_dt + timedelta(
+            hours=remaining_for_saturday + saturday_break
+        )
 
     return {
         "mode": "projection",
@@ -235,10 +252,16 @@ def fmt_suggested_datetime(dt, reference_date=None):
     return dt.strftime("%H:%M on %a %d %b")
 
 
-def suggested_logout(open_entry, weekly_before_today, weekly_target_hours, now=None):
+def suggested_logout(
+    open_entry, weekly_before_today, weekly_target_hours, now=None, user=None
+):
     """For a currently open (punched-in) entry, suggest a logout time that
     would exactly hit the weekly target, given hours already banked earlier
     in the week (``weekly_before_today``, i.e. not counting today).
+
+    When ``user`` is given, the clock-out time also allows for whatever is
+    left of the day's usual break, since that time will be spent but doesn't
+    count as worked.
 
     Returns (already_reached: bool, suggested_dt: datetime | None,
     hours_remaining_after_now: float).
@@ -251,8 +274,12 @@ def suggested_logout(open_entry, weekly_before_today, weekly_target_hours, now=N
         return True, now, 0.0
 
     still_needed = remaining_for_week - today_worked_so_far
-    # Assumes no further breaks between now and logout.
-    suggested_dt = now + timedelta(hours=still_needed)
+    break_to_come = (
+        unrecorded_break_hours(user, open_entry.date, open_entry, now=now)
+        if user is not None
+        else 0.0
+    )
+    suggested_dt = now + timedelta(hours=still_needed + break_to_come)
     return False, suggested_dt, still_needed
 
 

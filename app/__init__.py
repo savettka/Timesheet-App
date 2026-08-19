@@ -39,6 +39,16 @@ def _run_light_migrations():
             )
         if "avatar_filename" not in user_columns:
             statements.append("ALTER TABLE user ADD COLUMN avatar_filename VARCHAR(120)")
+        if "weekday_break_minutes" not in user_columns:
+            statements.append(
+                "ALTER TABLE user ADD COLUMN weekday_break_minutes "
+                "INTEGER NOT NULL DEFAULT 60"
+            )
+        if "saturday_break_minutes" not in user_columns:
+            statements.append(
+                "ALTER TABLE user ADD COLUMN saturday_break_minutes "
+                "INTEGER NOT NULL DEFAULT 30"
+            )
         if "email" not in user_columns:
             # Added without UNIQUE: SQLite can't add a unique column in place.
             # The unique index below does the same job on an existing table.
