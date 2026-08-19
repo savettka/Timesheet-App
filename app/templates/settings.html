@@ -40,6 +40,21 @@
       </label>
       <p class="hint">Set this so the dashboard can show an actual clock-out time for Saturday, planned
         from earlier in the week &mdash; not just once you've punched in.</p>
+      <div class="field-row">
+        <label class="field">
+          <span>Usual break, Mon&ndash;Fri (minutes)</span>
+          <input type="number" step="5" min="0" max="1440" name="weekday_break_minutes"
+                 value="{{ user.weekday_break_minutes }}">
+        </label>
+        <label class="field">
+          <span>Usual break, Saturday (minutes)</span>
+          <input type="number" step="5" min="0" max="1440" name="saturday_break_minutes"
+                 value="{{ user.saturday_break_minutes }}">
+        </label>
+      </div>
+      <p class="hint">Suggested clock-out times allow for this break even before you've recorded one,
+        so the estimate holds. Break time you do record counts towards it. Your recorded hours are
+        never affected &mdash; those always come from breaks you actually log.</p>
       <div class="form-actions">
         <button type="submit" class="btn btn-primary">Save targets</button>
       </div>

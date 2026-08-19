@@ -146,7 +146,7 @@ def build_dashboard_context():
         worked_today_in_week = logic.entry_total_hours(open_entry, now=now)
         weekly_before_today = weekly["worked_hours"] - worked_today_in_week
         reached, suggested_dt, still_needed = logic.suggested_logout(
-            open_entry, weekly_before_today, weekly["target_hours"], now=now
+            open_entry, weekly_before_today, weekly["target_hours"], now=now, user=user
         )
         # A suggested clock-out that lands on a later day is arithmetic, not
         # advice -- it assumes working straight through without ever logging
@@ -154,7 +154,16 @@ def build_dashboard_context():
         # today's own standard hours, which is a target today can actually meet.
         lands_today = suggested_dt is not None and suggested_dt.date() == now.date()
         today_remaining = today_target - today_worked
-        today_dt = now + timedelta(hours=today_remaining) if today_remaining > 0 else None
+        # Same allowance as the weekly suggestion: the break still to be taken
+        # is time at the desk that won't count as worked.
+        break_to_come = logic.unrecorded_break_hours(
+            user, open_entry.date, open_entry, now=now
+        )
+        today_dt = (
+            now + timedelta(hours=today_remaining + break_to_come)
+            if today_remaining > 0
+            else None
+        )
         suggestion = {
             "reached": reached,
             "lands_today": lands_today,
@@ -163,6 +172,9 @@ def build_dashboard_context():
             "today_target_met": today_remaining <= 0,
             "today_time": logic.fmt_suggested_datetime(today_dt, open_entry.date),
             "today_target_fmt": logic.fmt_hours(today_target),
+            "break_allowance_fmt": (
+                logic.fmt_hours(break_to_come) if break_to_come > 0 else None
+            ),
         }
 
     saturday = logic.saturday_plan(
@@ -506,9 +518,20 @@ def settings():
                 flash("Please enter valid numbers.", "error")
                 return redirect(url_for("main.settings"))
 
+            try:
+                weekday_break = int(request.form.get("weekday_break_minutes", 60) or 0)
+                saturday_break = int(request.form.get("saturday_break_minutes", 30) or 0)
+            except ValueError:
+                flash("Please enter break lengths in whole minutes.", "error")
+                return redirect(url_for("main.settings"))
+
             workdays = request.form.getlist("workdays")
             user.daily_target_hours = max(0.0, daily)
             user.weekly_target_hours = max(0.0, weekly)
+            # Capped at a day: a longer "break" would push every suggestion
+            # past midnight rather than mean anything useful.
+            user.weekday_break_minutes = min(1440, max(0, weekday_break))
+            user.saturday_break_minutes = min(1440, max(0, saturday_break))
             user.workdays = ",".join(sorted(set(workdays))) if workdays else ""
             user.saturday_login_hint = parse_time_field(request.form.get("saturday_login_hint"))
             db.session.commit()

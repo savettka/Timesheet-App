@@ -72,6 +72,14 @@
   }
 
   // ---------------------------------------------------------- status poll
+  // Says how much break a suggested clock-out time is allowing for, so the
+  // number can be reconciled against the hours worked.
+  function breakNote(suggestion) {
+    return suggestion.break_allowance_fmt
+      ? ", including " + suggestion.break_allowance_fmt + " of break"
+      : "";
+  }
+
   function initStatusPoll() {
     if (!window.STM_STATUS_URL) return;
 
@@ -94,11 +102,11 @@
               banner.textContent = "🎉 You've hit your weekly target" + (data.is_logged_in ? " — you can log out any time." : ".");
             } else if (data.suggestion && !data.suggestion.reached && data.suggestion.lands_today) {
               banner.className = "banner banner-info";
-              banner.innerHTML = data.weekly_remaining_fmt + " left this week. At this pace, punch out around <strong>" + data.suggestion.suggested_time + "</strong> today to hit your target.";
+              banner.innerHTML = data.weekly_remaining_fmt + " left this week. At this pace, punch out around <strong>" + data.suggestion.suggested_time + "</strong> today to hit your target" + breakNote(data.suggestion) + ".";
             } else if (data.suggestion && !data.suggestion.reached && !data.suggestion.today_target_met) {
               // The weekly figure can't be reached today, so aim at today's own hours.
               banner.className = "banner banner-info";
-              banner.innerHTML = data.weekly_remaining_fmt + " left this week — more than today can cover. Punch out around <strong>" + data.suggestion.today_time + "</strong> to finish today's " + data.suggestion.today_target_fmt + ".";
+              banner.innerHTML = data.weekly_remaining_fmt + " left this week — more than today can cover. Punch out around <strong>" + data.suggestion.today_time + "</strong> to finish today's " + data.suggestion.today_target_fmt + breakNote(data.suggestion) + ".";
             } else if (data.suggestion && !data.suggestion.reached) {
               banner.className = "banner banner-info";
               banner.textContent = "Today's hours are done. " + data.weekly_remaining_fmt + " left this week — see the Saturday plan below.";

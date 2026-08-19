@@ -103,13 +103,15 @@
     {% elif suggestion and suggestion.lands_today %}
       <div class="banner banner-info" id="weekly-banner">
         {{ fmt_hours(weekly.remaining_hours) }} left this week. At this pace, punch out around
-        <strong>{{ suggestion.suggested_time }}</strong> today to hit your target.
+        <strong>{{ suggestion.suggested_time }}</strong> today to hit your target{% if suggestion.break_allowance_fmt %},
+        including {{ suggestion.break_allowance_fmt }} of break{% endif %}.
       </div>
     {% elif suggestion and not suggestion.today_target_met %}
       <div class="banner banner-info" id="weekly-banner">
         {{ fmt_hours(weekly.remaining_hours) }} left this week &mdash; more than today can cover.
         Punch out around <strong>{{ suggestion.today_time }}</strong> to finish today's
-        {{ suggestion.today_target_fmt }}.
+        {{ suggestion.today_target_fmt }}{% if suggestion.break_allowance_fmt %},
+        including {{ suggestion.break_allowance_fmt }} of break{% endif %}.
       </div>
     {% elif suggestion %}
       <div class="banner banner-info" id="weekly-banner">
