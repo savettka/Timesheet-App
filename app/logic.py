@@ -187,8 +187,19 @@ def saturday_plan(user, entries_by_date, week_start, weekly_target_total, today,
         entry = entries_by_date.get(d)
         if d < today:
             banked += entry_total_hours(entry, now=now) if entry else 0.0
+        elif d == today:
+            # Today is partly known, so use it as it happens rather than
+            # waiting for midnight: once the day is closed its real total
+            # counts, and while it is still open it counts for at least the
+            # target, plus any hours already worked beyond it.
+            worked = entry_total_hours(entry, now=now) if entry else 0.0
+            target = target_hours_for(user, d, entry)
+            if entry is not None and entry.logout_time is not None:
+                banked += worked
+            else:
+                banked += max(worked, target)
         else:
-            # Today or a day still to come: assume the plan holds.
+            # Still to come: assume the plan holds.
             banked += target_hours_for(user, d, entry)
     if sunday_date < today:
         sunday_entry = entries_by_date.get(sunday_date)

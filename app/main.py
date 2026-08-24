@@ -259,7 +259,14 @@ def api_status():
         ),
         "suggestion": ctx["suggestion"],
         "saturday": (
-            {**ctx["saturday"], "saturday_date": ctx["saturday"]["saturday_date"].isoformat()}
+            {
+                **ctx["saturday"],
+                "saturday_date": ctx["saturday"]["saturday_date"].isoformat(),
+                # Pre-formatted so the live update reads identically to the
+                # server-rendered version rather than reimplementing fmt_hours.
+                "remaining_fmt": logic.fmt_hours(ctx["saturday"].get("remaining_hours")),
+                "worked_fmt": logic.fmt_hours(ctx["saturday"].get("worked_hours")),
+            }
             if ctx["saturday"]
             else None
         ),

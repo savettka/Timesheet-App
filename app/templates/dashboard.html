@@ -157,26 +157,26 @@
     </div>
     {% if saturday.mode == 'live' %}
       {% if saturday.reached %}
-        <div class="banner banner-success">🎉 You've already covered your 48h this week &mdash; log out on Saturday whenever suits you.</div>
+        <div class="banner banner-success" id="saturday-banner">🎉 You've already covered your 48h this week &mdash; log out on Saturday whenever suits you.</div>
       {% else %}
-        <div class="banner banner-info">Punch out around <strong>{{ saturday.suggested_time }}</strong> today to complete your week.</div>
+        <div class="banner banner-info" id="saturday-banner">Punch out around <strong>{{ saturday.suggested_time }}</strong> today to complete your week.</div>
       {% endif %}
     {% elif saturday.mode == 'done' %}
       {% if saturday.week_complete %}
-        <div class="banner banner-success">🎉 Saturday's done and your weekly target is complete.</div>
+        <div class="banner banner-success" id="saturday-banner">🎉 Saturday's done and your weekly target is complete.</div>
       {% else %}
-        <div class="banner banner-muted">Saturday's logged &mdash; you worked {{ fmt_hours(saturday.worked_hours) }}.</div>
+        <div class="banner banner-muted" id="saturday-banner">Saturday's logged &mdash; you worked {{ fmt_hours(saturday.worked_hours) }}.</div>
       {% endif %}
     {% else %}
       {% if saturday.reached %}
-        <div class="banner banner-success">🎉 On current pace you're set to hit 48h without needing Saturday at all.</div>
+        <div class="banner banner-success" id="saturday-banner">🎉 On current pace you're set to hit 48h without needing Saturday at all.</div>
       {% elif saturday.projected_time %}
-        <div class="banner banner-info">
+        <div class="banner banner-info" id="saturday-banner">
           If the rest of the week goes to plan, log out around <strong>{{ saturday.projected_time }}</strong> on
           Saturday ({{ fmt_hours(saturday.remaining_hours) }} of work) to hit your 48h target.
         </div>
       {% else %}
-        <div class="banner banner-muted">
+        <div class="banner banner-muted" id="saturday-banner">
           About {{ fmt_hours(saturday.remaining_hours) }} left for Saturday if the rest of the week goes to plan.
           <a href="{{ url_for('main.settings') }}" class="link">Set your usual Saturday login time</a> in Settings
           to see an exact clock-out estimate here.

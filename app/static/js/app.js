@@ -80,6 +80,46 @@
       : "";
   }
 
+  // Rebuilds the Saturday plan banner from the same fields the template uses,
+  // so the projected clock-out moves as the day is worked instead of only
+  // changing once the date rolls over.
+  function renderSaturday(sat) {
+    var el = document.getElementById("saturday-banner");
+    if (!el || !sat) return;
+    var cls = "banner banner-info";
+    var html;
+
+    if (sat.mode === "live") {
+      if (sat.reached) {
+        cls = "banner banner-success";
+        html = "🎉 You've already covered your 48h this week — log out on Saturday whenever suits you.";
+      } else {
+        html = "Punch out around <strong>" + sat.suggested_time + "</strong> today to complete your week.";
+      }
+    } else if (sat.mode === "done") {
+      if (sat.week_complete) {
+        cls = "banner banner-success";
+        html = "🎉 Saturday's done and your weekly target is complete.";
+      } else {
+        cls = "banner banner-muted";
+        html = "Saturday's logged — you worked " + sat.worked_fmt + ".";
+      }
+    } else if (sat.reached) {
+      cls = "banner banner-success";
+      html = "🎉 On current pace you're set to hit 48h without needing Saturday at all.";
+    } else if (sat.projected_time) {
+      html = "If the rest of the week goes to plan, log out around <strong>" +
+        sat.projected_time + "</strong> on Saturday (" + sat.remaining_fmt +
+        " of work) to hit your 48h target.";
+    } else {
+      cls = "banner banner-muted";
+      html = "About " + sat.remaining_fmt + " left for Saturday if the rest of the week goes to plan.";
+    }
+
+    el.className = cls;
+    el.innerHTML = html;
+  }
+
   function initStatusPoll() {
     if (!window.STM_STATUS_URL) return;
 
@@ -115,6 +155,8 @@
               banner.textContent = data.weekly_remaining_fmt + " left to reach your weekly target.";
             }
           }
+
+          renderSaturday(data.saturday);
         })
         .catch(function () { /* silent - keep last known state */ });
     }
