@@ -82,6 +82,12 @@ def unrecorded_break_hours(user, entry_date, entry=None, now=None):
     recorded counts against the allowance, so the suggestion doesn't jump
     later the moment a real break is logged.
     """
+    # A leave day carries no assumed break: a half day is worked straight
+    # through, and a full day off isn't worked at all. Same for any day whose
+    # target has been zeroed, which covers holidays recorded before leave
+    # types existed.
+    if entry is not None and (entry.is_leave or entry.target_override == 0):
+        return 0.0
     expected = user.expected_break_hours_for(entry_date.weekday())
     taken = entry_break_hours(entry, now=now) if entry is not None else 0.0
     return max(0.0, expected - taken)

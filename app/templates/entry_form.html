@@ -23,11 +23,16 @@
     <p class="hint">If logout is earlier than login, STM assumes the shift crossed midnight.</p>
 
     <div class="leave-block">
+      {% set current_type = entry.effective_leave_type if entry else None %}
       <div class="field-row">
         <label class="field">
-          <span>Standard hours for this day</span>
-          <input type="number" step="0.5" min="0" name="target_override" placeholder="{{ default_target|round(1) }} (default)"
-                 value="{{ entry.target_override if entry and entry.target_override is not none else '' }}">
+          <span>Day type</span>
+          <select name="day_type" id="day-type">
+            <option value="" {{ 'selected' if not current_type }}>Working day &mdash; {{ default_target|round(1) }}h</option>
+            <option value="half" {{ 'selected' if current_type == 'half' }}>Half day leave &mdash; {{ (default_target / 2)|round(1) }}h, no break</option>
+            <option value="full" {{ 'selected' if current_type == 'full' }}>Full day leave &mdash; 0h</option>
+            <option value="custom" {{ 'selected' if current_type == 'custom' }}>Custom hours&hellip;</option>
+          </select>
         </label>
         <label class="field">
           <span>Reason <em>(optional)</em></span>
@@ -35,9 +40,14 @@
                  value="{{ (entry.leave_label if entry else '') or '' }}">
         </label>
       </div>
-      <p class="hint">Leave blank to use your normal target ({{ default_target|round(1) }}h). Set to 0 for a full day
-        off, or e.g. {{ (default_target / 2)|round(1) }} for a half day &mdash; it'll reduce what you owe that
-        week to match.</p>
+      <label class="field" id="custom-hours-field" hidden>
+        <span>Standard hours for this day</span>
+        <input type="number" step="0.5" min="0" name="target_override" placeholder="{{ default_target|round(1) }}"
+               value="{{ entry.target_override if entry and entry.target_override is not none else '' }}">
+      </label>
+      <p class="hint">Choosing leave reduces what you owe that week to match, so a full day off costs you
+        nothing and a half day costs {{ (default_target / 2)|round(1) }}h. Leave days assume no break, so
+        suggested clock-out times aren't padded on a half day.</p>
     </div>
 
     <div class="breaks-block">

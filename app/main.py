@@ -444,17 +444,34 @@ def edit_entry(date_str):
         logout_t = parse_time_field(request.form.get("logout_time"))
         notes = (request.form.get("notes") or "").strip() or None
 
-        target_override_raw = (request.form.get("target_override") or "").strip()
-        target_override = None
-        if target_override_raw:
-            try:
-                target_override = max(0.0, float(target_override_raw))
-            except ValueError:
-                flash("Standard hours for this day must be a number.", "error")
-                return render_template(
-                    "entry_form.html", entry=entry, entry_date=entry_date, default_target=default_target
-                )
+        # The day type picks the hours; "custom" is the escape hatch that still
+        # lets a specific number be typed in.
+        day_type = (request.form.get("day_type") or "").strip()
         leave_label = (request.form.get("leave_label") or "").strip() or None
+        leave_type = None
+        target_override = None
+
+        if day_type == "full":
+            leave_type, target_override = "full", 0.0
+        elif day_type == "half":
+            leave_type, target_override = "half", default_target / 2
+        elif day_type == "custom":
+            leave_type = "custom"
+            target_override_raw = (request.form.get("target_override") or "").strip()
+            if target_override_raw:
+                try:
+                    target_override = max(0.0, float(target_override_raw))
+                except ValueError:
+                    flash("Standard hours for this day must be a number.", "error")
+                    return render_template(
+                        "entry_form.html", entry=entry, entry_date=entry_date,
+                        default_target=default_target
+                    )
+            else:
+                leave_type = None  # "custom" with nothing typed is a normal day
+
+        if leave_type in TimeEntry.LEAVE_TYPES and not leave_label:
+            leave_label = TimeEntry.LEAVE_TYPES[leave_type]
 
         break_starts = request.form.getlist("break_start")
         break_ends = request.form.getlist("break_end")
@@ -468,6 +485,7 @@ def edit_entry(date_str):
         entry.notes = notes
         entry.target_override = target_override
         entry.leave_label = leave_label
+        entry.leave_type = leave_type
 
         entry.breaks.clear()
         for bs, be in zip(break_starts, break_ends):
