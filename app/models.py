@@ -94,6 +94,32 @@ class TimeEntry(db.Model):
     target_override = db.Column(db.Float, nullable=True)
     leave_label = db.Column(db.String(60), nullable=True)
 
+    # How the day was classified on the entry form: "half", "full", "custom",
+    # or None for an ordinary working day. target_override still holds the
+    # resulting hours -- this records the intent, so a leave day can skip the
+    # assumed break and show the right option when the form is reopened.
+    leave_type = db.Column(db.String(10), nullable=True)
+
+    LEAVE_TYPES = {"half": "Half day leave", "full": "Full day leave"}
+
+    @property
+    def is_leave(self):
+        return self.leave_type in self.LEAVE_TYPES
+
+    @property
+    def effective_leave_type(self):
+        """Which option the entry form should start on.
+
+        Entries saved before day types existed only have the hours, so infer
+        the type from those rather than showing them as ordinary working days
+        -- reopening and saving one would otherwise wipe its override.
+        """
+        if self.leave_type:
+            return self.leave_type
+        if self.target_override is None:
+            return None
+        return "full" if self.target_override == 0 else "custom"
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

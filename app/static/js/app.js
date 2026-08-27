@@ -217,6 +217,21 @@
     });
   }
 
+  // ------------------------------------------------------------- day type
+  // The hours box is only relevant for a custom day; the leave options set
+  // the hours themselves.
+  function initDayType() {
+    var select = document.getElementById("day-type");
+    var field = document.getElementById("custom-hours-field");
+    if (!select || !field) return;
+
+    function sync() {
+      field.hidden = select.value !== "custom";
+    }
+    select.addEventListener("change", sync);
+    sync();
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     initTheme();
     initHamburger();
@@ -224,5 +239,6 @@
     initStatusPoll();
     initBreakRows();
     initAvatarPicker();
+    initDayType();
   });
 })();

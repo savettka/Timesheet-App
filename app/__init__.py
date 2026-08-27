@@ -28,6 +28,8 @@ def _run_light_migrations():
             statements.append("ALTER TABLE time_entry ADD COLUMN target_override FLOAT")
         if "leave_label" not in entry_columns:
             statements.append("ALTER TABLE time_entry ADD COLUMN leave_label VARCHAR(60)")
+        if "leave_type" not in entry_columns:
+            statements.append("ALTER TABLE time_entry ADD COLUMN leave_type VARCHAR(10)")
 
     if "user" in table_names:
         user_columns = {c["name"] for c in inspector.get_columns("user")}
