@@ -187,8 +187,16 @@ def saturday_plan(user, entries_by_date, week_start, weekly_target_total, today,
         return None
 
     banked = 0.0
+    excluded_target = 0.0
     for d in week_dates(week_start):
         if d in (saturday_date, sunday_date):
+            continue
+        if (d.year, d.month) != (saturday_date.year, saturday_date.month):
+            # A new month started partway through this week (e.g. the week's
+            # Monday is still in last month). That leftover weekday shouldn't
+            # feed into this month's Saturday overtime/logout plan, so drop
+            # both its worked hours and its slice of the weekly target.
+            excluded_target += target_hours_for(user, d, entries_by_date.get(d))
             continue
         entry = entries_by_date.get(d)
         if d < today:
@@ -211,6 +219,7 @@ def saturday_plan(user, entries_by_date, week_start, weekly_target_total, today,
         sunday_entry = entries_by_date.get(sunday_date)
         banked += entry_total_hours(sunday_entry, now=now) if sunday_entry else 0.0
 
+    weekly_target_total = max(0.0, weekly_target_total - excluded_target)
     remaining_for_saturday = max(0.0, weekly_target_total - banked)
 
     if saturday_entry and saturday_entry.login_time and not saturday_entry.logout_time:
