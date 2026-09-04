@@ -178,7 +178,7 @@ def build_dashboard_context():
         }
 
     saturday = logic.saturday_plan(
-        user, entries_by_date, week_start, weekly["target_hours"], date.today(), now=now
+        user, entries_by_date, week_start, date.today(), now=now
     )
 
     open_break = open_entry.open_break() if open_entry else None
@@ -206,6 +206,7 @@ def build_dashboard_context():
         "recent_entries": recent_entries,
         "now": now,
         "fmt_hours": logic.fmt_hours,
+        "fmt_target_hours": logic.fmt_target_hours,
         "fmt_time": logic.fmt_time,
         "entry_total_hours": lambda e: logic.entry_total_hours(e, now=now),
         "entry_break_hours": lambda e: logic.entry_break_hours(e, now=now),
@@ -266,6 +267,7 @@ def api_status():
                 # server-rendered version rather than reimplementing fmt_hours.
                 "remaining_fmt": logic.fmt_hours(ctx["saturday"].get("remaining_hours")),
                 "worked_fmt": logic.fmt_hours(ctx["saturday"].get("worked_hours")),
+                "target_fmt": logic.fmt_target_hours(ctx["saturday"].get("target_hours")),
             }
             if ctx["saturday"]
             else None

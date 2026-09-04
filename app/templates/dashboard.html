@@ -98,7 +98,7 @@
 
     {% if weekly.complete %}
       <div class="banner banner-success" id="weekly-banner">
-        🎉 You've hit your {{ weekly.target_hours | round(1) }}h weekly target{% if open_entry %} &mdash; you can log out any time{% endif %}.
+        🎉 You've hit your {{ fmt_target_hours(weekly.target_hours) }} weekly target{% if open_entry %} &mdash; you can log out any time{% endif %}.
       </div>
     {% elif suggestion and suggestion.lands_today %}
       <div class="banner banner-info" id="weekly-banner">
@@ -157,7 +157,7 @@
     </div>
     {% if saturday.mode == 'live' %}
       {% if saturday.reached %}
-        <div class="banner banner-success" id="saturday-banner">🎉 You've already covered your 48h this week &mdash; log out on Saturday whenever suits you.</div>
+        <div class="banner banner-success" id="saturday-banner">🎉 You've already covered your {{ fmt_target_hours(saturday.target_hours) }} this week &mdash; log out on Saturday whenever suits you.</div>
       {% else %}
         <div class="banner banner-info" id="saturday-banner">Punch out around <strong>{{ saturday.suggested_time }}</strong> today to complete your week.</div>
       {% endif %}
@@ -169,11 +169,11 @@
       {% endif %}
     {% else %}
       {% if saturday.reached %}
-        <div class="banner banner-success" id="saturday-banner">🎉 On current pace you're set to hit 48h without needing Saturday at all.</div>
+        <div class="banner banner-success" id="saturday-banner">🎉 On current pace you're set to hit {{ fmt_target_hours(saturday.target_hours) }} without needing Saturday at all.</div>
       {% elif saturday.projected_time %}
         <div class="banner banner-info" id="saturday-banner">
           If the rest of the week goes to plan, log out around <strong>{{ saturday.projected_time }}</strong> on
-          Saturday ({{ fmt_hours(saturday.remaining_hours) }} of work) to hit your 48h target.
+          Saturday ({{ fmt_hours(saturday.remaining_hours) }} of work) to hit your {{ fmt_target_hours(saturday.target_hours) }} target.
         </div>
       {% else %}
         <div class="banner banner-muted" id="saturday-banner">

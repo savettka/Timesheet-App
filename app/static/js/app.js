@@ -92,7 +92,7 @@
     if (sat.mode === "live") {
       if (sat.reached) {
         cls = "banner banner-success";
-        html = "🎉 You've already covered your 48h this week — log out on Saturday whenever suits you.";
+        html = "🎉 You've already covered your " + sat.target_fmt + " this week — log out on Saturday whenever suits you.";
       } else {
         html = "Punch out around <strong>" + sat.suggested_time + "</strong> today to complete your week.";
       }
@@ -106,11 +106,11 @@
       }
     } else if (sat.reached) {
       cls = "banner banner-success";
-      html = "🎉 On current pace you're set to hit 48h without needing Saturday at all.";
+      html = "🎉 On current pace you're set to hit " + sat.target_fmt + " without needing Saturday at all.";
     } else if (sat.projected_time) {
       html = "If the rest of the week goes to plan, log out around <strong>" +
         sat.projected_time + "</strong> on Saturday (" + sat.remaining_fmt +
-        " of work) to hit your 48h target.";
+        " of work) to hit your " + sat.target_fmt + " target.";
     } else {
       cls = "banner banner-muted";
       html = "About " + sat.remaining_fmt + " left for Saturday if the rest of the week goes to plan.";
