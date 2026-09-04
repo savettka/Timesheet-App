@@ -131,14 +131,23 @@ def weekly_totals(user, entries_by_date, any_date, now=None):
     # difference from that day's usual target, so e.g. a full day of leave
     # on an 8h day relieves 8h from what's owed that week.
     target_delta = 0.0
+    # When the week straddles a month change, the day(s) from the other
+    # month are shown for context but dropped from this week's own totals
+    # -- both their worked hours and their slice of the weekly target --
+    # so a leftover weekday doesn't pad or shrink the current month's figures.
+    excluded_target = 0.0
     for d in days:
         entry = entries_by_date.get(d)
         default_target = entry_target_hours(user, d)
         target = target_hours_for(user, d, entry)
-        if entry is not None and entry.target_override is not None:
-            target_delta += target - default_target
         worked = entry_total_hours(entry, now=now) if entry else 0.0
-        worked_total += worked
+        in_month = (d.year, d.month) == (any_date.year, any_date.month)
+        if in_month:
+            if entry is not None and entry.target_override is not None:
+                target_delta += target - default_target
+            worked_total += worked
+        else:
+            excluded_target += target
         rows.append(
             {
                 "date": d,
@@ -146,10 +155,11 @@ def weekly_totals(user, entries_by_date, any_date, now=None):
                 "target_hours": target,
                 "worked_hours": worked,
                 "balance_hours": worked - target,
+                "in_month": in_month,
             }
         )
 
-    target_total = max(0.0, user.weekly_target_hours + target_delta)
+    target_total = max(0.0, user.weekly_target_hours + target_delta - excluded_target)
     remaining = max(0.0, target_total - worked_total)
     return {
         "week_start": days[0],

@@ -127,7 +127,7 @@
     <div class="week-days">
       {% for row in weekly.rows %}
         {% set is_leave = row.entry and row.entry.target_override is not none %}
-        <a href="{{ url_for('main.edit_entry', date_str=row.date.isoformat()) }}" class="week-day {{ 'is-today' if row.date == today }} {{ 'has-entry' if row.entry }} {{ 'is-leave' if is_leave }}">
+        <a href="{{ url_for('main.edit_entry', date_str=row.date.isoformat()) }}" class="week-day {{ 'is-today' if row.date == today }} {{ 'has-entry' if row.entry }} {{ 'is-leave' if is_leave }} {{ 'is-other-month' if not row.in_month }}">
           <span class="week-day-label">{{ row.date.strftime('%a') }}</span>
           <span class="week-day-num">{{ row.date.day }}</span>
           <span class="week-day-hours">
