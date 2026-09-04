@@ -118,6 +118,33 @@ def week_dates(any_date):
     return [start + timedelta(days=i) for i in range(7)]
 
 
+def week_target_hours(user, entries_by_date, week_start, year, month):
+    """The weekly target scaled to just the days of this week that belong to
+    the given month.
+
+    ``user.weekly_target_hours`` assumes a whole Mon-Sun week, and two things
+    move it. A day-off/half-day override shifts it by exactly the difference
+    from that day's usual target, so a full day of leave on an 8h day relieves
+    8h from what's owed. And when the week straddles a month change, a day
+    belonging to the other month drops out entirely, taking its usual target
+    with it -- each month's part-week only owes its own days.
+
+    This is the single place that split is worked out, so the weekly card and
+    the Saturday plan can never disagree about what the week owes.
+    """
+    total = user.weekly_target_hours
+    for d in week_dates(week_start):
+        entry = entries_by_date.get(d)
+        default_target = entry_target_hours(user, d)
+        if (d.year, d.month) != (year, month):
+            # The other month's day: drop its usual target. Any override on it
+            # belongs to that month's accounting, not this one's.
+            total -= default_target
+        elif entry is not None and entry.target_override is not None:
+            total += target_hours_for(user, d, entry) - default_target
+    return max(0.0, total)
+
+
 def weekly_totals(user, entries_by_date, any_date, now=None):
     """Aggregate hours for the week containing ``any_date``.
 
@@ -127,27 +154,16 @@ def weekly_totals(user, entries_by_date, any_date, now=None):
     days = week_dates(any_date)
     rows = []
     worked_total = 0.0
-    # A day-off/half-day override shifts the weekly target by exactly the
-    # difference from that day's usual target, so e.g. a full day of leave
-    # on an 8h day relieves 8h from what's owed that week.
-    target_delta = 0.0
-    # When the week straddles a month change, the day(s) from the other
-    # month are shown for context but dropped from this week's own totals
-    # -- both their worked hours and their slice of the weekly target --
-    # so a leftover weekday doesn't pad or shrink the current month's figures.
-    excluded_target = 0.0
+    # When the week straddles a month change, the day(s) from the other month
+    # are still shown for context but dropped from this week's own figures, so
+    # a leftover weekday doesn't pad the current month's worked total.
     for d in days:
         entry = entries_by_date.get(d)
-        default_target = entry_target_hours(user, d)
         target = target_hours_for(user, d, entry)
         worked = entry_total_hours(entry, now=now) if entry else 0.0
         in_month = (d.year, d.month) == (any_date.year, any_date.month)
         if in_month:
-            if entry is not None and entry.target_override is not None:
-                target_delta += target - default_target
             worked_total += worked
-        else:
-            excluded_target += target
         rows.append(
             {
                 "date": d,
@@ -159,7 +175,9 @@ def weekly_totals(user, entries_by_date, any_date, now=None):
             }
         )
 
-    target_total = max(0.0, user.weekly_target_hours + target_delta - excluded_target)
+    target_total = week_target_hours(
+        user, entries_by_date, days[0], any_date.year, any_date.month
+    )
     remaining = max(0.0, target_total - worked_total)
     return {
         "week_start": days[0],
@@ -173,7 +191,7 @@ def weekly_totals(user, entries_by_date, any_date, now=None):
     }
 
 
-def saturday_plan(user, entries_by_date, week_start, weekly_target_total, today, now=None):
+def saturday_plan(user, entries_by_date, week_start, today, now=None):
     """A forward-looking plan for when Saturday's shift can end, visible on
     any day of the week (not just Saturday itself) so it can be planned for
     in advance.
@@ -196,17 +214,21 @@ def saturday_plan(user, entries_by_date, week_start, weekly_target_total, today,
     if target_hours_for(user, saturday_date, saturday_entry) <= 0:
         return None
 
+    # Anchored on Saturday's own month rather than today's: in a week split by
+    # a month change the two differ (standing on Mon 31 Aug, Saturday is
+    # already September), and this plan is about Saturday's part-week. The
+    # target comes from the same helper the weekly card uses, so the month's
+    # days are dropped exactly once.
+    month = (saturday_date.year, saturday_date.month)
+    weekly_target_total = week_target_hours(user, entries_by_date, week_start, *month)
+
     banked = 0.0
-    excluded_target = 0.0
     for d in week_dates(week_start):
         if d in (saturday_date, sunday_date):
             continue
-        if (d.year, d.month) != (saturday_date.year, saturday_date.month):
-            # A new month started partway through this week (e.g. the week's
-            # Monday is still in last month). That leftover weekday shouldn't
-            # feed into this month's Saturday overtime/logout plan, so drop
-            # both its worked hours and its slice of the weekly target.
-            excluded_target += target_hours_for(user, d, entries_by_date.get(d))
+        if (d.year, d.month) != month:
+            # A weekday left over from last month: its hours belong to that
+            # month, so they don't count towards this Saturday.
             continue
         entry = entries_by_date.get(d)
         if d < today:
@@ -225,11 +247,10 @@ def saturday_plan(user, entries_by_date, week_start, weekly_target_total, today,
         else:
             # Still to come: assume the plan holds.
             banked += target_hours_for(user, d, entry)
-    if sunday_date < today:
+    if sunday_date < today and (sunday_date.year, sunday_date.month) == month:
         sunday_entry = entries_by_date.get(sunday_date)
         banked += entry_total_hours(sunday_entry, now=now) if sunday_entry else 0.0
 
-    weekly_target_total = max(0.0, weekly_target_total - excluded_target)
     remaining_for_saturday = max(0.0, weekly_target_total - banked)
 
     if saturday_entry and saturday_entry.login_time and not saturday_entry.logout_time:
@@ -242,6 +263,7 @@ def saturday_plan(user, entries_by_date, week_start, weekly_target_total, today,
             "reached": reached,
             "suggested_time": fmt_suggested_datetime(suggested_dt, saturday_date),
             "still_needed_hours": still_needed,
+            "target_hours": weekly_target_total,
         }
 
     if saturday_entry and saturday_entry.logout_time:
@@ -251,6 +273,7 @@ def saturday_plan(user, entries_by_date, week_start, weekly_target_total, today,
             "saturday_date": saturday_date,
             "worked_hours": worked,
             "week_complete": (banked + worked) >= weekly_target_total,
+            "target_hours": weekly_target_total,
         }
 
     projected_dt = None
@@ -269,6 +292,7 @@ def saturday_plan(user, entries_by_date, week_start, weekly_target_total, today,
         "projected_time": fmt_suggested_datetime(projected_dt, saturday_date),
         "has_login_hint": bool(user.saturday_login_hint),
         "reached": remaining_for_saturday <= 0,
+        "target_hours": weekly_target_total,
     }
 
 
@@ -339,6 +363,20 @@ def fmt_hours(value):
     total_minutes = round(value * 60)
     h, m = divmod(total_minutes, 60)
     return f"{sign}{h}h {m:02d}m"
+
+
+def fmt_target_hours(value):
+    """A weekly target written the way it's spoken: 48h, 40h, 47.5h.
+
+    Kept separate from ``fmt_hours`` because a target reads as a round figure
+    ("your 40h") where a worked total needs the minutes ("39h 45m").
+    """
+    if value is None:
+        return "--"
+    rounded = round(value, 1)
+    if rounded == int(rounded):
+        return f"{int(rounded)}h"
+    return f"{rounded:g}h"
 
 
 def fmt_time(t):
