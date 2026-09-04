@@ -423,6 +423,7 @@ table { border-collapse: collapse; width: 100%; }
 }
 .week-day.has-entry .week-day-hours { color: var(--text-2); }
 .week-day.is-leave { background: var(--surface-2); }
+.week-day.is-other-month { opacity: 0.4; }
 
 /* ==========================================================================
    Stats
