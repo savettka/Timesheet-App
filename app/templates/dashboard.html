@@ -83,7 +83,7 @@
   <section class="card card-week">
     <div class="card-heading">
       <h2>This week</h2>
-      <span class="muted">{{ weekly.week_start.strftime('%d %b') }} &ndash; {{ weekly.week_end.strftime('%d %b') }}</span>
+      <span class="muted">{{ weekly.span_start.strftime('%d %b') }}{% if weekly.span_end != weekly.span_start %} &ndash; {{ weekly.span_end.strftime('%d %b') }}{% endif %}</span>
     </div>
 
     <div class="progress-wrap">
