@@ -179,9 +179,15 @@ def weekly_totals(user, entries_by_date, any_date, now=None):
         user, entries_by_date, days[0], any_date.year, any_date.month
     )
     remaining = max(0.0, target_total - worked_total)
+    # The stretch of the week these figures actually cover. On a week split by
+    # a month change that's shorter than Mon-Sun (01-06 Sep, not 31 Aug-06
+    # Sep), so the dates over the card match the hours underneath them.
+    counted_days = [row["date"] for row in rows if row["in_month"]]
     return {
         "week_start": days[0],
         "week_end": days[-1],
+        "span_start": counted_days[0],
+        "span_end": counted_days[-1],
         "rows": rows,
         "worked_hours": worked_total,
         "target_hours": target_total,
