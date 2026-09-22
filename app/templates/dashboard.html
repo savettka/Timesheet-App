@@ -202,7 +202,12 @@
         <span class="stat-label">Target</span>
       </div>
       <div class="stat">
-        <span class="stat-value {{ 'stat-positive' if (today_worked - today_target) >= 0 else 'stat-negative' }}">{{ fmt_hours(today_worked - today_target) }}</span>
+        {%- set today_balance = today_worked - today_accrued_target %}
+        {%- if today_in_progress and today_balance <= 0 %}
+        <span class="stat-value muted" title="Still running &mdash; today's target isn't due yet">&mdash;</span>
+        {%- else %}
+        <span class="stat-value {{ 'stat-positive' if today_balance >= 0 else 'stat-negative' }}">{{ fmt_hours(today_balance) }}</span>
+        {%- endif %}
         <span class="stat-label">Balance</span>
       </div>
     </div>

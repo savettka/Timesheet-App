@@ -17,13 +17,18 @@
     </div>
     <div class="stat">
       <span class="stat-value">{{ fmt_hours(month_target) }}</span>
-      <span class="stat-label">Target this month</span>
+      <span class="stat-label">Target so far</span>
     </div>
     <div class="stat">
       <span class="stat-value {{ 'stat-positive' if (month_total - month_target) >= 0 else 'stat-negative' }}">{{ fmt_hours(month_total - month_target) }}</span>
       <span class="stat-label">Balance</span>
     </div>
   </div>
+  {% if rows | selectattr('in_progress') | first %}
+  <p class="muted month-note">Today is still running, so only the hours it has
+  actually reached count towards its target &mdash; the balance above is your
+  overtime as it stands right now.</p>
+  {% endif %}
 
   <div class="table-scroll">
     <table class="data-table">
@@ -44,7 +49,7 @@
         {% for row in rows %}
         {% set is_leave = row.entry and row.entry.target_override is not none %}
         {% set show_target = not row.is_future or is_leave %}
-        {% set balance = row.worked_hours - row.target_hours %}
+        {% set balance = row.worked_hours - row.accrued_target_hours %}
         <tr class="{{ 'row-today' if row.date == today }} {{ 'row-rest' if row.target_hours == 0 and not row.entry and not row.is_future }} {{ 'row-future' if row.is_future }} {{ 'row-leave' if is_leave }}">
           <td>
             {{ row.date.strftime('%d %b') }}
@@ -64,7 +69,11 @@
           </td>
           <td><strong>{{ fmt_hours(row.worked_hours) if row.entry else '&mdash;' | safe }}</strong></td>
           <td class="muted">{{ fmt_hours(row.target_hours) if show_target else '&mdash;' | safe }}</td>
+          {%- if row.in_progress and balance <= 0 %}
+          <td class="muted" title="Still running &mdash; today's target isn't due yet">&mdash;</td>
+          {%- else %}
           <td class="{{ 'stat-positive' if balance >= 0 else 'stat-negative' }}">{{ fmt_hours(balance) if (row.entry or row.target_hours) and show_target else '&mdash;' | safe }}</td>
+          {%- endif %}
           <td class="table-action">
             <a href="{{ url_for('main.edit_entry', date_str=row.date.isoformat()) }}" class="link">{{ 'Edit' if row.entry else 'Add' }}</a>
           </td>

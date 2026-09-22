@@ -107,6 +107,28 @@ def target_hours_for(user, entry_date, entry=None):
     return entry_target_hours(user, entry_date)
 
 
+def accrued_target_hours(full_target, entry, entry_date, today, now=None):
+    """How much of a day's target has actually fallen due yet.
+
+    Charging a day its whole target from midnight makes an ordinary
+    lunchtime look like a six-hour deficit -- those hours aren't missing,
+    they just haven't come round yet. So while today is still running only
+    the hours worked so far count against it: the balance sits at zero
+    through the day and starts climbing the moment real overtime begins,
+    which is the figure actually worth watching.
+
+    Once the day has been clocked out of -- and for every day already past
+    -- the full target applies again, because a short day that has *ended*
+    really is time owed.
+    """
+    if entry_date != today:
+        return full_target
+    if entry is not None and entry.logout_time is not None:
+        return full_target
+    worked = entry_total_hours(entry, now=now) if entry is not None else 0.0
+    return min(full_target, worked)
+
+
 def week_bounds(any_date):
     start = any_date - timedelta(days=any_date.weekday())  # Monday
     end = start + timedelta(days=6)  # Sunday

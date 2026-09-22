@@ -140,6 +140,11 @@ def build_dashboard_context():
     today_entry = entries_by_date.get(date.today())
     today_target = logic.target_hours_for(user, date.today(), today_entry)
     today_worked = logic.entry_total_hours(today_entry, now=now) if today_entry else 0.0
+    # Same rule as History: an unfinished day owes only what it has had the
+    # chance to work, so the morning doesn't read as a whole day behind.
+    today_accrued_target = logic.accrued_target_hours(
+        today_target, today_entry, date.today(), date.today(), now=now
+    )
 
     suggestion = None
     if open_entry:
@@ -200,6 +205,8 @@ def build_dashboard_context():
         "weekly": weekly,
         "today_entry": today_entry,
         "today_target": today_target,
+        "today_accrued_target": today_accrued_target,
+        "today_in_progress": today_accrued_target < today_target,
         "today_worked": today_worked,
         "suggestion": suggestion,
         "saturday": saturday,
@@ -396,18 +403,24 @@ def history(year=None, month=None):
         else:
             target = logic.entry_target_hours(current_user, d)
         worked = logic.entry_total_hours(entry, now=now) if entry else 0.0
+        # Today is only part-way through, so only the slice of its target
+        # that has already come round counts against the balance -- the rest
+        # is time yet to come, not time owed.
+        accrued = logic.accrued_target_hours(target, entry, d, today, now=now)
         rows.append(
             {
                 "date": d,
                 "entry": entry,
                 "target_hours": target,
+                "accrued_target_hours": accrued,
                 "worked_hours": worked,
                 "is_future": is_future,
+                "in_progress": d == today and accrued < target,
             }
         )
 
     month_total = sum(r["worked_hours"] for r in rows)
-    month_target = sum(r["target_hours"] for r in rows)
+    month_target = sum(r["accrued_target_hours"] for r in rows)
 
     prev_month = (first_day - timedelta(days=1)).replace(day=1)
     next_month_first = last_day + timedelta(days=1)

@@ -439,6 +439,7 @@ table { border-collapse: collapse; width: 100%; }
 .stat-positive { color: var(--text); }
 .stat-negative { color: var(--negative); }
 .month-summary { margin-bottom: var(--s5); padding-bottom: var(--s5); border-bottom: 1px solid var(--rule); }
+.month-note { margin: 0 0 var(--s5); line-height: 1.5; max-width: 62ch; }
 
 .break-list { margin-top: var(--s4); padding-top: var(--s3); border-top: 1px solid var(--rule); display: flex; flex-direction: column; gap: var(--s1); }
 .break-row { font-size: 13px; color: var(--text-2); font-variant-numeric: tabular-nums; }
