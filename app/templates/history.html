@@ -1,86 +1,111 @@
 {% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
 {% block title %}History{% endblock %}
 {% block page_title %}History{% endblock %}
 
 {% block content %}
-<section class="card">
-  <div class="card-heading month-nav">
-    <a class="btn btn-icon" href="{{ url_for('main.history', year=prev_year, month=prev_month) }}" aria-label="Previous month">&larr;</a>
-    <h2>{{ month_name }} {{ year }}</h2>
-    <a class="btn btn-icon" href="{{ url_for('main.history', year=next_year, month=next_month) }}" aria-label="Next month">&rarr;</a>
+{% set balance_minutes = (summary.balance_hours * 60)|round|int %}
+<section class="card month-head" aria-labelledby="month-title">
+  <div class="month-nav">
+    <a class="btn btn-icon" href="{{ url_for('main.history', year=prev_year, month=prev_month) }}"
+       aria-label="Previous month">{{ icon('chevron-left') }}</a>
+    <h2 id="month-title" class="month-title">{{ month_name }} {{ year }}</h2>
+    <a class="btn btn-icon" href="{{ url_for('main.history', year=next_year, month=next_month) }}"
+       aria-label="Next month">{{ icon('chevron-right') }}</a>
   </div>
-
-  <div class="stat-row month-summary">
-    <div class="stat">
-      <span class="stat-value">{{ fmt_hours(month_total) }}</span>
-      <span class="stat-label">Worked this month</span>
-    </div>
-    <div class="stat">
-      <span class="stat-value">{{ fmt_hours(month_target) }}</span>
-      <span class="stat-label">Target so far</span>
-    </div>
-    <div class="stat">
-      <span class="stat-value {{ 'stat-positive' if (month_total - month_target) >= 0 else 'stat-negative' }}">{{ fmt_hours(month_total - month_target) }}</span>
-      <span class="stat-label">Balance</span>
-    </div>
-  </div>
-  {% if rows | selectattr('in_progress') | first %}
-  <p class="muted month-note">Today is still running, so only the hours it has
-  actually reached count towards its target &mdash; the balance above is your
-  overtime as it stands right now.</p>
+  {% if not is_current_month %}
+    <p class="month-jump"><a class="link" href="{{ url_for('main.history') }}">Jump to this month</a></p>
   {% endif %}
 
-  <div class="table-scroll">
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th>Date</th>
-          <th>Day</th>
-          <th>Login</th>
-          <th>Logout</th>
-          <th>Break</th>
-          <th>Total</th>
-          <th>Target</th>
-          <th>Balance</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for row in rows %}
-        {% set is_leave = row.entry and row.entry.target_override is not none %}
-        {% set show_target = not row.is_future or is_leave %}
-        {% set balance = row.worked_hours - row.accrued_target_hours %}
-        <tr class="{{ 'row-today' if row.date == today }} {{ 'row-rest' if row.target_hours == 0 and not row.entry and not row.is_future }} {{ 'row-future' if row.is_future }} {{ 'row-leave' if is_leave }}">
-          <td>
-            {{ row.date.strftime('%d %b') }}
-            {%- if is_leave %}
-              <span class="leave-badge">{{ row.entry.leave_label or 'Leave' }}</span>
-            {%- endif %}
-          </td>
-          <td class="muted">{{ row.date.strftime('%a') }}</td>
-          <td>{{ fmt_time(row.entry.login_time) if row.entry else '&mdash;' | safe }}</td>
-          <td>{{ fmt_time(row.entry.logout_time) if row.entry and row.entry.logout_time else '&mdash;' | safe }}</td>
-          <td>
-            {%- if row.entry and row.entry.breaks -%}
-              {{ row.entry.breaks|length }} brk
-            {%- else -%}
-              &mdash;
-            {%- endif -%}
-          </td>
-          <td><strong>{{ fmt_hours(row.worked_hours) if row.entry else '&mdash;' | safe }}</strong></td>
-          <td class="muted">{{ fmt_hours(row.target_hours) if show_target else '&mdash;' | safe }}</td>
-          {%- if row.in_progress and balance <= 0 %}
-          <td class="muted" title="Still running &mdash; today's target isn't due yet">&mdash;</td>
-          {%- else %}
-          <td class="{{ 'stat-positive' if balance >= 0 else 'stat-negative' }}">{{ fmt_hours(balance) if (row.entry or row.target_hours) and show_target else '&mdash;' | safe }}</td>
-          {%- endif %}
-          <td class="table-action">
-            <a href="{{ url_for('main.edit_entry', date_str=row.date.isoformat()) }}" class="link">{{ 'Edit' if row.entry else 'Add' }}</a>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+  <dl class="figures figures-lg">
+    <div class="figure">
+      <dt>Worked</dt>
+      <dd>{{ fmt_hours(summary.worked_hours) }}</dd>
+    </div>
+    <div class="figure">
+      <dt>Target so far</dt>
+      <dd>{{ fmt_hours(summary.target_hours) }}</dd>
+    </div>
+    <div class="figure">
+      <dt>Balance</dt>
+      <dd class="{{ 'is-ahead' if balance_minutes > 0 else ('is-behind' if balance_minutes < 0 else '') }}">
+        {{ fmt_balance(summary.balance_hours) }}
+        <span class="figure-note">
+          {%- if balance_minutes > 0 %}ahead{% elif balance_minutes < 0 %}behind{% else %}on target{% endif -%}
+        </span>
+      </dd>
+    </div>
+  </dl>
+  {% if summary.today_in_progress %}
+  <p class="card-note">Today is still running, so only the hours it has reached count so far &mdash;
+    the balance is your overtime as it stands right now.</p>
+  {% endif %}
+</section>
+
+<section class="card days-card" aria-labelledby="days-title">
+  <h2 id="days-title" class="visually-hidden">Every day in {{ month_name }} {{ year }}</h2>
+  <table class="days" role="table">
+    <thead role="rowgroup">
+      <tr role="row">
+        <th scope="col" role="columnheader">Day</th>
+        <th scope="col" role="columnheader">Login</th>
+        <th scope="col" role="columnheader">Logout</th>
+        <th scope="col" role="columnheader">Breaks</th>
+        <th scope="col" role="columnheader">Worked</th>
+        <th scope="col" role="columnheader">Target</th>
+        <th scope="col" role="columnheader">Balance</th>
+        <th scope="col" role="columnheader"><span class="visually-hidden">Open</span></th>
+      </tr>
+    </thead>
+    <tbody role="rowgroup">
+      {% for row in rows %}
+      {% set e = row.entry %}
+      {% set is_leave = e and e.target_override is not none %}
+      {% set is_rest = row.target_hours == 0 and not e and not row.is_future %}
+      {% set is_missing = not e and row.target_hours > 0 and not row.is_future and not row.is_today %}
+      {% set needs_logout = row.needs_logout %}
+      {% set brk = entry_break_hours(e) if e else 0 %}
+      {% set minutes = (row.balance_hours * 60)|round|int %}
+      {% set worked_any = e and e.login_time %}
+      <tr role="row" class="day-row{{ ' is-today' if row.is_today }}{{ ' is-future' if row.is_future }}{{ ' is-rest' if is_rest }}{{ ' is-missing' if is_missing }}">
+        <th scope="row" role="rowheader" class="c-day">
+          <a class="day-link" href="{{ url_for('main.edit_entry', date_str=row.date.isoformat()) }}">
+            <span class="visually-hidden">{{ 'Edit' if e else 'Add' }} </span>{{ row.date.strftime('%a %d %b') }}
+          </a>
+          {%- if row.is_today %} <span class="badge badge-accent">Today</span>{% endif %}
+          {%- if is_leave %} <span class="badge">{{ e.leave_label or 'Leave' }}</span>{% endif %}
+          {%- if is_rest %} <span class="badge badge-quiet">Rest day</span>{% endif %}
+          {%- if is_missing %} <span class="badge badge-warn">Not logged</span>{% endif %}
+          {%- if needs_logout %} <span class="badge badge-warn">Logout missing</span>{% endif %}
+        </th>
+        <td role="cell" class="c-in{{ ' is-empty' if not (e and e.login_time) }}" data-label="Login">
+          {{ fmt_time(e.login_time) if e and e.login_time else '–' }}
+        </td>
+        <td role="cell" class="c-out{{ ' is-empty' if not (e and e.logout_time) }}" data-label="Logout">
+          {{ fmt_time(e.logout_time) if e and e.logout_time else '–' }}
+        </td>
+        <td role="cell" class="c-brk{{ ' is-empty' if not brk }}" data-label="Breaks">
+          {%- if brk %}<span class="brk-ico">{{ icon('coffee') }}</span>{{ fmt_duration(brk) }}{% else %}–{% endif -%}
+        </td>
+        <td role="cell" class="c-worked{{ ' is-empty' if not worked_any }}" data-label="Worked">
+          {{ fmt_hours(row.worked_hours) if worked_any else '–' }}
+        </td>
+        <td role="cell" class="c-target" data-label="Target">
+          {{ fmt_hours(row.target_hours) if (not row.is_future or is_leave) and not is_rest else '–' }}
+        </td>
+        {% if row.in_progress and minutes <= 0 %}
+        <td class="c-bal" role="cell" data-label="Balance"><span class="pending">Still going</span></td>
+        {% elif row.is_future or is_rest or (not worked_any and minutes == 0) %}
+        <td class="c-bal is-empty" role="cell" data-label="Balance">–</td>
+        {% else %}
+        <td role="cell" class="c-bal {{ 'is-ahead' if minutes > 0 else ('is-behind' if minutes < 0 else '') }}" data-label="Balance">
+          {{ fmt_balance(row.balance_hours) }}
+        </td>
+        {% endif %}
+        <td role="cell" class="c-go" aria-hidden="true">{{ icon('chevron-right') }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
 </section>
 {% endblock %}

@@ -5,17 +5,16 @@
 <div class="auth-card">
   <div class="auth-brand">
     {{ stm_logo('logo-mark logo-lg') }}
-    <h1>STM</h1>
-    <span class="logo-tagline">Time Tracking App</span>
-    <p>Enter your email address and we'll send you a sign-in code.</p>
+    <h1>Sign in with a code</h1>
+    <p>Enter your email address and we'll send you a 6-digit sign-in code.</p>
   </div>
   <form method="post" class="form">
-    <label class="field">
-      <span>Email address</span>
-      <input type="email" name="email" required autofocus autocomplete="email"
+    <div class="field">
+      <label for="email">Email address</label>
+      <input type="email" id="email" name="email" required autofocus autocomplete="email"
              inputmode="email" placeholder="you@example.com">
-    </label>
-    <button type="submit" class="btn btn-primary btn-block">Email me a code</button>
+    </div>
+    <button type="submit" class="btn btn-primary btn-block btn-lg">Email me a code</button>
   </form>
   <p class="auth-alt">
     <a href="{{ url_for('auth.login') }}" class="link">Sign in with a password instead</a>

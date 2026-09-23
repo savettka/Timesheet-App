@@ -1,15 +1,28 @@
 {
   "name": "STM — Time Tracking App",
   "short_name": "STM",
-  "description": "Punch in and out, track breaks, and hit your weekly hours target.",
+  "description": "Log your login, breaks and logout, and hit your weekly hours target.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#5e6ad2",
+  "background_color": "#f4f5f9",
+  "theme_color": "#f4f5f9",
   "icons": [
-    { "src": "/static/img/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/static/img/icon-512.png", "sizes": "512x512", "type": "image/png" },
-    { "src": "/static/img/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    {
+      "src": "/static/img/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/img/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/img/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
   ]
 }

@@ -13,7 +13,20 @@ Mirrors the rules from the user's original spreadsheet:
     early Saturday finish).
 """
 
-from datetime import datetime, timedelta
+import calendar
+from datetime import date, datetime, timedelta
+
+# A typed time may run a little ahead of the server's clock without being in
+# the future in any sense that matters.
+PUNCH_GRACE = timedelta(minutes=2)
+# Past this, a shift still open is taken to be a forgotten logout rather than
+# a long day, and the dashboard asks when it really ended.
+STALE_SHIFT_HOURS = 16
+# The longest shift the dashboard will close on its own. Longer than this
+# nearly always means a missed logout, so the real time has to be given.
+MAX_LIVE_SHIFT_HOURS = 20
+# A saved day longer than this gets a heads-up: usually an AM/PM slip.
+LONG_SHIFT_WARNING_HOURS = 16
 
 
 def _combine(date_, time_, reference_dt=None):
@@ -24,6 +37,19 @@ def _combine(date_, time_, reference_dt=None):
     if reference_dt is not None and dt < reference_dt:
         dt += timedelta(days=1)
     return dt
+
+
+def is_open_shift(entry):
+    return entry is not None and entry.login_time is not None and entry.logout_time is None
+
+
+def is_stale_shift(entry, now=None):
+    """An open shift that has run on so long it must be a forgotten logout."""
+    if not is_open_shift(entry):
+        return False
+    now = now or datetime.now()
+    login_dt = datetime.combine(entry.date, entry.login_time)
+    return now - login_dt > timedelta(hours=STALE_SHIFT_HOURS)
 
 
 def break_segment_hours(entry, segment, now=None):
@@ -63,6 +89,11 @@ def entry_raw_hours(entry, now=None):
     else:
         logout_dt = now or datetime.now()
         if logout_dt < login_dt:
+            return 0.0
+        # Left open this long, it's a forgotten logout and its real length is
+        # unknown -- so it counts for nothing until the logout time is put in,
+        # rather than as a 30-hour day that swamps the week and the month.
+        if logout_dt - login_dt > timedelta(hours=STALE_SHIFT_HOURS):
             return 0.0
     return max(0.0, (logout_dt - login_dt).total_seconds() / 3600.0)
 
@@ -117,16 +148,78 @@ def accrued_target_hours(full_target, entry, entry_date, today, now=None):
     through the day and starts climbing the moment real overtime begins,
     which is the figure actually worth watching.
 
-    Once the day has been clocked out of -- and for every day already past
+    Once the day has been logged out of -- and for every day already past
     -- the full target applies again, because a short day that has *ended*
-    really is time owed.
+    really is time owed. A day not reached yet owes nothing, even with leave
+    booked on it: that shows as the day's target, but it can't put the
+    month behind before the day arrives.
     """
-    if entry_date != today:
+    if entry_date > today:
+        return 0.0
+    if is_open_shift(entry) and not is_stale_shift(entry, now):
+        # Still being worked -- today, or an overnight shift carrying on from
+        # yesterday, which is just as unfinished.
+        return min(full_target, entry_total_hours(entry, now=now))
+    if entry_date < today:
         return full_target
-    if entry is not None and entry.logout_time is not None:
+    if entry is not None and (entry.logout_time is not None or is_stale_shift(entry, now)):
         return full_target
+    # Today with nothing recorded yet, or leave booked with no login: none of
+    # the day has come round.
     worked = entry_total_hours(entry, now=now) if entry is not None else 0.0
     return min(full_target, worked)
+
+
+def month_summary(user, entries_by_date, year, month, today, now=None):
+    """Every day of a month -- what it owes, what was worked -- and the
+    month's totals.
+
+    History and the dashboard both read the month from here, so the balance
+    in one place is always the balance in the other.
+    """
+    first_day = date(year, month, 1)
+    rows = []
+    for i in range(calendar.monthrange(year, month)[1]):
+        d = first_day + timedelta(days=i)
+        entry = entries_by_date.get(d)
+        is_future = d > today
+        # A day you haven't reached yet can't owe hours. Leave booked ahead
+        # still shows its target, since it was set on purpose.
+        if entry is not None:
+            target = target_hours_for(user, d, entry)
+        elif is_future:
+            target = 0.0
+        else:
+            target = entry_target_hours(user, d)
+        worked = entry_total_hours(entry, now=now) if entry else 0.0
+        # Today is only part-way through, so only the slice of its target
+        # that has already come round counts against the balance.
+        accrued = accrued_target_hours(target, entry, d, today, now=now)
+        rows.append(
+            {
+                "date": d,
+                "entry": entry,
+                "target_hours": target,
+                "accrued_target_hours": accrued,
+                "worked_hours": worked,
+                "balance_hours": worked - accrued,
+                "is_future": is_future,
+                "is_today": d == today,
+                "in_progress": not is_future and accrued < target,
+                # Its hours count for nothing until the real logout is given.
+                "needs_logout": is_stale_shift(entry, now),
+            }
+        )
+
+    worked_total = sum(r["worked_hours"] for r in rows)
+    target_total = sum(r["accrued_target_hours"] for r in rows)
+    return {
+        "rows": rows,
+        "worked_hours": worked_total,
+        "target_hours": target_total,
+        "balance_hours": worked_total - target_total,
+        "today_in_progress": any(r["in_progress"] for r in rows),
+    }
 
 
 def week_bounds(any_date):
@@ -194,6 +287,7 @@ def weekly_totals(user, entries_by_date, any_date, now=None):
                 "worked_hours": worked,
                 "balance_hours": worked - target,
                 "in_month": in_month,
+                "needs_logout": is_stale_shift(entry, now),
             }
         )
 
@@ -317,6 +411,9 @@ def saturday_plan(user, entries_by_date, week_start, today, now=None):
         "mode": "projection",
         "saturday_date": saturday_date,
         "remaining_hours": remaining_for_saturday,
+        # More than one Saturday can hold: the "logout time" would land after
+        # midnight, which is arithmetic rather than a plan.
+        "projected_spills": projected_dt is not None and projected_dt.date() != saturday_date,
         "projected_time": fmt_suggested_datetime(projected_dt, saturday_date),
         "has_login_hint": bool(user.saturday_login_hint),
         "reached": remaining_for_saturday <= 0,
@@ -382,6 +479,64 @@ def suggested_logout(
     return False, suggested_dt, still_needed
 
 
+def shift_login_dt(entry):
+    return datetime.combine(entry.date, entry.login_time)
+
+
+def place_on_shift(entry_date, typed, earliest=None):
+    """Put a typed time of day onto a shift's timeline. A time earlier than
+    ``earliest`` belongs to the next day -- that is how an overnight shift
+    carries past midnight, the same way the day's hours are added up."""
+    dt = datetime.combine(entry_date, typed)
+    if earliest is not None and dt < earliest:
+        dt += timedelta(days=1)
+    return dt
+
+
+def last_mark_dt(entry, now):
+    """The latest moment already recorded on an open shift: the login, or
+    the most recent break start or end. Anything placed after ``now`` is
+    impossible, so it's ignored rather than blocking every typed time."""
+    login_dt = shift_login_dt(entry)
+    mark = login_dt
+    for b in entry.breaks:
+        start = place_on_shift(entry.date, b.break_start, login_dt)
+        points = [start]
+        if b.break_end is not None:
+            points.append(place_on_shift(entry.date, b.break_end, start))
+        for p in points:
+            if p <= now + PUNCH_GRACE:
+                mark = max(mark, p)
+    return mark
+
+
+def check_typed_time(entry_date, typed, now, earliest=None, earliest_label=None):
+    """Check a time typed in for a login, break or logout missed live.
+
+    Returns ``(when, None)`` if it fits the shift, or ``(None, message)``
+    saying what's wrong. When the other half of the day would have fitted,
+    the message suggests it, because an AM/PM slip is the usual cause --
+    and left alone, a 6:00 AM logout meant as 6:00 PM becomes a 21h day.
+    """
+    def fits(t):
+        dt = place_on_shift(entry_date, t, earliest)
+        return dt if dt <= now + PUNCH_GRACE else None
+
+    when = fits(typed)
+    if when is not None:
+        return when, None
+
+    typed_same_day = datetime.combine(entry_date, typed)
+    if earliest is not None and entry_date == now.date() and typed_same_day < earliest:
+        message = f"{fmt_clock(typed)} is before {earliest_label} ({fmt_clock(earliest)})."
+    else:
+        message = f"{fmt_clock(typed)} hasn't happened yet."
+    flipped = (typed_same_day + timedelta(hours=12)).time()
+    if fits(flipped) is not None:
+        message += f" Did you mean {fmt_clock(flipped)}?"
+    return None, message
+
+
 def fmt_hours(value):
     """Format decimal hours as 'Hh MMm'."""
     if value is None:
@@ -391,6 +546,43 @@ def fmt_hours(value):
     total_minutes = round(value * 60)
     h, m = divmod(total_minutes, 60)
     return f"{sign}{h}h {m:02d}m"
+
+
+def fmt_balance(value):
+    """A balance with its direction written out: +7h 52m, −6h 09m.
+
+    Always signed, so ahead and behind never depend on colour alone, and the
+    minus is a real minus sign, which screen readers say as "minus" rather
+    than "dash".
+    """
+    if value is None:
+        return "--"
+    total_minutes = round(value * 60)
+    if total_minutes == 0:
+        return "0h 00m"
+    h, m = divmod(abs(total_minutes), 60)
+    sign = "+" if total_minutes > 0 else "\u2212"
+    return f"{sign}{h}h {m:02d}m"
+
+
+def fmt_duration(value):
+    """A length of time for a sentence: 25m, 1h 05m, 8h."""
+    total_minutes = max(0, round((value or 0) * 60))
+    h, m = divmod(total_minutes, 60)
+    if h == 0:
+        return f"{m}m"
+    if m == 0:
+        return f"{h}h"
+    return f"{h}h {m:02d}m"
+
+
+def fmt_hours_compact(value):
+    """Hours squeezed for a narrow column on a phone: 8h25, 11h40, 45m."""
+    total_minutes = max(0, round((value or 0) * 60))
+    h, m = divmod(total_minutes, 60)
+    if h == 0:
+        return f"{m}m"
+    return f"{h}h{m:02d}"
 
 
 def fmt_target_hours(value):

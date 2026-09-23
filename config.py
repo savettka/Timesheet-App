@@ -22,6 +22,12 @@ class Config:
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
+    # Send the sign-in cookies only on requests that start on STM itself, so
+    # another website can't submit STM's forms -- log someone out, remove a
+    # user -- riding on the visitor's signed-in session.
+    SESSION_COOKIE_SAMESITE = "Lax"
+    REMEMBER_COOKIE_SAMESITE = "Lax"
+
     # Profile pictures get downscaled to a small square on upload, so the
     # only reason to accept a large file is the original phone photo.
     MAX_CONTENT_LENGTH = 8 * 1024 * 1024  # 8 MB

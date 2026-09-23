@@ -1,240 +1,325 @@
 (function () {
   "use strict";
 
-  // ---------------------------------------------------------- theme toggle
+  // ------------------------------------------------------------- helpers
+  function fmtHours(hours) {
+    var total = Math.max(0, Math.round(hours * 60));
+    return Math.floor(total / 60) + "h " + String(total % 60).padStart(2, "0") + "m";
+  }
+
+  // A length of time for a sentence: 25m, 1h 05m, 8h (matches the server).
+  function fmtDuration(hours) {
+    var total = Math.max(0, Math.round(hours * 60));
+    var h = Math.floor(total / 60);
+    var m = total % 60;
+    if (!h) return m + "m";
+    if (!m) return h + "h";
+    return h + "h " + String(m).padStart(2, "0") + "m";
+  }
+
+  // ---------------------------------------------------------------- theme
+  function currentTheme() {
+    var set = document.documentElement.getAttribute("data-theme");
+    if (set === "dark" || set === "light") return set;
+    return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark" : "light";
+  }
+
   function initTheme() {
-    var toggle = document.getElementById("theme-toggle");
-    if (!toggle) return;
-    toggle.addEventListener("click", function () {
-      var root = document.documentElement;
-      var current = root.getAttribute("data-theme") === "dark" ? "dark" : "light";
-      var next = current === "dark" ? "light" : "dark";
-      root.setAttribute("data-theme", next);
-      localStorage.setItem("stm-theme", next);
-    });
-  }
+    var toggles = document.querySelectorAll(".js-theme-toggle");
+    if (!toggles.length) return;
 
-  // ---------------------------------------------------------- mobile nav
-  function initHamburger() {
-    var btn = document.getElementById("hamburger");
-    var sidebar = document.querySelector(".sidebar");
-    if (!btn || !sidebar) return;
-    btn.addEventListener("click", function () {
-      sidebar.classList.toggle("open");
-    });
-    document.addEventListener("click", function (e) {
-      if (sidebar.classList.contains("open") && !sidebar.contains(e.target) && e.target !== btn && !btn.contains(e.target)) {
-        sidebar.classList.remove("open");
-      }
-    });
-  }
-
-  // ---------------------------------------------------------- live clock
-  function fmtHours(hoursDecimal) {
-    var sign = hoursDecimal < 0 ? "-" : "";
-    var abs = Math.abs(hoursDecimal);
-    var totalMinutes = Math.round(abs * 60);
-    var h = Math.floor(totalMinutes / 60);
-    var m = totalMinutes % 60;
-    return sign + h + "h " + String(m).padStart(2, "0") + "m";
-  }
-
-  function initLiveTimer() {
-    var card = document.getElementById("clock-card");
-    var valueEl = document.getElementById("live-timer-value");
-    if (!card || !valueEl) return;
-
-    var loggedIn = card.dataset.loggedIn === "true";
-    if (!loggedIn) return;
-
-    var onBreak = card.dataset.onBreak === "true";
-    var loginIso = card.dataset.loginIso;
-    var breakStartIso = card.dataset.breakStartIso;
-    var closedBreakSeconds = parseInt(card.dataset.closedBreakSeconds || "0", 10);
-
-    if (!loginIso) return;
-    var loginMs = new Date(loginIso).getTime();
-    var breakStartMs = breakStartIso ? new Date(breakStartIso).getTime() : null;
-
-    function tick() {
-      var now = Date.now();
-      var rawSeconds = (now - loginMs) / 1000;
-      var breakSeconds = closedBreakSeconds;
-      if (onBreak && breakStartMs) {
-        breakSeconds += (now - breakStartMs) / 1000;
-      }
-      var netHours = Math.max(0, (rawSeconds - breakSeconds) / 3600);
-      valueEl.textContent = fmtHours(netHours);
+    function sync() {
+      var dark = currentTheme() === "dark";
+      toggles.forEach(function (t) { t.setAttribute("aria-pressed", dark ? "true" : "false"); });
     }
 
+    toggles.forEach(function (toggle) {
+      toggle.addEventListener("click", function () {
+        var next = currentTheme() === "dark" ? "light" : "dark";
+        document.documentElement.setAttribute("data-theme", next);
+        try { localStorage.setItem("stm-theme", next); } catch (e) { /* not saved - still applied */ }
+        sync();
+      });
+    });
+
+    if (window.matchMedia) {
+      var mq = window.matchMedia("(prefers-color-scheme: dark)");
+      if (mq.addEventListener) mq.addEventListener("change", sync);
+    }
+    sync();
+  }
+
+  // ------------------------------------------------------------- messages
+  function initFlashes() {
+    document.addEventListener("click", function (e) {
+      var btn = e.target.closest(".flash-close");
+      if (!btn) return;
+      var flash = btn.closest(".flash");
+      var stack = flash && flash.parentElement;
+      if (flash) flash.remove();
+      if (stack && !stack.children.length) stack.remove();
+      // The button that had focus is gone; keep keyboard users in the page
+      // instead of dropping them back at the very top.
+      var main = document.getElementById("main");
+      if (main) main.focus();
+    });
+  }
+
+  // ---------------------------------------------------------------- forms
+  // `data-confirm` asks before a form goes (delete a day, remove a user).
+  // The question lives in an attribute rather than inline script, so a name
+  // with an apostrophe can't break it and skip the question.
+  //
+  // `js-once` forms ignore a second press while the first is on its way,
+  // since a double tap on Login used to send it twice and show an error.
+  function initForms() {
+    document.addEventListener("submit", function (e) {
+      var form = e.target;
+      var question = form.getAttribute("data-confirm");
+      if (question && !window.confirm(question)) {
+        e.preventDefault();
+        return;
+      }
+      if (form.classList.contains("js-once")) {
+        if (form.dataset.sent === "true") {
+          e.preventDefault();
+          return;
+        }
+        form.dataset.sent = "true";
+        var btn = e.submitter || form.querySelector('[type="submit"]');
+        if (btn) btn.setAttribute("aria-disabled", "true");
+      }
+    });
+
+    // Coming back with the browser's Back button restores the page as it was
+    // left -- mid-submit -- so make its buttons pressable again.
+    window.addEventListener("pageshow", function (e) {
+      if (!e.persisted) return;
+      document.querySelectorAll("form.js-once").forEach(function (form) {
+        delete form.dataset.sent;
+        form.querySelectorAll('[aria-disabled="true"]').forEach(function (b) {
+          b.removeAttribute("aria-disabled");
+        });
+      });
+    });
+  }
+
+  // ----------------------------------------------------------- live timer
+  // Counts on from what the server worked out when the page was made. The
+  // old timer re-read the login clock time in the browser's own time zone,
+  // which was hours out whenever the phone and the server disagreed.
+  function initLiveTimer() {
+    var card = document.getElementById("clock-card");
+    if (!card) return;
+    var state = card.dataset.dayState;
+    if (state !== "working" && state !== "break") return;
+
+    var worked = parseInt(card.dataset.workedSeconds || "0", 10);
+    var onBreak = parseInt(card.dataset.breakSeconds || "0", 10);
+    var timerEl = document.getElementById("live-timer-value");
+    var breakEl = document.getElementById("break-timer");
+    // Wall-clock time, not performance.now(): it keeps counting while a phone
+    // sleeps, so the figure is right the moment the screen comes back on.
+    var started = Date.now();
+
+    function tick() {
+      var elapsed = (Date.now() - started) / 1000;
+      if (state === "working" && timerEl) timerEl.textContent = fmtHours((worked + elapsed) / 3600);
+      if (state === "break" && breakEl) breakEl.textContent = fmtDuration((onBreak + elapsed) / 3600);
+    }
     tick();
     setInterval(tick, 1000);
   }
 
-  // ---------------------------------------------------------- status poll
-  // Says how much break a suggested clock-out time is allowing for, so the
-  // number can be reconciled against the hours worked.
-  function breakNote(suggestion) {
-    return suggestion.break_allowance_fmt
-      ? ", including " + suggestion.break_allowance_fmt + " of break"
-      : "";
+  // ----------------------------------------------------------- status poll
+  function breakNote(s) {
+    return s.break_allowance_fmt ? ", allowing " + s.break_allowance_fmt + " more break" : "";
   }
 
-  // Rebuilds the Saturday plan banner from the same fields the template uses,
-  // so the projected clock-out moves as the day is worked instead of only
-  // changing once the date rolls over.
+  function setBanner(el, cls, html) {
+    if (!el) return;
+    el.className = "banner " + cls;
+    el.innerHTML = html;
+  }
+
+  function renderWeekly(data) {
+    var s = data.suggestion;
+    var el = document.getElementById("weekly-banner");
+    var left = data.weekly_remaining_fmt;
+    if (data.weekly_complete) {
+      setBanner(el, "banner-success", "You've hit your " + data.weekly_target_fmt + " weekly target" +
+        (data.is_logged_in ? " — you can log out any time." : "."));
+    } else if (s && !s.reached && s.lands_today) {
+      setBanner(el, "banner-info", left + " left this week. At this pace, log out around <strong>" +
+        s.suggested_time + "</strong> today to hit your target" + breakNote(s) + ".");
+    } else if (s && !s.reached && !s.today_target_met) {
+      setBanner(el, "banner-info", left + " left this week — more than today can cover. " +
+        "Log out around <strong>" + s.today_time + "</strong> to finish today's " +
+        s.today_target_fmt + breakNote(s) + ".");
+    } else if (s && !s.reached) {
+      setBanner(el, "banner-info", "Today's hours are done. " + left +
+        " left this week — see the Saturday plan below.");
+    } else {
+      setBanner(el, "banner-muted", left + " left to reach your weekly target.");
+    }
+
+    var fill = document.getElementById("weekly-progress-fill");
+    var bar = document.getElementById("weekly-progress");
+    var pct = Math.min(100, data.weekly_progress_pct);
+    if (fill) fill.style.width = pct + "%";
+    if (bar) {
+      bar.setAttribute("aria-valuenow", String(Math.round(pct)));
+      bar.setAttribute("aria-valuetext", data.weekly_worked_fmt + " of " + data.weekly_target_fmt);
+    }
+    var fig = document.getElementById("weekly-worked-fig");
+    if (fig) fig.textContent = data.weekly_worked_fmt;
+
+    var finish = document.getElementById("finish-time");
+    if (finish && s && s.today_time) finish.textContent = s.today_time;
+  }
+
+  // Rebuilds the Saturday plan from the same fields the page uses, so the
+  // projected logout moves as the day is worked.
   function renderSaturday(sat) {
     var el = document.getElementById("saturday-banner");
     if (!el || !sat) return;
-    var cls = "banner banner-info";
-    var html;
-
     if (sat.mode === "live") {
       if (sat.reached) {
-        cls = "banner banner-success";
-        html = "🎉 You've already covered your " + sat.target_fmt + " this week — log out on Saturday whenever suits you.";
+        setBanner(el, "banner-success", "You've already covered your " + sat.target_fmt +
+          " this week — log out on Saturday whenever suits you.");
       } else {
-        html = "Punch out around <strong>" + sat.suggested_time + "</strong> today to complete your week.";
+        setBanner(el, "banner-info", "Log out around <strong>" + sat.suggested_time +
+          "</strong> today to complete your week.");
       }
     } else if (sat.mode === "done") {
       if (sat.week_complete) {
-        cls = "banner banner-success";
-        html = "🎉 Saturday's done and your weekly target is complete.";
+        setBanner(el, "banner-success", "Saturday's done and your weekly target is complete.");
       } else {
-        cls = "banner banner-muted";
-        html = "Saturday's logged — you worked " + sat.worked_fmt + ".";
+        setBanner(el, "banner-muted", "Saturday's logged — you worked " + sat.worked_fmt + ".");
       }
     } else if (sat.reached) {
-      cls = "banner banner-success";
-      html = "🎉 On current pace you're set to hit " + sat.target_fmt + " without needing Saturday at all.";
+      setBanner(el, "banner-success", "On current pace you'll hit " + sat.target_fmt +
+        " without needing Saturday at all.");
+    } else if (sat.projected_spills) {
+      setBanner(el, "banner-muted", "About " + sat.remaining_fmt + " would be left for Saturday — " +
+        "more than one day can hold. Adding a little to the days before will spread it out.");
     } else if (sat.projected_time) {
-      html = "If the rest of the week goes to plan, log out around <strong>" +
+      setBanner(el, "banner-info", "If the rest of the week goes to plan, log out around <strong>" +
         sat.projected_time + "</strong> on Saturday (" + sat.remaining_fmt +
-        " of work) to hit your " + sat.target_fmt + " target.";
-    } else {
-      cls = "banner banner-muted";
-      html = "About " + sat.remaining_fmt + " left for Saturday if the rest of the week goes to plan.";
+        " of work) to hit your " + sat.target_fmt + " target.");
     }
-
-    el.className = cls;
-    el.innerHTML = html;
   }
 
   function initStatusPoll() {
     if (!window.STM_STATUS_URL) return;
+    var card = document.getElementById("clock-card");
+    var pageState = card ? card.dataset.dayState : null;
+
+    function typingInCard() {
+      var active = document.activeElement;
+      return card && active && card.contains(active) && active.tagName === "INPUT";
+    }
 
     function refresh() {
       fetch(window.STM_STATUS_URL, { headers: { Accept: "application/json" } })
         .then(function (r) { return r.ok ? r.json() : null; })
         .then(function (data) {
           if (!data) return;
-
-          var fill = document.getElementById("weekly-progress-fill");
-          if (fill) fill.style.width = Math.min(100, data.weekly_progress_pct) + "%";
-
-          var workedFig = document.getElementById("weekly-worked-fig");
-          if (workedFig) workedFig.innerHTML = "<strong>" + data.weekly_worked_fmt + "</strong> worked";
-
-          var banner = document.getElementById("weekly-banner");
-          if (banner) {
-            if (data.weekly_complete) {
-              banner.className = "banner banner-success";
-              banner.textContent = "🎉 You've hit your weekly target" + (data.is_logged_in ? " — you can log out any time." : ".");
-            } else if (data.suggestion && !data.suggestion.reached && data.suggestion.lands_today) {
-              banner.className = "banner banner-info";
-              banner.innerHTML = data.weekly_remaining_fmt + " left this week. At this pace, punch out around <strong>" + data.suggestion.suggested_time + "</strong> today to hit your target" + breakNote(data.suggestion) + ".";
-            } else if (data.suggestion && !data.suggestion.reached && !data.suggestion.today_target_met) {
-              // The weekly figure can't be reached today, so aim at today's own hours.
-              banner.className = "banner banner-info";
-              banner.innerHTML = data.weekly_remaining_fmt + " left this week — more than today can cover. Punch out around <strong>" + data.suggestion.today_time + "</strong> to finish today's " + data.suggestion.today_target_fmt + breakNote(data.suggestion) + ".";
-            } else if (data.suggestion && !data.suggestion.reached) {
-              banner.className = "banner banner-info";
-              banner.textContent = "Today's hours are done. " + data.weekly_remaining_fmt + " left this week — see the Saturday plan below.";
-            } else {
-              banner.className = "banner banner-muted";
-              banner.textContent = data.weekly_remaining_fmt + " left to reach your weekly target.";
-            }
+          // Logged in, out or on a break somewhere else -- another device or
+          // tab. Show what's really happening instead of a screen that's
+          // still ticking for a shift that has ended.
+          if (pageState && data.day_state && data.day_state !== pageState) {
+            if (!typingInCard()) window.location.reload();
+            return;
           }
-
+          renderWeekly(data);
           renderSaturday(data.saturday);
         })
-        .catch(function () { /* silent - keep last known state */ });
+        .catch(function () { /* offline for a moment - keep what's shown */ });
     }
 
-    // Only poll while the tab is actually being looked at. A dashboard left
-    // open in a background tab all day would otherwise keep hitting the
-    // server every 30s for a screen nobody is reading -- wasted requests,
-    // and wasted CPU allowance on a small host.
-    setInterval(function () {
-      if (!document.hidden) refresh();
-    }, 30000);
-
-    // Coming back to the tab shouldn't mean waiting up to 30s for fresh numbers.
-    document.addEventListener("visibilitychange", function () {
-      if (!document.hidden) refresh();
-    });
+    // Only poll while the page is actually being looked at: a tab left open
+    // all day would otherwise keep using the host's CPU allowance for nobody.
+    setInterval(function () { if (!document.hidden) refresh(); }, 30000);
+    document.addEventListener("visibilitychange", function () { if (!document.hidden) refresh(); });
   }
 
-  // ---------------------------------------------------------- break rows
+  // ------------------------------------------------------------ break rows
   function initBreakRows() {
     var container = document.getElementById("break-rows");
     var addBtn = document.getElementById("add-break");
     var template = document.getElementById("break-row-template");
     if (!container || !addBtn || !template) return;
+    var counter = 1000;
 
     addBtn.addEventListener("click", function () {
       var clone = template.content.cloneNode(true);
+      counter += 1;
+      // Each new row gets its own ids, so every label stays tied to its box.
+      clone.querySelectorAll("[data-id]").forEach(function (input) {
+        input.id = input.dataset.id + "-" + counter;
+      });
+      clone.querySelectorAll("[data-for]").forEach(function (label) {
+        label.htmlFor = label.dataset.for + "-" + counter;
+      });
       container.appendChild(clone);
+      var first = container.lastElementChild.querySelector("input");
+      if (first) first.focus();
     });
 
     container.addEventListener("click", function (e) {
       var btn = e.target.closest(".remove-break");
       if (!btn) return;
-      var rows = container.querySelectorAll(".break-row-input");
-      if (rows.length <= 1) {
-        btn.closest(".break-row-input").querySelectorAll("input").forEach(function (i) { i.value = ""; });
+      var row = btn.closest(".break-row-input");
+      if (container.querySelectorAll(".break-row-input").length <= 1) {
+        row.querySelectorAll("input").forEach(function (i) { i.value = ""; });
+        row.querySelector("input").focus();
         return;
       }
-      btn.closest(".break-row-input").remove();
+      // Move focus before the row -- and the button that had it -- goes.
+      var neighbour = row.nextElementSibling || row.previousElementSibling;
+      row.remove();
+      var target = (neighbour && neighbour.querySelector("input")) || addBtn;
+      target.focus();
     });
   }
 
-  // ------------------------------------------------- profile picture picker
+  // --------------------------------------------------- profile picture pick
   function initAvatarPicker() {
     var input = document.getElementById("avatar-input");
     var label = document.getElementById("avatar-filename");
     if (!input || !label) return;
-
     var original = label.textContent;
     input.addEventListener("change", function () {
-      if (!input.files || !input.files.length) {
-        label.textContent = original;
-        return;
-      }
-      // Confirm the pick, since the file dialog gives no other feedback
-      // until the form is actually saved.
-      label.textContent = input.files[0].name + " — press Save profile";
+      label.textContent = input.files && input.files.length
+        ? input.files[0].name + " — press Save profile to use it"
+        : original;
     });
   }
 
   // ------------------------------------------------------------- day type
-  // The hours box is only relevant for a custom day; the leave options set
-  // the hours themselves.
+  // The hours box only matters for a custom day, and a reason only for a day
+  // that isn't an ordinary working day.
   function initDayType() {
-    var select = document.getElementById("day-type");
-    var field = document.getElementById("custom-hours-field");
-    if (!select || !field) return;
-
+    var group = document.getElementById("day-type");
+    if (!group) return;
+    var custom = document.getElementById("custom-hours-field");
+    var reason = document.getElementById("leave-reason-field");
     function sync() {
-      field.hidden = select.value !== "custom";
+      var checked = group.querySelector("input:checked");
+      var value = checked ? checked.value : "";
+      if (custom) custom.hidden = value !== "custom";
+      if (reason) reason.hidden = value === "";
     }
-    select.addEventListener("change", sync);
+    group.addEventListener("change", sync);
     sync();
   }
 
   document.addEventListener("DOMContentLoaded", function () {
     initTheme();
-    initHamburger();
+    initFlashes();
+    initForms();
     initLiveTimer();
     initStatusPoll();
     initBreakRows();

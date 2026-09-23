@@ -1,8 +1,10 @@
 import calendar
+import math
 import os
 import secrets
 import uuid
 from datetime import date, datetime, timedelta
+from types import SimpleNamespace
 
 from flask import (
     Blueprint,
@@ -130,24 +132,33 @@ def parse_time_field(value):
 def build_dashboard_context():
     user = current_user
     now = datetime.now()
+    today = now.date()
     open_entry = get_open_entry(user.id)
-    reference_date = open_entry.date if open_entry else date.today()
+    # A shift left open so long it's almost certainly a forgotten logout:
+    # logging out now would record a day of 20-odd hours, so the dashboard
+    # asks when it really ended, and offers no suggestions built on it.
+    stale = logic.is_stale_shift(open_entry, now)
+    reference_date = open_entry.date if open_entry else today
 
     week_start, week_end = logic.week_bounds(reference_date)
     entries_by_date = get_entries_for_range(user.id, week_start, week_end)
     weekly = logic.weekly_totals(user, entries_by_date, reference_date, now=now)
 
-    today_entry = entries_by_date.get(date.today())
-    today_target = logic.target_hours_for(user, date.today(), today_entry)
+    today_entry = entries_by_date.get(today)
+    if today_entry is None and not (week_start <= today <= week_end):
+        # An open shift from last week leaves today outside the week just
+        # loaded, so fetch it on its own rather than miss it.
+        today_entry = TimeEntry.query.filter_by(user_id=user.id, date=today).first()
+    today_target = logic.target_hours_for(user, today, today_entry)
     today_worked = logic.entry_total_hours(today_entry, now=now) if today_entry else 0.0
     # Same rule as History: an unfinished day owes only what it has had the
     # chance to work, so the morning doesn't read as a whole day behind.
     today_accrued_target = logic.accrued_target_hours(
-        today_target, today_entry, date.today(), date.today(), now=now
+        today_target, today_entry, today, today, now=now
     )
 
     suggestion = None
-    if open_entry:
+    if open_entry and not stale:
         worked_today_in_week = logic.entry_total_hours(open_entry, now=now)
         weekly_before_today = weekly["worked_hours"] - worked_today_in_week
         reached, suggested_dt, still_needed = logic.suggested_logout(
@@ -176,9 +187,9 @@ def build_dashboard_context():
             "still_needed_hours": still_needed,
             "today_target_met": today_remaining <= 0,
             "today_time": logic.fmt_suggested_datetime(today_dt, open_entry.date),
-            "today_target_fmt": logic.fmt_hours(today_target),
+            "today_target_fmt": logic.fmt_duration(today_target),
             "break_allowance_fmt": (
-                logic.fmt_hours(break_to_come) if break_to_come > 0 else None
+                logic.fmt_duration(break_to_come) if break_to_come > 0 else None
             ),
         }
 
@@ -190,6 +201,31 @@ def build_dashboard_context():
     open_entry_closed_break_seconds = (
         int(logic.closed_break_hours(open_entry) * 3600) if open_entry else 0
     )
+
+    # Which moment of the day the dashboard is showing.
+    if open_entry is not None:
+        day_state = "stale" if stale else ("break" if open_break else "working")
+    elif today_entry is not None and today_entry.login_time and today_entry.logout_time:
+        day_state = "done"
+    else:
+        day_state = "ready"
+
+    if open_entry is not None:
+        shift_worked = logic.entry_total_hours(open_entry, now=now)
+    elif day_state == "done":
+        shift_worked = today_worked
+    else:
+        shift_worked = 0.0
+    break_elapsed = (
+        logic.break_segment_hours(open_entry, open_break, now=now) if open_break else 0.0
+    )
+
+    if now.hour < 12:
+        greeting = "Good morning"
+    elif now.hour < 17:
+        greeting = "Good afternoon"
+    else:
+        greeting = "Good evening"
 
     recent_entries = (
         TimeEntry.query.filter_by(user_id=user.id)
@@ -212,6 +248,16 @@ def build_dashboard_context():
         "saturday": saturday,
         "recent_entries": recent_entries,
         "now": now,
+        "day_state": day_state,
+        # The live timer counts on from these instead of re-deriving times
+        # from a login clock time, which the browser would read in its own
+        # time zone -- wrong whenever the phone and server disagree.
+        "shift_worked_seconds": int(shift_worked * 3600),
+        "break_elapsed_seconds": int(break_elapsed * 3600),
+        "greeting": greeting,
+        "fmt_balance": logic.fmt_balance,
+        "fmt_duration": logic.fmt_duration,
+        "fmt_hours_compact": logic.fmt_hours_compact,
         "fmt_hours": logic.fmt_hours,
         "fmt_target_hours": logic.fmt_target_hours,
         "fmt_time": logic.fmt_time,
@@ -231,7 +277,15 @@ def index():
 @main_bp.route("/dashboard")
 @login_required
 def dashboard():
-    return render_template("dashboard.html", **build_dashboard_context())
+    ctx = build_dashboard_context()
+    today = ctx["now"].date()
+    first_day = today.replace(day=1)
+    last_day = today.replace(day=calendar.monthrange(today.year, today.month)[1])
+    month_entries = get_entries_for_range(current_user.id, first_day, last_day)
+    ctx["month"] = logic.month_summary(
+        current_user, month_entries, today.year, today.month, today, now=ctx["now"]
+    )
+    return render_template("dashboard.html", **ctx)
 
 
 @main_bp.route("/api/status")
@@ -252,6 +306,8 @@ def api_status():
         "weekly_remaining_fmt": logic.fmt_hours(ctx["weekly"]["remaining_hours"]),
         "weekly_progress_pct": round(ctx["weekly"]["progress_pct"], 1),
         "weekly_complete": ctx["weekly"]["complete"],
+        "weekly_target_fmt": logic.fmt_target_hours(ctx["weekly"]["target_hours"]),
+        "day_state": ctx["day_state"],
         "is_logged_in": bool(open_entry),
         "is_on_break": bool(open_break),
         "login_time": logic.fmt_time(open_entry.login_time) if open_entry else None,
@@ -286,87 +342,209 @@ def api_status():
 
 # ---------------------------------------------------------------- punches
 
+def typed_punch_time():
+    """The time typed in for a punch that was missed live, if any."""
+    return parse_time_field(request.form.get("time"))
+
+
+def stale_shift_redirect(entry):
+    flash(
+        f"You're still logged in from {entry.date.strftime('%a %d %b')} "
+        f"({logic.fmt_time(entry.login_time)}). Enter the time you finished "
+        "that day below, or fix it in History.",
+        "error",
+    )
+    return redirect(url_for("main.dashboard"))
+
+
+def mark_label(entry, mark):
+    """Names the latest recorded point on a shift, for an error message."""
+    return "you logged in" if mark == logic.shift_login_dt(entry) else "your last break"
+
+
 @main_bp.route("/punch/in", methods=["POST"])
 @login_required
 def punch_in():
     user_id = current_user.id
+    now = datetime.now()
+    today = now.date()
     if get_open_entry(user_id):
         flash("You're already logged in.", "error")
         return redirect(url_for("main.dashboard"))
 
-    custom_time = parse_time_field(request.form.get("time"))
-    punch_dt = datetime.combine(date.today(), custom_time) if custom_time else datetime.now()
-    entry_date = punch_dt.date()
+    typed = typed_punch_time()
+    entry = TimeEntry.query.filter_by(user_id=user_id, date=today).first()
 
-    existing = TimeEntry.query.filter_by(user_id=user_id, date=entry_date).first()
-    if existing:
-        flash(
-            f"There's already an entry for {entry_date.strftime('%d %b %Y')}. "
-            "Edit it from History instead.",
-            "error",
-        )
+    # Logged out already today: carry on with the same day, the time away
+    # recorded as a break. This used to be refused because the day existed,
+    # which left the dashboard's main button a dead end after every logout.
+    if entry is not None and entry.login_time is not None and entry.logout_time is not None:
+        logout_dt = logic.place_on_shift(today, entry.logout_time, logic.shift_login_dt(entry))
+        if typed:
+            when, error = logic.check_typed_time(
+                today, typed, now, earliest=logout_dt, earliest_label="you logged out"
+            )
+            if error:
+                flash(error, "error")
+                return redirect(url_for("main.dashboard"))
+        else:
+            when = now
+        if when < logout_dt:
+            flash(
+                f"You logged out at {logic.fmt_time(entry.logout_time)}, so you can't "
+                "log in again before then.",
+                "error",
+            )
+            return redirect(url_for("main.dashboard"))
+        gap = (when - logout_dt).total_seconds() / 3600.0
+        # Under a minute is an accidental logout being undone, not a break.
+        if gap >= 1 / 60:
+            entry.breaks.append(
+                BreakSegment(break_start=entry.logout_time, break_end=when.time())
+            )
+            message = (
+                f"Logged in again at {logic.fmt_time(when.time())}. The "
+                f"{logic.fmt_duration(gap)} since you logged out counts as a break."
+            )
+        else:
+            message = f"Logged in again at {logic.fmt_time(when.time())}."
+        entry.logout_time = None
+        db.session.commit()
+        flash(message, "success")
         return redirect(url_for("main.dashboard"))
 
-    entry = TimeEntry(user_id=user_id, date=entry_date, login_time=punch_dt.time())
-    db.session.add(entry)
+    if typed:
+        when, error = logic.check_typed_time(today, typed, now)
+        if error:
+            flash(error, "error")
+            return redirect(url_for("main.dashboard"))
+    else:
+        when = now
+
+    if entry is not None:
+        # The day already exists without a login -- leave booked in advance,
+        # or its own target set from History. Log in to that day rather than
+        # turning the login away.
+        entry.login_time = when.time()
+        entry.logout_time = None
+    else:
+        entry = TimeEntry(user_id=user_id, date=today, login_time=when.time())
+        db.session.add(entry)
     db.session.commit()
-    flash(f"Punched in at {logic.fmt_time(entry.login_time)}.", "success")
+    flash(f"Logged in at {logic.fmt_time(entry.login_time)}.", "success")
     return redirect(url_for("main.dashboard"))
 
 
 @main_bp.route("/punch/break/start", methods=["POST"])
 @login_required
 def punch_break_start():
+    now = datetime.now()
     entry = get_open_entry(current_user.id)
     if not entry:
-        flash("You need to punch in first.", "error")
+        flash("You're not logged in yet — tap Login first.", "error")
         return redirect(url_for("main.dashboard"))
     if entry.open_break():
         flash("You're already on a break.", "error")
         return redirect(url_for("main.dashboard"))
+    if logic.is_stale_shift(entry, now):
+        return stale_shift_redirect(entry)
 
-    custom_time = parse_time_field(request.form.get("time"))
-    t = custom_time or datetime.now().time()
+    typed = typed_punch_time()
+    if typed:
+        mark = logic.last_mark_dt(entry, now)
+        _, error = logic.check_typed_time(
+            entry.date, typed, now, earliest=mark, earliest_label=mark_label(entry, mark)
+        )
+        if error:
+            flash(error, "error")
+            return redirect(url_for("main.dashboard"))
+    t = typed or now.time()
     db.session.add(BreakSegment(entry_id=entry.id, break_start=t))
     db.session.commit()
-    flash(f"Break started at {logic.fmt_time(t)}.", "success")
+    flash(f"Break started at {logic.fmt_time(t)}. Tap Back when you return.", "success")
     return redirect(url_for("main.dashboard"))
 
 
 @main_bp.route("/punch/break/end", methods=["POST"])
 @login_required
 def punch_break_end():
+    now = datetime.now()
     entry = get_open_entry(current_user.id)
     open_break = entry.open_break() if entry else None
     if not open_break:
-        flash("You're not currently on a break.", "error")
+        flash("You're not on a break right now.", "error")
         return redirect(url_for("main.dashboard"))
+    if logic.is_stale_shift(entry, now):
+        return stale_shift_redirect(entry)
 
-    custom_time = parse_time_field(request.form.get("time"))
-    t = custom_time or datetime.now().time()
-    open_break.break_end = t
+    start_dt = logic.place_on_shift(
+        entry.date, open_break.break_start, logic.shift_login_dt(entry)
+    )
+    typed = typed_punch_time()
+    if typed:
+        when, error = logic.check_typed_time(
+            entry.date, typed, now, earliest=start_dt, earliest_label="your break started"
+        )
+        if error:
+            flash(error, "error")
+            return redirect(url_for("main.dashboard"))
+    else:
+        when = now
+    open_break.break_end = when.time()
     db.session.commit()
-    flash(f"Break ended at {logic.fmt_time(t)}.", "success")
+    length = max(0.0, (when - start_dt).total_seconds() / 3600.0)
+    flash(
+        f"Back at {logic.fmt_time(open_break.break_end)}, after a "
+        f"{logic.fmt_duration(length)} break.",
+        "success",
+    )
     return redirect(url_for("main.dashboard"))
 
 
 @main_bp.route("/punch/out", methods=["POST"])
 @login_required
 def punch_out():
+    now = datetime.now()
     entry = get_open_entry(current_user.id)
     if not entry:
-        flash("You're not currently logged in.", "error")
+        flash("You're not logged in right now.", "error")
         return redirect(url_for("main.dashboard"))
     if entry.open_break():
-        flash("End your break before logging out.", "error")
+        flash("You're on a break — tap Back first, then Logout.", "error")
         return redirect(url_for("main.dashboard"))
 
-    custom_time = parse_time_field(request.form.get("time"))
-    t = custom_time or datetime.now().time()
-    entry.logout_time = t
+    typed = typed_punch_time()
+    if typed:
+        mark = logic.last_mark_dt(entry, now)
+        when, error = logic.check_typed_time(
+            entry.date, typed, now, earliest=mark, earliest_label=mark_label(entry, mark)
+        )
+        if error:
+            flash(error, "error")
+            return redirect(url_for("main.dashboard"))
+    else:
+        when = now
+
+    # A logout the day after, from a tab left open or a forgotten evening,
+    # would otherwise quietly record a 24h+ day.
+    span = (when - logic.shift_login_dt(entry)).total_seconds() / 3600.0
+    if span > logic.MAX_LIVE_SHIFT_HOURS:
+        flash(
+            f"That would make a {logic.fmt_duration(span)} day. Enter the time you "
+            f"actually finished on {entry.date.strftime('%a %d %b')}.",
+            "error",
+        )
+        return redirect(url_for("main.dashboard"))
+
+    entry.logout_time = when.time()
     db.session.commit()
     total = logic.entry_total_hours(entry)
-    flash(f"Punched out at {logic.fmt_time(t)}. Total: {logic.fmt_hours(total)}.", "success")
+    day = "today" if entry.date == now.date() else f"on {entry.date.strftime('%a %d %b')}"
+    flash(
+        f"Logged out at {logic.fmt_time(entry.logout_time)}. "
+        f"You worked {logic.fmt_hours(total)} {day}.",
+        "success",
+    )
     return redirect(url_for("main.dashboard"))
 
 
@@ -379,66 +557,36 @@ def history(year=None, month=None):
     today = date.today()
     year = year or today.year
     month = month or today.month
+    # A hand-typed or mangled link (month 13) would otherwise be a server error.
+    if not (1 <= month <= 12 and 1970 <= year <= 2100):
+        return redirect(url_for("main.history"))
 
     first_day = date(year, month, 1)
-    last_day_num = calendar.monthrange(year, month)[1]
-    last_day = date(year, month, last_day_num)
-
-    entries_by_date = get_entries_for_range(current_user.id, first_day, last_day)
+    last_day = date(year, month, calendar.monthrange(year, month)[1])
     now = datetime.now()
-
-    rows = []
-    for i in range(last_day_num):
-        d = first_day + timedelta(days=i)
-        is_future = d > today
-        entry = entries_by_date.get(d)
-        # A day you haven't reached yet can't owe hours -- only count a target
-        # once the day has actually arrived, unless it already carries an
-        # explicit override (e.g. pre-booked leave), which the user set on
-        # purpose and should show up right away.
-        if entry is not None:
-            target = logic.target_hours_for(current_user, d, entry)
-        elif is_future:
-            target = 0.0
-        else:
-            target = logic.entry_target_hours(current_user, d)
-        worked = logic.entry_total_hours(entry, now=now) if entry else 0.0
-        # Today is only part-way through, so only the slice of its target
-        # that has already come round counts against the balance -- the rest
-        # is time yet to come, not time owed.
-        accrued = logic.accrued_target_hours(target, entry, d, today, now=now)
-        rows.append(
-            {
-                "date": d,
-                "entry": entry,
-                "target_hours": target,
-                "accrued_target_hours": accrued,
-                "worked_hours": worked,
-                "is_future": is_future,
-                "in_progress": d == today and accrued < target,
-            }
-        )
-
-    month_total = sum(r["worked_hours"] for r in rows)
-    month_target = sum(r["accrued_target_hours"] for r in rows)
+    entries_by_date = get_entries_for_range(current_user.id, first_day, last_day)
+    summary = logic.month_summary(current_user, entries_by_date, year, month, today, now=now)
 
     prev_month = (first_day - timedelta(days=1)).replace(day=1)
     next_month_first = last_day + timedelta(days=1)
 
     return render_template(
         "history.html",
-        rows=rows,
+        summary=summary,
+        rows=summary["rows"],
         year=year,
         month=month,
         month_name=calendar.month_name[month],
-        month_total=month_total,
-        month_target=month_target,
+        is_current_month=(year, month) == (today.year, today.month),
         prev_year=prev_month.year,
         prev_month=prev_month.month,
         next_year=next_month_first.year,
         next_month=next_month_first.month,
         fmt_hours=logic.fmt_hours,
+        fmt_balance=logic.fmt_balance,
+        fmt_duration=logic.fmt_duration,
         fmt_time=logic.fmt_time,
+        entry_break_hours=lambda e: logic.entry_break_hours(e, now=now),
     )
 
 
@@ -448,48 +596,83 @@ def edit_entry(date_str):
     try:
         entry_date = datetime.strptime(date_str, "%Y-%m-%d").date()
     except ValueError:
-        flash("Invalid date.", "error")
+        flash("That isn't a valid date.", "error")
         return redirect(url_for("main.history"))
 
     entry = TimeEntry.query.filter_by(user_id=current_user.id, date=entry_date).first()
     default_target = logic.entry_target_hours(current_user, entry_date)
 
-    if request.method == "POST":
-        login_t = parse_time_field(request.form.get("login_time"))
-        logout_t = parse_time_field(request.form.get("logout_time"))
-        notes = (request.form.get("notes") or "").strip() or None
+    def show_form(draft=None):
+        return render_template(
+            "entry_form.html",
+            entry=entry,
+            draft=draft,
+            entry_date=entry_date,
+            default_target=default_target,
+            prev_date=entry_date - timedelta(days=1),
+            next_date=entry_date + timedelta(days=1),
+        )
 
+    if request.method == "POST":
+        form = request.form
+        login_t = parse_time_field(form.get("login_time"))
+        logout_t = parse_time_field(form.get("logout_time"))
+        notes = (form.get("notes") or "").strip() or None
         # The day type picks the hours; "custom" is the escape hatch that still
         # lets a specific number be typed in.
-        day_type = (request.form.get("day_type") or "").strip()
-        leave_label = (request.form.get("leave_label") or "").strip() or None
-        leave_type = None
-        target_override = None
+        day_type = (form.get("day_type") or "").strip()
+        leave_label = (form.get("leave_label") or "").strip() or None
+        target_raw = (form.get("target_override") or "").strip()
 
+        breaks = []
+        for bs, be in zip(form.getlist("break_start"), form.getlist("break_end")):
+            start, end = parse_time_field(bs), parse_time_field(be)
+            if start is not None or end is not None:
+                breaks.append((start, end))
+
+        # Everything as typed, so a form sent back with a problem keeps it all
+        # instead of making the whole day be entered again.
+        draft = SimpleNamespace(
+            login_time=login_t,
+            logout_time=logout_t,
+            notes=notes,
+            leave_label=leave_label,
+            effective_leave_type=day_type or None,
+            target_override=target_raw or None,
+            breaks=[SimpleNamespace(break_start=s, break_end=e) for s, e in breaks],
+        )
+
+        leave_type, target_override = None, None
         if day_type == "full":
             leave_type, target_override = "full", 0.0
         elif day_type == "half":
             leave_type, target_override = "half", default_target / 2
-        elif day_type == "custom":
-            leave_type = "custom"
-            target_override_raw = (request.form.get("target_override") or "").strip()
-            if target_override_raw:
-                try:
-                    target_override = max(0.0, float(target_override_raw))
-                except ValueError:
-                    flash("Standard hours for this day must be a number.", "error")
-                    return render_template(
-                        "entry_form.html", entry=entry, entry_date=entry_date,
-                        default_target=default_target
-                    )
-            else:
-                leave_type = None  # "custom" with nothing typed is a normal day
+        elif day_type == "custom" and target_raw:
+            try:
+                target_override = float(target_raw)
+            except ValueError:
+                target_override = None
+            if target_override is None or not math.isfinite(target_override):
+                flash("Hours for this day must be a number, like 4 or 6.5.", "error")
+                return show_form(draft)
+            leave_type, target_override = "custom", max(0.0, target_override)
+        # "custom" with nothing typed is an ordinary working day.
+
+        # Checked before anything is saved. This used to report the problem
+        # and save anyway -- showing "Saved" beside the error, with the break
+        # silently dropped.
+        if any(start is None for start, _ in breaks):
+            flash("Each break needs a start time — add one, or clear that row.", "error")
+            return show_form(draft)
+        if logout_t is not None and login_t is None:
+            flash("Add a login time to go with the logout time.", "error")
+            return show_form(draft)
 
         if leave_type in TimeEntry.LEAVE_TYPES and not leave_label:
             leave_label = TimeEntry.LEAVE_TYPES[leave_type]
-
-        break_starts = request.form.getlist("break_start")
-        break_ends = request.form.getlist("break_end")
+        if leave_type is None:
+            # A reason only means something on a leave or custom-hours day.
+            leave_label = None
 
         if entry is None:
             entry = TimeEntry(user_id=current_user.id, date=entry_date)
@@ -503,23 +686,26 @@ def edit_entry(date_str):
         entry.leave_type = leave_type
 
         entry.breaks.clear()
-        for bs, be in zip(break_starts, break_ends):
-            bs_t = parse_time_field(bs)
-            be_t = parse_time_field(be)
-            if bs_t is None and be_t is None:
-                continue
-            if bs_t is None:
-                flash("Each break needs a start time.", "error")
-                continue
-            entry.breaks.append(BreakSegment(break_start=bs_t, break_end=be_t))
+        for start, end in breaks:
+            entry.breaks.append(BreakSegment(break_start=start, break_end=end))
 
         db.session.commit()
-        flash(f"Saved entry for {entry_date.strftime('%d %b %Y')}.", "success")
+
+        day = entry_date.strftime("%a %d %b")
+        span = logic.entry_raw_hours(entry) if login_t and logout_t else 0.0
+        if span > logic.LONG_SHIFT_WARNING_HOURS:
+            # Saved as typed, but kept on the form: a day this long is almost
+            # always a logout typed as AM when PM was meant, or the reverse.
+            flash(
+                f"Saved {day} — but that's a {logic.fmt_duration(span)} day. If the "
+                "logout should be AM/PM the other way round, change it here.",
+                "warning",
+            )
+            return redirect(url_for("main.edit_entry", date_str=entry_date.isoformat()))
+        flash(f"Saved {day}.", "success")
         return redirect(url_for("main.history", year=entry_date.year, month=entry_date.month))
 
-    return render_template(
-        "entry_form.html", entry=entry, entry_date=entry_date, default_target=default_target
-    )
+    return show_form()
 
 
 @main_bp.route("/entry/<date_str>/delete", methods=["POST"])
@@ -557,6 +743,9 @@ def settings():
             except ValueError:
                 flash("Please enter valid numbers.", "error")
                 return redirect(url_for("main.settings"))
+            if not (math.isfinite(daily) and math.isfinite(weekly)):
+                flash("Please enter valid numbers.", "error")
+                return redirect(url_for("main.settings"))
 
             try:
                 weekday_break = int(request.form.get("weekday_break_minutes", 60) or 0)
@@ -565,7 +754,9 @@ def settings():
                 flash("Please enter break lengths in whole minutes.", "error")
                 return redirect(url_for("main.settings"))
 
-            workdays = request.form.getlist("workdays")
+            # Only real weekdays: anything else would break every page that
+            # reads the workday list back.
+            workdays = [d for d in request.form.getlist("workdays") if d in set("0123456")]
             user.daily_target_hours = max(0.0, daily)
             user.weekly_target_hours = max(0.0, weekly)
             # Capped at a day: a longer "break" would push every suggestion

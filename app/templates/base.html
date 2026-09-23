@@ -1,11 +1,26 @@
 <!doctype html>
 {% from "partials/logo.html" import stm_logo %}
 {% from "partials/avatar.html" import avatar %}
-<html lang="en" data-theme="light">
+{% from "partials/icons.html" import icon %}
+<html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>{% block title %}STM{% endblock %} · STM</title>
+
+  <script>
+    // Runs before anything is drawn, so someone who chose dark mode never
+    // sees a white flash first. With no choice saved, the page follows the
+    // device's own light/dark setting.
+    (function () {
+      try {
+        var saved = localStorage.getItem("stm-theme");
+        if (saved === "dark" || saved === "light") {
+          document.documentElement.setAttribute("data-theme", saved);
+        }
+      } catch (e) { /* storage blocked - follow the device */ }
+    })();
+  </script>
 
   <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/stm-logo.svg') }}">
   {# iOS ignores SVG icons for the home screen and falls back to the first
@@ -15,101 +30,108 @@
   <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
   <meta name="apple-mobile-web-app-title" content="STM">
   <meta name="application-name" content="STM">
-  <meta name="theme-color" content="#5e6ad2">
+  <meta name="theme-color" content="#f5f6fa" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0e1016" media="(prefers-color-scheme: dark)">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Inter+Tight:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-  <script>
-    (function () {
-      var saved = localStorage.getItem('stm-theme');
-      if (saved) document.documentElement.setAttribute('data-theme', saved);
-      else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-        document.documentElement.setAttribute('data-theme', 'dark');
-      }
-    })();
-  </script>
+  <a class="skip-link" href="#main">Skip to main content</a>
+
+  {% macro flashes() %}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flash-stack">
+          {% for category, message in messages %}
+            {# Errors and warnings interrupt; confirmations wait their turn. #}
+            <div class="flash flash-{{ category }}"
+                 role="{{ 'status' if category == 'success' else 'alert' }}">
+              {{ icon('check' if category == 'success' else 'alert', 'flash-icon') }}
+              <p class="flash-text">{{ message }}</p>
+              <button type="button" class="flash-close" aria-label="Dismiss this message">
+                {{ icon('x') }}
+              </button>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+  {% endmacro %}
+
+  {% macro theme_toggle(extra_class="") %}
+    <button type="button" class="theme-toggle js-theme-toggle {{ extra_class }}" aria-pressed="false">
+      {{ icon('moon', 'icon icon-when-light') }}{{ icon('sun', 'icon icon-when-dark') }}
+      <span class="theme-toggle-label">Dark mode</span>
+    </button>
+  {% endmacro %}
 
   {% if current_user.is_authenticated %}
+  {% set nav_items = [
+      ('main.dashboard', 'Home', 'home', ['main.dashboard']),
+      ('main.history', 'History', 'calendar', ['main.history', 'main.edit_entry']),
+      ('main.settings', 'Settings', 'sliders', ['main.settings']),
+  ] %}
   <div class="app-shell">
     <aside class="sidebar">
-      <div class="brand">
+      <a class="brand" href="{{ url_for('main.dashboard') }}">
         {{ stm_logo('logo-mark') }}
         <span class="brand-name">STM</span>
-      </div>
-      <nav class="nav">
-        <a href="{{ url_for('main.dashboard') }}" class="nav-link {{ 'active' if request.endpoint == 'main.dashboard' }}">
-          <svg viewBox="0 0 24 24" class="nav-icon"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm1 10.59 4 2.3-1 1.73-5-2.9V6h2Z"/></svg>
-          Dashboard
-        </a>
-        <a href="{{ url_for('main.history') }}" class="nav-link {{ 'active' if request.endpoint in ['main.history', 'main.edit_entry'] }}">
-          <svg viewBox="0 0 24 24" class="nav-icon"><path d="M7 2h2v2h6V2h2v2h3a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h3V2Zm12 8H5v10h14V10Zm0-4h-2v2h2V6Zm-4 0H9v2h6V6ZM7 6H5v2h2V6Z"/></svg>
-          History
-        </a>
-        <a href="{{ url_for('main.settings') }}" class="nav-link {{ 'active' if request.endpoint == 'main.settings' }}">
-          <svg viewBox="0 0 24 24" class="nav-icon"><path d="M12 8a4 4 0 1 0 4 4 4 4 0 0 0-4-4Zm9 4a7.1 7.1 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7.6 7.6 0 0 0-2-1.2l-.4-2.6H9.9l-.4 2.6a7.6 7.6 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6A7.1 7.1 0 0 0 5 12a7.1 7.1 0 0 0 .1 1.2l-2 1.6 2 3.4 2.4-1a7.6 7.6 0 0 0 2 1.2l.4 2.6h4.2l.4-2.6a7.6 7.6 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6A7.1 7.1 0 0 0 21 12Z"/></svg>
-          Settings
-        </a>
+      </a>
+      <nav class="side-nav" aria-label="Main">
+        {% for endpoint, label, icon_name, active_on in nav_items %}
+          <a href="{{ url_for(endpoint) }}" class="nav-link"
+             {% if request.endpoint in active_on %}aria-current="page"{% endif %}>
+            {{ icon(icon_name) }}<span>{{ label }}</span>
+          </a>
+        {% endfor %}
       </nav>
       <div class="sidebar-footer">
-        <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Toggle dark mode">
-          <svg viewBox="0 0 24 24" class="icon-sun"><path d="M12 4V2m0 20v-2M4 12H2m20 0h-2M5.6 5.6 4.2 4.2m15.6 15.6-1.4-1.4M5.6 18.4 4.2 19.8M18.4 5.6l1.4-1.4M12 7a5 5 0 1 0 5 5 5 5 0 0 0-5-5Z"/></svg>
-          <svg viewBox="0 0 24 24" class="icon-moon"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
-          <span class="theme-toggle-label">Theme</span>
-        </button>
-        <a class="nav-link logout-link" href="{{ url_for('auth.logout') }}">
-          <svg viewBox="0 0 24 24" class="nav-icon"><path d="M10 17v-2H3v-2h7V9l5 4-5 4Zm9 3H12v-2h7V6h-7V4h7a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2Z"/></svg>
-          Sign out
+        {{ theme_toggle() }}
+        <a class="nav-link" href="{{ url_for('auth.logout') }}">
+          {{ icon('power') }}<span>Sign out</span>
         </a>
       </div>
     </aside>
 
     <div class="main-col">
       <header class="topbar">
-        <button class="hamburger" id="hamburger" type="button" aria-label="Menu">
-          <svg viewBox="0 0 24 24"><path d="M3 6h18v2H3V6Zm0 5h18v2H3v-2Zm0 5h18v2H3v-2Z"/></svg>
-        </button>
-        <div class="topbar-title">{% block page_title %}Dashboard{% endblock %}</div>
-        <div class="topbar-user">
+        <a class="topbar-brand" href="{{ url_for('main.dashboard') }}" aria-label="STM home">
+          {{ stm_logo('logo-mark') }}
+        </a>
+        <h1 class="page-title">{% block page_title %}STM{% endblock %}</h1>
+        {{ theme_toggle('theme-toggle-icon') }}
+        <a class="topbar-user" href="{{ url_for('main.settings') }}">
           <span class="user-name">{{ current_user.display_name or current_user.username }}</span>
           {{ avatar(current_user) }}
-        </div>
+        </a>
       </header>
 
-      <main class="content">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-          {% if messages %}
-            <div class="flash-stack">
-              {% for category, message in messages %}
-                <div class="flash flash-{{ category }}">{{ message }}</div>
-              {% endfor %}
-            </div>
-          {% endif %}
-        {% endwith %}
+      <main id="main" class="content" tabindex="-1">
+        {{ flashes() }}
         {% block content %}{% endblock %}
       </main>
     </div>
+
+    {# Phones get the pages as a bar under the thumb instead of a menu that
+       has to be opened first. #}
+    <nav class="tab-bar" aria-label="Main">
+      {% for endpoint, label, icon_name, active_on in nav_items %}
+        <a href="{{ url_for(endpoint) }}" class="tab-link"
+           {% if request.endpoint in active_on %}aria-current="page"{% endif %}>
+          {{ icon(icon_name) }}<span>{{ label }}</span>
+        </a>
+      {% endfor %}
+    </nav>
   </div>
   {% else %}
-    <button class="theme-toggle standalone" id="theme-toggle" type="button" aria-label="Toggle dark mode">
-      <svg viewBox="0 0 24 24" class="icon-sun"><path d="M12 4V2m0 20v-2M4 12H2m20 0h-2M5.6 5.6 4.2 4.2m15.6 15.6-1.4-1.4M5.6 18.4 4.2 19.8M18.4 5.6l1.4-1.4M12 7a5 5 0 1 0 5 5 5 5 0 0 0-5-5Z"/></svg>
-      <svg viewBox="0 0 24 24" class="icon-moon"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
-    </button>
-    <main class="auth-shell">
-      {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-          <div class="flash-stack">
-            {% for category, message in messages %}
-              <div class="flash flash-{{ category }}">{{ message }}</div>
-            {% endfor %}
-          </div>
-        {% endif %}
-      {% endwith %}
-      {% block auth_content %}{% endblock %}
-    </main>
+  <div class="auth-top">{{ theme_toggle('theme-toggle-icon') }}</div>
+  <main id="main" class="auth-shell" tabindex="-1">
+    {{ flashes() }}
+    {% block auth_content %}{% endblock %}
+  </main>
   {% endif %}
 
   <script src="{{ url_for('static', filename='js/app.js') }}"></script>

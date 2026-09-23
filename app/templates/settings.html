@@ -1,97 +1,107 @@
 {% extends "base.html" %}
 {% from "partials/avatar.html" import avatar %}
+{% from "partials/icons.html" import icon %}
 {% block title %}Settings{% endblock %}
 {% block page_title %}Settings{% endblock %}
 
 {% block content %}
-<div class="grid grid-secondary">
-  <section class="card">
-    <div class="card-heading"><h2>Hours &amp; targets</h2></div>
-    <p class="hint">This is the same rule your spreadsheet used: 8h/day on workdays, 0h on your rest day, 48h/week total &mdash; all adjustable here.</p>
+<div class="settings-grid">
+  <section class="card" aria-labelledby="targets-heading">
+    <h2 id="targets-heading" class="card-title">Hours &amp; targets</h2>
+    <p class="card-note">The same rule as your spreadsheet: 8h a day on workdays, nothing on your rest day,
+      48h a week &mdash; change any of it here.</p>
     <form method="post" class="form">
       <input type="hidden" name="form_type" value="targets">
       <div class="field-row">
-        <label class="field">
-          <span>Daily target (hours)</span>
-          <input type="number" step="0.25" min="0" name="daily_target_hours" value="{{ user.daily_target_hours }}">
-        </label>
-        <label class="field">
-          <span>Weekly target (hours)</span>
-          <input type="number" step="0.5" min="0" name="weekly_target_hours" value="{{ user.weekly_target_hours }}">
-        </label>
+        <div class="field">
+          <label for="daily_target_hours">Daily target (hours)</label>
+          <input type="number" id="daily_target_hours" name="daily_target_hours" step="0.25" min="0"
+                 inputmode="decimal" value="{{ '%g'|format(user.daily_target_hours) }}">
+        </div>
+        <div class="field">
+          <label for="weekly_target_hours">Weekly target (hours)</label>
+          <input type="number" id="weekly_target_hours" name="weekly_target_hours" step="0.5" min="0"
+                 inputmode="decimal" value="{{ '%g'|format(user.weekly_target_hours) }}">
+        </div>
       </div>
-      <fieldset class="field">
-        <span>Workdays</span>
-        <div class="checkbox-row">
+
+      <fieldset class="fieldset">
+        <legend>Workdays</legend>
+        <div class="chip-row">
           {% set day_names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] %}
           {% set active = user.workday_set() %}
           {% for i in range(7) %}
-          <label class="checkbox-chip">
+          <label class="check-chip">
             <input type="checkbox" name="workdays" value="{{ i }}" {{ 'checked' if i in active }}>
             <span>{{ day_names[i] }}</span>
           </label>
           {% endfor %}
         </div>
       </fieldset>
-      <label class="field">
-        <span>Usual Saturday login time <em>(optional)</em></span>
-        <input type="time" name="saturday_login_hint"
+
+      <div class="field">
+        <label for="saturday_login_hint">Usual Saturday login time <span class="optional">(optional)</span></label>
+        <input type="time" id="saturday_login_hint" name="saturday_login_hint"
+               aria-describedby="saturday-hint"
                value="{{ user.saturday_login_hint.strftime('%H:%M') if user.saturday_login_hint else '' }}">
-      </label>
-      <p class="hint">Set this so the dashboard can show an actual clock-out time for Saturday, planned
-        from earlier in the week &mdash; not just once you've punched in.</p>
-      <div class="field-row">
-        <label class="field">
-          <span>Usual break, Mon&ndash;Fri (minutes)</span>
-          <input type="number" step="5" min="0" max="1440" name="weekday_break_minutes"
-                 value="{{ user.weekday_break_minutes }}">
-        </label>
-        <label class="field">
-          <span>Usual break, Saturday (minutes)</span>
-          <input type="number" step="5" min="0" max="1440" name="saturday_break_minutes"
-                 value="{{ user.saturday_break_minutes }}">
-        </label>
+        <p class="hint" id="saturday-hint">Lets Home show a real logout time for Saturday, planned from
+          earlier in the week &mdash; not just once you've logged in that day.</p>
       </div>
-      <p class="hint">Suggested clock-out times allow for this break even before you've recorded one,
-        so the estimate holds. Break time you do record counts towards it. Your recorded hours are
-        never affected &mdash; those always come from breaks you actually log.</p>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="weekday_break_minutes">Usual break, Mon&ndash;Fri (minutes)</label>
+          <input type="number" id="weekday_break_minutes" name="weekday_break_minutes" step="5" min="0" max="1440"
+                 inputmode="numeric" aria-describedby="break-hint" value="{{ user.weekday_break_minutes }}">
+        </div>
+        <div class="field">
+          <label for="saturday_break_minutes">Usual break, Saturday (minutes)</label>
+          <input type="number" id="saturday_break_minutes" name="saturday_break_minutes" step="5" min="0" max="1440"
+                 inputmode="numeric" aria-describedby="break-hint" value="{{ user.saturday_break_minutes }}">
+        </div>
+      </div>
+      <p class="hint" id="break-hint">Suggested logout times leave room for this break even before you've
+        taken it. Your recorded hours only ever use the breaks you actually log.</p>
+
       <div class="form-actions">
         <button type="submit" class="btn btn-primary">Save targets</button>
       </div>
     </form>
   </section>
 
-  <section class="card">
-    <div class="card-heading">
-      <h2>Profile</h2>
-      {% if user.is_admin %}<span class="role-badge">Admin</span>{% endif %}
+  <section class="card" aria-labelledby="profile-heading">
+    <div class="card-head">
+      <h2 id="profile-heading" class="card-title">Profile</h2>
+      {% if user.is_admin %}<span class="badge badge-accent">Admin</span>{% endif %}
     </div>
     <form method="post" class="form" enctype="multipart/form-data">
       <input type="hidden" name="form_type" value="profile">
 
       <div class="avatar-field">
-        {{ avatar(user, 'avatar avatar-xl') }}
+        {{ avatar(user, 'avatar avatar-xl', alt='Your profile picture') }}
         <div class="avatar-field-controls">
-          <span class="avatar-field-label">Profile picture</span>
-          <input type="file" name="avatar" id="avatar-input" accept="image/*" class="file-input">
-          <label for="avatar-input" class="btn btn-ghost btn-sm">Choose photo</label>
-          <span class="hint" id="avatar-filename">Square works best &mdash; it's resized automatically.</span>
+          <span class="avatar-field-label" id="avatar-label">Profile picture</span>
+          <input type="file" name="avatar" id="avatar-input" accept="image/*" class="file-input"
+                 aria-describedby="avatar-filename">
+          <label for="avatar-input" class="btn btn-ghost">Choose a photo</label>
+          <span class="hint" id="avatar-filename">A square photo works best &mdash; it's resized for you.</span>
         </div>
       </div>
 
-      <label class="field">
-        <span>Display name</span>
-        <input type="text" name="display_name" value="{{ user.display_name or '' }}">
-      </label>
-      <label class="field">
-        <span>Email address <em>(for sign-in codes)</em></span>
-        <input type="email" name="email" value="{{ user.email or '' }}"
+      <div class="field">
+        <label for="display_name">Display name</label>
+        <input type="text" id="display_name" name="display_name" maxlength="120"
+               autocomplete="name" value="{{ user.display_name or '' }}">
+      </div>
+      <div class="field">
+        <label for="email">Email address <span class="optional">(for sign-in codes)</span></label>
+        <input type="email" id="email" name="email" value="{{ user.email or '' }}"
                autocomplete="email" placeholder="you@example.com">
-      </label>
-      <label class="field">
-        <span>Username</span>
-        <input type="text" value="{{ user.username }}" disabled>
-      </label>
+      </div>
+      <div class="field">
+        <label for="username">Username</label>
+        <input type="text" id="username" value="{{ user.username }}" disabled>
+      </div>
       <div class="form-actions">
         <button type="submit" class="btn btn-primary">Save profile</button>
         {% if user.avatar_filename %}
@@ -101,94 +111,111 @@
     </form>
   </section>
 
-  <section class="card">
-    <div class="card-heading"><h2>Change password</h2></div>
+  <section class="card" aria-labelledby="password-heading">
+    <h2 id="password-heading" class="card-title">Change password</h2>
     <form method="post" class="form">
       <input type="hidden" name="form_type" value="password">
-      <label class="field">
-        <span>Current password</span>
-        <input type="password" name="current_password" required autocomplete="current-password">
-      </label>
-      <label class="field">
-        <span>New password</span>
-        <input type="password" name="new_password" required minlength="6" autocomplete="new-password">
-      </label>
-      <label class="field">
-        <span>Confirm new password</span>
-        <input type="password" name="confirm_password" required minlength="6" autocomplete="new-password">
-      </label>
+      <div class="field">
+        <label for="current_password">Current password</label>
+        <input type="password" id="current_password" name="current_password" required autocomplete="current-password">
+      </div>
+      <div class="field">
+        <label for="new_password">New password</label>
+        <input type="password" id="new_password" name="new_password" required minlength="6"
+               autocomplete="new-password" aria-describedby="pw-hint">
+        <p class="hint" id="pw-hint">At least 6 characters.</p>
+      </div>
+      <div class="field">
+        <label for="confirm_password">Type the new password again</label>
+        <input type="password" id="confirm_password" name="confirm_password" required minlength="6" autocomplete="new-password">
+      </div>
       <div class="form-actions">
         <button type="submit" class="btn btn-primary">Update password</button>
       </div>
     </form>
   </section>
 
-  {% if user.is_admin %}
-  <section class="card">
-    <div class="card-heading">
-      <h2>Team members</h2>
-      <span class="role-badge">Admin only</span>
+  <section class="card" aria-labelledby="account-heading">
+    <h2 id="account-heading" class="card-title">Account</h2>
+    <p class="card-note">Signed in as <strong>{{ user.username }}</strong>. Signing out doesn't log you out
+      of work &mdash; your hours keep counting until you tap Logout on Home.</p>
+    <div class="form-actions">
+      <a class="btn btn-secondary" href="{{ url_for('auth.logout') }}">{{ icon('power') }}Sign out of STM</a>
     </div>
-    <p class="hint">Everyone gets their own login and their own punches, targets, and history &mdash;
+  </section>
+
+  {% if user.is_admin %}
+  <section class="card card-wide" aria-labelledby="team-heading">
+    <div class="card-head">
+      <h2 id="team-heading" class="card-title">Team members</h2>
+      <span class="badge">Only you can see this</span>
+    </div>
+    <p class="card-note">Everyone has their own sign-in and their own hours, targets and history &mdash;
       nothing is shared between accounts, and only you can add or remove people.</p>
 
-    <div class="user-list">
+    <ul class="user-list">
       {% for u in all_users %}
-      <div class="user-row">
+      {% set name = u.display_name or u.username %}
+      <li class="user-row">
         {{ avatar(u) }}
         <div class="user-row-info">
           <span class="user-row-name">
-            {{ u.display_name or u.username }}{% if u.id == user.id %} <em>(you)</em>{% endif %}
-            {%- if u.is_admin %} <span class="role-badge role-badge-sm">Admin</span>{% endif %}
+            {{ name }}{% if u.id == user.id %} <span class="optional">(you)</span>{% endif %}
+            {%- if u.is_admin %} <span class="badge badge-accent">Admin</span>{% endif %}
           </span>
-          <span class="user-row-username muted">{{ u.username }}</span>
+          <span class="user-row-username">{{ u.username }}</span>
         </div>
         {% if u.id != user.id %}
         <div class="user-row-actions">
-          <form method="post" onsubmit="return confirm('Reset {{ (u.display_name or u.username)|e }}\'s password? Their current one stops working immediately.');">
+          {# The confirmation text rides in a data attribute, escaped like any
+             other attribute. It used to be pasted into inline JavaScript, where
+             a name like O'Brien broke the script and skipped the question. #}
+          <form method="post" data-confirm="Reset {{ name }}'s password? Their current one stops working straight away.">
             <input type="hidden" name="form_type" value="reset_password">
             <input type="hidden" name="user_id" value="{{ u.id }}">
             <button type="submit" class="btn btn-ghost btn-sm">Reset password</button>
           </form>
-          <form method="post" onsubmit="return confirm('Remove {{ (u.display_name or u.username)|e }}? This deletes all of their punches too.');">
+          <form method="post" data-confirm="Remove {{ name }}? This deletes all of their hours too, and can't be undone.">
             <input type="hidden" name="form_type" value="remove_user">
             <input type="hidden" name="user_id" value="{{ u.id }}">
             <button type="submit" class="btn btn-danger-ghost btn-sm">Remove</button>
           </form>
         </div>
         {% endif %}
-      </div>
+      </li>
       {% endfor %}
-    </div>
+    </ul>
 
+    <h3 class="mini-title">Add someone</h3>
     <form method="post" class="form user-add-form">
       <input type="hidden" name="form_type" value="add_user">
       <div class="field-row">
-        <label class="field">
-          <span>Username</span>
-          <input type="text" name="new_username" required autocomplete="off">
-        </label>
-        <label class="field">
-          <span>Display name <em>(optional)</em></span>
-          <input type="text" name="new_display_name">
-        </label>
+        <div class="field">
+          <label for="new_username">Username</label>
+          <input type="text" id="new_username" name="new_username" required autocomplete="off"
+                 autocapitalize="none" spellcheck="false">
+        </div>
+        <div class="field">
+          <label for="new_display_name">Display name <span class="optional">(optional)</span></label>
+          <input type="text" id="new_display_name" name="new_display_name">
+        </div>
       </div>
-      <label class="field">
-        <span>Email address <em>(optional, for sign-in codes)</em></span>
-        <input type="email" name="new_email" autocomplete="off" placeholder="them@example.com">
-      </label>
+      <div class="field">
+        <label for="new_email">Email address <span class="optional">(optional, for sign-in codes)</span></label>
+        <input type="email" id="new_email" name="new_email" autocomplete="off" placeholder="them@example.com">
+      </div>
       <div class="field-row">
-        <label class="field">
-          <span>Password</span>
-          <input type="password" name="new_user_password" required minlength="6" autocomplete="new-password">
-        </label>
-        <label class="field">
-          <span>Confirm password</span>
-          <input type="password" name="new_user_confirm" required minlength="6" autocomplete="new-password">
-        </label>
+        <div class="field">
+          <label for="new_user_password">Password</label>
+          <input type="password" id="new_user_password" name="new_user_password" required minlength="6" autocomplete="new-password">
+        </div>
+        <div class="field">
+          <label for="new_user_confirm">Type it again</label>
+          <input type="password" id="new_user_confirm" name="new_user_confirm" required minlength="6" autocomplete="new-password">
+        </div>
       </div>
       <div class="form-actions">
-        <button type="submit" class="btn btn-primary">Add user</button>
+        <button type="submit" class="btn btn-primary">{{ icon('plus') }}Add person</button>
       </div>
     </form>
   </section>

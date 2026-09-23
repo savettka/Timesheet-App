@@ -1,13 +1,17 @@
 {#
   A user's avatar: their uploaded photo when they have one, otherwise
-  their initials on the brand gradient.
+  their initials on a tinted circle.
+
+  The picture almost always sits right beside the person's name, so it is
+  decorative by default (empty alt) -- otherwise a screen reader reads the
+  name twice. Pass `alt` where the picture stands on its own.
 #}
-{% macro avatar(user, class="avatar") %}
+{% macro avatar(user, class="avatar", alt="") %}
   {%- if user.avatar_filename -%}
     <img class="{{ class }} avatar-photo"
          src="{{ url_for('static', filename='uploads/avatars/' ~ user.avatar_filename) }}"
-         alt="{{ user.display_name or user.username }}">
+         alt="{{ alt }}">
   {%- else -%}
-    <span class="{{ class }}">{{ user.initials }}</span>
+    <span class="{{ class }}" aria-hidden="true">{{ user.initials }}</span>
   {%- endif -%}
 {% endmacro %}

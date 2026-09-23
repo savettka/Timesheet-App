@@ -1,8 +1,8 @@
 # STM — Simple Time Manager
 
-A personal punch-clock web app that replaces the manual Excel timesheet: punch in/out and
-break start/end live, and STM works out **total hours without break** and **weekly hours**
-for you — including telling you when you've hit your **48-hour weekly target** so you know
+A personal time-clock web app that replaces the manual Excel timesheet: tap **Login**,
+**Break**, **Back** and **Logout** as your day goes, and STM works out **total hours without
+break** and **weekly hours** for you — including telling you when you've hit your **48-hour weekly target** so you know
 you can log out early (e.g. on Saturday).
 
 ## How the numbers are worked out
@@ -15,7 +15,7 @@ This mirrors the logic in the original spreadsheet:
   (Sun by default). Both the days and the daily target are editable in **Settings**.
 - **Weekly target** = 48 hours (Mon–Sat × 8h) by default, also editable in Settings.
 - Once your running total for the week reaches the weekly target, STM tells you your
-  target is complete — if you're still punched in, it shows a suggested logout time so
+  target is complete — if you're still logged in, it shows a suggested logout time so
   you can leave early instead of working a full extra day.
 - **Leave / holiday days**: any day can have its target overridden (e.g. 0 for a day
   off, half your usual target for a half day) from that day's Edit screen. The weekly
@@ -24,8 +24,14 @@ This mirrors the logic in the original spreadsheet:
 
 ## Features
 
-- Live **Punch in / Start break / End break / Punch out** buttons, plus an option to
-  enter a different time for any punch (for when you forget to punch live).
+- Big **Login / Break / Back / Logout** buttons, plus "Forgot to tap?" for entering a
+  time you missed. Typed times are checked against the rest of the day, so an AM/PM slip
+  is caught (with a "did you mean 6:00 PM?") instead of becoming a 21-hour day.
+- **Login again** after logging out carries on the same day, with the time away counted
+  as a break. A shift left open overnight by mistake is spotted, and Home asks when it
+  really ended rather than recording a 24-hour day.
+- **Balances that make sense mid-day** — today only owes the hours it has reached so far,
+  so the month's balance shows your real overtime at any moment.
 - **History** — a full month view of every day, with an **Add/Edit** screen to enter or
   correct all 4 times (and multiple breaks) for any date by hand, or mark it as leave/a
   holiday with a custom target.
@@ -35,10 +41,11 @@ This mirrors the logic in the original spreadsheet:
   and password.
 - **Team members (admin only)** — the first account created owns the install. Only it
   can add people, reset their passwords, or remove them; everyone else never even sees
-  that other accounts exist. Each person's punches, history and targets are their own.
+  that other accounts exist. Each person's hours, history and targets are their own.
 - **Sign in with an emailed code** (optional) — see "Sign-in codes by email" below.
-- Modern UI with a **light/dark mode toggle** (remembers your choice), tuned for both
-  desktop and mobile, and a proper home-screen icon on iOS and Android.
+- **Easy to read and use**: 16px text, every colour pair checked for contrast in both
+  light and dark mode, 44px+ touch targets, full keyboard use with visible focus, a
+  bottom tab bar on phones, and a proper home-screen icon on iOS and Android.
 
 ## Sign-in codes by email (optional)
 
@@ -81,7 +88,7 @@ app/
   models.py         User / TimeEntry / BreakSegment (SQLAlchemy)
   logic.py          All the hour/target/weekly-target math
   auth.py           First-run setup + login/logout
-  main.py           Dashboard, punch actions, history, settings routes
+  main.py           Home, login/break/logout actions, history, settings routes
   templates/        Jinja2 templates
   static/           CSS + JS (no build step, no frontend framework)
 config.py           Reads SECRET_KEY / DATABASE_URL from the environment

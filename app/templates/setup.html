@@ -6,27 +6,31 @@
   <div class="auth-brand">
     {{ stm_logo('logo-mark logo-lg') }}
     <h1>Welcome to STM</h1>
-    <span class="logo-tagline">Time Tracking App</span>
-    <p>Let's set up your account. This is a one-time step &mdash; STM is built for a single user (you).</p>
+    <p>Create your account to get started. You'll be the admin, so you can add other people
+      later in Settings.</p>
   </div>
   <form method="post" class="form">
-    <label class="field">
-      <span>Username</span>
-      <input type="text" name="username" value="{{ username or '' }}" required autofocus autocomplete="username">
-    </label>
-    <label class="field">
-      <span>Display name <em>(optional)</em></span>
-      <input type="text" name="display_name" value="{{ display_name or '' }}" placeholder="e.g. Pulkit">
-    </label>
-    <label class="field">
-      <span>Password</span>
-      <input type="password" name="password" required minlength="6" autocomplete="new-password">
-    </label>
-    <label class="field">
-      <span>Confirm password</span>
-      <input type="password" name="confirm_password" required minlength="6" autocomplete="new-password">
-    </label>
-    <button type="submit" class="btn btn-primary btn-block">Create account &amp; continue</button>
+    <div class="field">
+      <label for="username">Username</label>
+      <input type="text" id="username" name="username" value="{{ username or '' }}" required autofocus
+             autocomplete="username" autocapitalize="none" spellcheck="false">
+    </div>
+    <div class="field">
+      <label for="display_name">Display name <span class="optional">(optional)</span></label>
+      <input type="text" id="display_name" name="display_name" value="{{ display_name or '' }}"
+             autocomplete="name" placeholder="e.g. Pulkit">
+    </div>
+    <div class="field">
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" required minlength="6"
+             autocomplete="new-password" aria-describedby="setup-pw-hint">
+      <p class="hint" id="setup-pw-hint">At least 6 characters.</p>
+    </div>
+    <div class="field">
+      <label for="confirm_password">Type it again</label>
+      <input type="password" id="confirm_password" name="confirm_password" required minlength="6" autocomplete="new-password">
+    </div>
+    <button type="submit" class="btn btn-primary btn-block btn-lg">Create account</button>
   </form>
 </div>
 {% endblock %}

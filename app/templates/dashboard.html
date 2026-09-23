@@ -1,117 +1,243 @@
 {% extends "base.html" %}
-{% block title %}Dashboard{% endblock %}
-{% block page_title %}Dashboard{% endblock %}
+{% from "partials/icons.html" import icon %}
+{% block title %}Home{% endblock %}
+{% block page_title %}
+  {%- set first_name = ((current_user.display_name or current_user.username).split() or [current_user.username])[0] -%}
+  {{ greeting }}, {{ first_name }}
+{%- endblock %}
 
 {% block content %}
-<div class="grid grid-hero">
+<div class="dash-grid">
 
-  <section class="card card-clock"
-    id="clock-card"
-    data-logged-in="{{ 'true' if open_entry else 'false' }}"
-    data-on-break="{{ 'true' if open_break else 'false' }}"
-    data-login-iso="{{ open_entry.date.isoformat() ~ 'T' ~ open_entry.login_time.strftime('%H:%M:%S') if open_entry else '' }}"
-    data-break-start-iso="{{ open_entry.date.isoformat() ~ 'T' ~ open_break.break_start.strftime('%H:%M:%S') if open_break else '' }}"
-    data-closed-break-seconds="{{ open_entry_closed_break_seconds }}">
+  {# ------------------------------------------------------------ status #}
+  <section class="card status-card state-{{ day_state }}" id="clock-card"
+           aria-labelledby="status-heading"
+           data-day-state="{{ day_state }}"
+           data-worked-seconds="{{ shift_worked_seconds }}"
+           data-break-seconds="{{ break_elapsed_seconds }}">
 
-    <div class="clock-status">
-      {% if open_break %}
-        <span class="status-pill status-break">On break</span>
-        <p class="status-detail">Since {{ fmt_time(open_break.break_start) }}</p>
-      {% elif open_entry %}
-        <span class="status-pill status-in">Logged in</span>
-        <p class="status-detail">Since {{ fmt_time(open_entry.login_time) }}{% if open_entry.date != today %} &middot; {{ open_entry.date.strftime('%d %b') }}{% endif %}</p>
-      {% else %}
-        <span class="status-pill status-out">Not logged in</span>
-        <p class="status-detail">Ready when you are</p>
-      {% endif %}
+    <div class="status-head">
+      <span class="status-dot" aria-hidden="true"></span>
+      <div>
+        <h2 id="status-heading" class="status-title">
+          {%- if day_state == 'working' -%} Logged in
+          {%- elif day_state == 'break' -%} On break
+          {%- elif day_state == 'done' -%} Done for today
+          {%- elif day_state == 'stale' -%} Still logged in from {{ open_entry.date.strftime('%a %d %b') }}
+          {%- else -%} Not logged in yet
+          {%- endif -%}
+        </h2>
+        <p class="status-sub">
+          {%- if day_state == 'working' -%}
+            Since {{ fmt_time(open_entry.login_time) }}{% if open_entry.date != today %} on {{ open_entry.date.strftime('%a %d %b') }}{% endif %}
+          {%- elif day_state == 'break' -%}
+            Since {{ fmt_time(open_break.break_start) }} &middot; <span id="break-timer">{{ fmt_duration(break_elapsed_seconds / 3600) }}</span> so far
+          {%- elif day_state == 'done' -%}
+            {{ fmt_time(today_entry.login_time) }} to {{ fmt_time(today_entry.logout_time) }}
+          {%- elif day_state == 'stale' -%}
+            You logged in at {{ fmt_time(open_entry.login_time) }} and it looks like you didn't log out.
+          {%- elif today_entry and today_entry.is_leave -%}
+            {{ today_entry.leave_label or 'Leave' }} today &middot; {{ fmt_duration(today_target) + ' due' if today_target else 'nothing due' }}
+          {%- elif today_target == 0 -%}
+            It's your rest day &mdash; nothing due.
+          {%- else -%}
+            Today's target is {{ fmt_duration(today_target) }}.
+          {%- endif -%}
+        </p>
+      </div>
     </div>
 
-    <div class="live-timer">
-      <span id="live-timer-value">{{ fmt_hours(today_worked) }}</span>
-      <span class="live-timer-label">worked today (net of breaks)</span>
+    {% if day_state != 'stale' %}
+    <div class="timer">
+      <span class="timer-value" id="live-timer-value">{{ fmt_hours(shift_worked_seconds / 3600) }}</span>
+      <span class="timer-label">
+        worked {{ 'this shift' if open_entry and open_entry.date != today else 'today' }} &middot; breaks not counted
+      </span>
     </div>
+    {% endif %}
 
-    <div class="clock-actions">
-      {% if open_break %}
-        <form method="post" action="{{ url_for('main.punch_break_end') }}" class="punch-form">
-          <button type="submit" class="btn btn-primary btn-lg">End break</button>
+    <div class="actions">
+      {% if day_state == 'ready' %}
+        <form method="post" action="{{ url_for('main.punch_in') }}" class="js-once">
+          <button type="submit" class="btn btn-action btn-go">{{ icon('login') }}Login</button>
         </form>
-        <details class="custom-time">
-          <summary>Use a different time</summary>
-          <form method="post" action="{{ url_for('main.punch_break_end') }}" class="inline-form">
-            <input type="time" name="time" required>
-            <button type="submit" class="btn btn-ghost">End break at this time</button>
+      {% elif day_state == 'working' %}
+        <div class="action-pair">
+          <form method="post" action="{{ url_for('main.punch_break_start') }}" class="js-once">
+            <button type="submit" class="btn btn-action btn-pause">{{ icon('coffee') }}Break</button>
           </form>
-        </details>
-      {% elif open_entry %}
-        <div class="btn-row">
-          <form method="post" action="{{ url_for('main.punch_break_start') }}" class="punch-form">
-            <button type="submit" class="btn btn-secondary btn-lg">Start break</button>
-          </form>
-          <form method="post" action="{{ url_for('main.punch_out') }}" class="punch-form">
-            <button type="submit" class="btn btn-danger btn-lg">Punch out</button>
+          <form method="post" action="{{ url_for('main.punch_out') }}" class="js-once">
+            <button type="submit" class="btn btn-action btn-stop">{{ icon('logout') }}Logout</button>
           </form>
         </div>
-        <details class="custom-time">
-          <summary>Use a different time</summary>
-          <div class="custom-time-grid">
-            <form method="post" action="{{ url_for('main.punch_break_start') }}" class="inline-form">
-              <input type="time" name="time" required>
-              <button type="submit" class="btn btn-ghost">Break started</button>
-            </form>
-            <form method="post" action="{{ url_for('main.punch_out') }}" class="inline-form">
-              <input type="time" name="time" required>
-              <button type="submit" class="btn btn-ghost">Punched out</button>
-            </form>
-          </div>
-        </details>
-      {% else %}
-        <form method="post" action="{{ url_for('main.punch_in') }}" class="punch-form">
-          <button type="submit" class="btn btn-primary btn-lg">Punch in</button>
+      {% elif day_state == 'break' %}
+        <form method="post" action="{{ url_for('main.punch_break_end') }}" class="js-once">
+          <button type="submit" class="btn btn-action btn-go" aria-label="Back from break">{{ icon('play') }}Back</button>
         </form>
-        <details class="custom-time">
-          <summary>Use a different time</summary>
-          <form method="post" action="{{ url_for('main.punch_in') }}" class="inline-form">
-            <input type="time" name="time" required>
-            <button type="submit" class="btn btn-ghost">Logged in at this time</button>
+      {% elif day_state == 'done' %}
+        <form method="post" action="{{ url_for('main.punch_in') }}" class="js-once">
+          <button type="submit" class="btn btn-secondary btn-block btn-lg">{{ icon('login') }}Login again</button>
+        </form>
+        <p class="hint">Came back to work? The time since you logged out will count as a break.</p>
+      {% elif day_state == 'stale' %}
+        {% set stale_day = open_entry.date.strftime('%a %d %b') %}
+        {% if open_break %}
+          <p class="stale-text">You also started a break at {{ fmt_time(open_break.break_start) }} that day
+            without tapping Back. Open the day to put in the real times.</p>
+          <a class="btn btn-action btn-go" href="{{ url_for('main.edit_entry', date_str=open_entry.date.isoformat()) }}">
+            {{ icon('pencil') }}Fix {{ stale_day }}</a>
+        {% else %}
+          <form method="post" action="{{ url_for('main.punch_out') }}" class="stale-form js-once">
+            <label for="stale-time">What time did you finish on {{ stale_day }}?</label>
+            <div class="time-row">
+              <input type="time" id="stale-time" name="time" required>
+              <button type="submit" class="btn btn-stop btn-lg">{{ icon('logout') }}Save logout</button>
+            </div>
           </form>
-        </details>
+          <a class="link" href="{{ url_for('main.edit_entry', date_str=open_entry.date.isoformat()) }}">
+            Or open {{ stale_day }} to edit everything</a>
+        {% endif %}
       {% endif %}
     </div>
+
+    {% if day_state in ['ready', 'working', 'break', 'done'] %}
+    <details class="other-time">
+      <summary>{{ icon('clock') }}<span>Forgot to tap? Enter a different time</span>{{ icon('chevron-down', 'icon summary-chevron') }}</summary>
+      <div class="other-time-body">
+        {% if day_state in ['ready', 'done'] %}
+          <form method="post" action="{{ url_for('main.punch_in') }}" class="time-form js-once">
+            <label for="t-login">{{ 'Login again' if day_state == 'done' else 'Login' }} time</label>
+            <div class="time-row">
+              <input type="time" id="t-login" name="time" required>
+              <button type="submit" class="btn btn-secondary">Save</button>
+            </div>
+          </form>
+        {% elif day_state == 'working' %}
+          <form method="post" action="{{ url_for('main.punch_break_start') }}" class="time-form js-once">
+            <label for="t-break">Break start time</label>
+            <div class="time-row">
+              <input type="time" id="t-break" name="time" required>
+              <button type="submit" class="btn btn-secondary">Save</button>
+            </div>
+          </form>
+          <form method="post" action="{{ url_for('main.punch_out') }}" class="time-form js-once">
+            <label for="t-logout">Logout time</label>
+            <div class="time-row">
+              <input type="time" id="t-logout" name="time" required>
+              <button type="submit" class="btn btn-secondary">Save</button>
+            </div>
+          </form>
+        {% elif day_state == 'break' %}
+          <form method="post" action="{{ url_for('main.punch_break_end') }}" class="time-form js-once">
+            <label for="t-back">Back from break time</label>
+            <div class="time-row">
+              <input type="time" id="t-back" name="time" required>
+              <button type="submit" class="btn btn-secondary">Save</button>
+            </div>
+          </form>
+        {% endif %}
+      </div>
+    </details>
+    {% endif %}
+
+    {% if day_state == 'working' and suggestion %}
+    <p class="finish-line" id="finish-line">
+      {%- if suggestion.today_target_met -%}
+        {{ icon('check') }}<span>Today's {{ suggestion.today_target_fmt }} is done &mdash; anything more is overtime.</span>
+      {%- else -%}
+        {{ icon('flag') }}<span>Finish today's {{ suggestion.today_target_fmt }} at <strong id="finish-time">{{ suggestion.today_time }}</strong>{% if suggestion.break_allowance_fmt %}, allowing {{ suggestion.break_allowance_fmt }} more break{% endif %}.</span>
+      {%- endif -%}
+    </p>
+    {% endif %}
   </section>
 
-  <section class="card card-week">
-    <div class="card-heading">
-      <h2>This week</h2>
-      <span class="muted">{{ weekly.span_start.strftime('%d %b') }}{% if weekly.span_end != weekly.span_start %} &ndash; {{ weekly.span_end.strftime('%d %b') }}{% endif %}</span>
+  {# ------------------------------------------------------------- month #}
+  {% set month_minutes = (month.balance_hours * 60)|round|int %}
+  <section class="card month-card" aria-labelledby="month-heading">
+    <div class="card-head">
+      <h2 id="month-heading" class="card-title">{{ today.strftime('%B') }} so far</h2>
+      <a class="link" href="{{ url_for('main.history') }}">Every day {{ icon('chevron-right', 'icon icon-inline') }}</a>
+    </div>
+    <p class="big-balance {{ 'is-ahead' if month_minutes > 0 else ('is-behind' if month_minutes < 0 else '') }}">
+      <span class="big-balance-value">{{ fmt_balance(month.balance_hours) }}</span>
+      <span class="big-balance-label">
+        {%- if month_minutes > 0 %}ahead of target{% elif month_minutes < 0 %}behind target{% else %}right on target{% endif -%}
+      </span>
+    </p>
+    <p class="card-note">{{ fmt_hours(month.worked_hours) }} worked of {{ fmt_hours(month.target_hours) }} due so far{% if month.today_in_progress %} &middot; today counts as you go{% endif %}.</p>
+  </section>
+
+  {# ------------------------------------------------------------- today #}
+  <section class="card today-card" aria-labelledby="today-heading">
+    <div class="card-head">
+      <h2 id="today-heading" class="card-title">Today</h2>
+      <span class="card-sub">{{ today.strftime('%a %d %b') }}</span>
+    </div>
+    <dl class="figures">
+      <div class="figure">
+        <dt>Worked</dt>
+        <dd>{{ fmt_hours(today_worked) }}</dd>
+      </div>
+      <div class="figure">
+        <dt>Target</dt>
+        <dd>{{ fmt_hours(today_target) }}</dd>
+      </div>
+      <div class="figure">
+        <dt>Balance</dt>
+        {%- set today_balance = today_worked - today_accrued_target %}
+        {%- set today_minutes = (today_balance * 60)|round|int %}
+        {%- if today_in_progress and today_minutes <= 0 %}
+        <dd class="is-pending">Still going</dd>
+        {%- else %}
+        <dd class="{{ 'is-ahead' if today_minutes > 0 else ('is-behind' if today_minutes < 0 else '') }}">{{ fmt_balance(today_balance) }}</dd>
+        {%- endif %}
+      </div>
+    </dl>
+    {% if today_entry and today_entry.breaks %}
+    <div class="break-list">
+      <h3 class="mini-title">Breaks today</h3>
+      <ul>
+        {% for b in today_entry.breaks %}
+        <li>{{ fmt_time(b.break_start) }} to {{ fmt_time(b.break_end) if b.break_end else 'now' }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+  </section>
+
+  {# -------------------------------------------------------------- week #}
+  <section class="card week-card" aria-labelledby="week-heading">
+    <div class="card-head">
+      <h2 id="week-heading" class="card-title">This week</h2>
+      <span class="card-sub">{{ weekly.span_start.strftime('%d %b') }}{% if weekly.span_end != weekly.span_start %} &ndash; {{ weekly.span_end.strftime('%d %b') }}{% endif %}</span>
     </div>
 
-    <div class="progress-wrap">
-      <div class="progress-track">
-        <div class="progress-fill" id="weekly-progress-fill" style="width: {{ weekly.progress_pct }}%"></div>
-      </div>
-      <div class="progress-figures">
-        <span id="weekly-worked-fig"><strong>{{ fmt_hours(weekly.worked_hours) }}</strong> worked</span>
-        <span id="weekly-target-fig">of {{ fmt_hours(weekly.target_hours) }} target</span>
-      </div>
+    <p class="week-figures">
+      <strong id="weekly-worked-fig">{{ fmt_hours(weekly.worked_hours) }}</strong>
+      <span>of {{ fmt_target_hours(weekly.target_hours) }}</span>
+    </p>
+    <div class="progress" id="weekly-progress" role="progressbar" aria-label="Weekly target"
+         aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ weekly.progress_pct|round|int }}"
+         aria-valuetext="{{ fmt_hours(weekly.worked_hours) }} of {{ fmt_target_hours(weekly.target_hours) }}">
+      <div class="progress-fill" id="weekly-progress-fill" style="width: {{ weekly.progress_pct }}%"></div>
     </div>
 
     {% if weekly.complete %}
       <div class="banner banner-success" id="weekly-banner">
-        🎉 You've hit your {{ fmt_target_hours(weekly.target_hours) }} weekly target{% if open_entry %} &mdash; you can log out any time{% endif %}.
+        You've hit your {{ fmt_target_hours(weekly.target_hours) }} weekly target{% if open_entry %} &mdash; you can log out any time{% endif %}.
       </div>
     {% elif suggestion and suggestion.lands_today %}
       <div class="banner banner-info" id="weekly-banner">
-        {{ fmt_hours(weekly.remaining_hours) }} left this week. At this pace, punch out around
+        {{ fmt_hours(weekly.remaining_hours) }} left this week. At this pace, log out around
         <strong>{{ suggestion.suggested_time }}</strong> today to hit your target{% if suggestion.break_allowance_fmt %},
-        including {{ suggestion.break_allowance_fmt }} of break{% endif %}.
+        allowing {{ suggestion.break_allowance_fmt }} more break{% endif %}.
       </div>
     {% elif suggestion and not suggestion.today_target_met %}
       <div class="banner banner-info" id="weekly-banner">
         {{ fmt_hours(weekly.remaining_hours) }} left this week &mdash; more than today can cover.
-        Punch out around <strong>{{ suggestion.today_time }}</strong> to finish today's
+        Log out around <strong>{{ suggestion.today_time }}</strong> to finish today's
         {{ suggestion.today_target_fmt }}{% if suggestion.break_allowance_fmt %},
-        including {{ suggestion.break_allowance_fmt }} of break{% endif %}.
+        allowing {{ suggestion.break_allowance_fmt }} more break{% endif %}.
       </div>
     {% elif suggestion %}
       <div class="banner banner-info" id="weekly-banner">
@@ -124,52 +250,66 @@
       </div>
     {% endif %}
 
-    <div class="week-days">
+    <ol class="week-strip">
       {% for row in weekly.rows %}
         {% set is_leave = row.entry and row.entry.target_override is not none %}
-        <a href="{{ url_for('main.edit_entry', date_str=row.date.isoformat()) }}" class="week-day {{ 'is-today' if row.date == today }} {{ 'has-entry' if row.entry }} {{ 'is-leave' if is_leave }} {{ 'is-other-month' if not row.in_month }}">
-          <span class="week-day-label">{{ row.date.strftime('%a') }}</span>
-          <span class="week-day-num">{{ row.date.day }}</span>
-          <span class="week-day-hours">
-            {%- if is_leave and row.worked_hours == 0 -%}
-              {{ (row.entry.leave_label or 'Leave')[:7] }}
-            {%- elif row.entry -%}
-              {{ fmt_hours(row.worked_hours) }}
-            {%- elif row.target_hours == 0 -%}
-              rest
-            {%- else -%}
-              &mdash;
-            {%- endif -%}
-          </span>
-        </a>
+        {% if row.needs_logout %}
+          {% set short = 'Fix' %}
+          {% set spoken = 'logout time missing' %}
+        {% elif is_leave and row.worked_hours == 0 %}
+          {% set short = {'half': '½ day', 'full': 'Leave'}.get(row.entry.effective_leave_type, 'Custom') %}
+          {% set spoken = row.entry.leave_label or 'leave' %}
+        {% elif row.entry %}
+          {% set short = fmt_hours_compact(row.worked_hours) %}
+          {% set spoken = fmt_hours(row.worked_hours) ~ ' worked' %}
+        {% elif row.target_hours == 0 %}
+          {% set short = 'Rest' %}
+          {% set spoken = 'rest day' %}
+        {% else %}
+          {% set short = '–' %}
+          {% set spoken = 'nothing logged' if row.date < today else 'not yet' %}
+        {% endif %}
+        <li>
+          <a href="{{ url_for('main.edit_entry', date_str=row.date.isoformat()) }}"
+             class="day-chip{{ ' is-today' if row.date == today }}{{ ' has-entry' if row.entry }}{{ ' is-leave' if is_leave }}{{ ' is-other-month' if not row.in_month }}{{ ' needs-fix' if row.needs_logout }}"
+             aria-label="{{ row.date.strftime('%A %d %B') }}: {{ spoken }}"
+             {% if row.date == today %}aria-current="date"{% endif %}>
+            <span class="day-chip-name" aria-hidden="true">{{ row.date.strftime('%a') }}</span>
+            <span class="day-chip-num" aria-hidden="true">{{ row.date.day }}</span>
+            <span class="day-chip-hours" aria-hidden="true">{{ short }}</span>
+          </a>
+        </li>
       {% endfor %}
-    </div>
+    </ol>
   </section>
 
-</div>
-
-{% if saturday %}
-<div class="grid">
-  <section class="card card-saturday" id="saturday-card">
-    <div class="card-heading">
-      <h2>Saturday plan</h2>
-      <span class="muted">{{ saturday.saturday_date.strftime('%A, %d %b') }}</span>
+  {# ---------------------------------------------------------- saturday #}
+  {% if saturday %}
+  <section class="card saturday-card" id="saturday-card" aria-labelledby="saturday-heading">
+    <div class="card-head">
+      <h2 id="saturday-heading" class="card-title">Saturday plan</h2>
+      <span class="card-sub">{{ saturday.saturday_date.strftime('%a %d %b') }}</span>
     </div>
     {% if saturday.mode == 'live' %}
       {% if saturday.reached %}
-        <div class="banner banner-success" id="saturday-banner">🎉 You've already covered your {{ fmt_target_hours(saturday.target_hours) }} this week &mdash; log out on Saturday whenever suits you.</div>
+        <div class="banner banner-success" id="saturday-banner">You've already covered your {{ fmt_target_hours(saturday.target_hours) }} this week &mdash; log out on Saturday whenever suits you.</div>
       {% else %}
-        <div class="banner banner-info" id="saturday-banner">Punch out around <strong>{{ saturday.suggested_time }}</strong> today to complete your week.</div>
+        <div class="banner banner-info" id="saturday-banner">Log out around <strong>{{ saturday.suggested_time }}</strong> today to complete your week.</div>
       {% endif %}
     {% elif saturday.mode == 'done' %}
       {% if saturday.week_complete %}
-        <div class="banner banner-success" id="saturday-banner">🎉 Saturday's done and your weekly target is complete.</div>
+        <div class="banner banner-success" id="saturday-banner">Saturday's done and your weekly target is complete.</div>
       {% else %}
         <div class="banner banner-muted" id="saturday-banner">Saturday's logged &mdash; you worked {{ fmt_hours(saturday.worked_hours) }}.</div>
       {% endif %}
     {% else %}
       {% if saturday.reached %}
-        <div class="banner banner-success" id="saturday-banner">🎉 On current pace you're set to hit {{ fmt_target_hours(saturday.target_hours) }} without needing Saturday at all.</div>
+        <div class="banner banner-success" id="saturday-banner">On current pace you'll hit {{ fmt_target_hours(saturday.target_hours) }} without needing Saturday at all.</div>
+      {% elif saturday.projected_spills %}
+        <div class="banner banner-muted" id="saturday-banner">
+          About {{ fmt_hours(saturday.remaining_hours) }} would be left for Saturday &mdash; more than one day
+          can hold. Adding a little to the days before will spread it out.
+        </div>
       {% elif saturday.projected_time %}
         <div class="banner banner-info" id="saturday-banner">
           If the rest of the week goes to plan, log out around <strong>{{ saturday.projected_time }}</strong> on
@@ -179,73 +319,13 @@
         <div class="banner banner-muted" id="saturday-banner">
           About {{ fmt_hours(saturday.remaining_hours) }} left for Saturday if the rest of the week goes to plan.
           <a href="{{ url_for('main.settings') }}" class="link">Set your usual Saturday login time</a> in Settings
-          to see an exact clock-out estimate here.
+          to see an exact logout time here.
         </div>
       {% endif %}
     {% endif %}
   </section>
-</div>
-{% endif %}
+  {% endif %}
 
-<div class="grid grid-secondary">
-  <section class="card">
-    <div class="card-heading">
-      <h2>Today</h2>
-    </div>
-    <div class="stat-row">
-      <div class="stat">
-        <span class="stat-value">{{ fmt_hours(today_worked) }}</span>
-        <span class="stat-label">Worked (no break)</span>
-      </div>
-      <div class="stat">
-        <span class="stat-value">{{ fmt_hours(today_target) }}</span>
-        <span class="stat-label">Target</span>
-      </div>
-      <div class="stat">
-        {%- set today_balance = today_worked - today_accrued_target %}
-        {%- if today_in_progress and today_balance <= 0 %}
-        <span class="stat-value muted" title="Still running &mdash; today's target isn't due yet">&mdash;</span>
-        {%- else %}
-        <span class="stat-value {{ 'stat-positive' if today_balance >= 0 else 'stat-negative' }}">{{ fmt_hours(today_balance) }}</span>
-        {%- endif %}
-        <span class="stat-label">Balance</span>
-      </div>
-    </div>
-    {% if today_entry and today_entry.breaks %}
-    <div class="break-list">
-      <span class="muted">Breaks today</span>
-      {% for b in today_entry.breaks %}
-        <div class="break-row">
-          <span>{{ fmt_time(b.break_start) }} &rarr; {{ fmt_time(b.break_end) if b.break_end else 'ongoing' }}</span>
-        </div>
-      {% endfor %}
-    </div>
-    {% endif %}
-  </section>
-
-  <section class="card">
-    <div class="card-heading">
-      <h2>Recent entries</h2>
-      <a href="{{ url_for('main.history') }}" class="link">View history &rarr;</a>
-    </div>
-    <table class="mini-table">
-      <thead>
-        <tr><th>Date</th><th>In</th><th>Out</th><th>Total</th></tr>
-      </thead>
-      <tbody>
-        {% for e in recent_entries %}
-        <tr onclick="window.location='{{ url_for('main.edit_entry', date_str=e.date.isoformat()) }}'">
-          <td>{{ e.date.strftime('%d %b') }}</td>
-          <td>{{ fmt_time(e.login_time) }}</td>
-          <td>{{ fmt_time(e.logout_time) if e.logout_time else '&mdash;' | safe }}</td>
-          <td>{{ fmt_hours(entry_total_hours(e)) }}</td>
-        </tr>
-        {% else %}
-        <tr><td colspan="4" class="muted">No entries yet. Punch in above to get started.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </section>
 </div>
 {% endblock %}
 
