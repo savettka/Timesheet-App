@@ -9,9 +9,14 @@ BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 # stamp, and suggested logout time by however far the server is from the
 # user's real timezone. Pin it here so "now" in the app matches the user's
 # actual wall clock instead of the host's.
+#
+# Only where the zone can actually be switched (Linux, like PythonAnywhere).
+# Windows can't read a name like "Asia/Kolkata" -- it silently falls back to
+# UTC instead -- so the Windows app just keeps the PC's own clock, which is
+# already the user's wall clock.
 TIMEZONE = os.environ.get("TIMEZONE", "Asia/Kolkata")
-os.environ["TZ"] = TIMEZONE
 if hasattr(time, "tzset"):
+    os.environ["TZ"] = TIMEZONE
     time.tzset()
 
 

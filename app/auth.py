@@ -33,6 +33,40 @@ IP_REQUEST_WINDOW_SECONDS = 3600
 _ip_requests = {}
 
 
+# Wrong passwords allowed from one address before sign-in pauses for it. Web
+# and Windows-app sign-in share the count, so switching between them buys an
+# attacker nothing. In memory, like the code limit above.
+LOGIN_FAILURE_LIMIT = 10
+LOGIN_FAILURE_WINDOW_SECONDS = 15 * 60
+_login_failures = {}
+
+
+def client_ip():
+    """The visitor's address. PythonAnywhere's proxy passes it in X-Real-IP
+    (setting it itself, so it can't be forged from outside); anywhere else,
+    the connection's own address."""
+    return request.headers.get("X-Real-IP") or request.remote_addr or "unknown"
+
+
+def _recent_failures(ip):
+    cutoff = time.monotonic() - LOGIN_FAILURE_WINDOW_SECONDS
+    for known_ip in [k for k, v in _login_failures.items() if not [t for t in v if t > cutoff]]:
+        _login_failures.pop(known_ip, None)
+    return [t for t in _login_failures.get(ip, []) if t > cutoff]
+
+
+def login_blocked(ip):
+    return len(_recent_failures(ip)) >= LOGIN_FAILURE_LIMIT
+
+
+def record_login_failure(ip):
+    _login_failures[ip] = _recent_failures(ip) + [time.monotonic()]
+
+
+def clear_login_failures(ip):
+    _login_failures.pop(ip, None)
+
+
 def _ip_rate_limited(ip):
     """Record a code request from `ip`, returning True if it's over the cap."""
     now = time.monotonic()
@@ -97,13 +131,20 @@ def login():
         return redirect(url_for("auth.setup"))
 
     if request.method == "POST":
+        ip = client_ip()
+        # Without a limit, a password could be guessed at as fast as the
+        # server answers.
+        if login_blocked(ip):
+            flash("Too many wrong passwords. Wait 15 minutes and try again.", "error")
+            return render_template("login.html", code_login_available=mailer.is_configured())
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
         user = User.query.filter_by(username=username).first()
         if user and user.check_password(password):
+            clear_login_failures(ip)
             login_user(user, remember=True)
-            next_url = request.args.get("next")
-            return redirect(next_url or url_for("main.dashboard"))
+            return redirect(_safe_next_url() or url_for("main.dashboard"))
+        record_login_failure(ip)
         flash("Invalid username or password.", "error")
 
     return render_template("login.html", code_login_available=mailer.is_configured())

@@ -144,6 +144,38 @@
     </div>
   </section>
 
+  <section class="card" aria-labelledby="apps-heading">
+    <h2 id="apps-heading" class="card-title">Windows apps signed in</h2>
+    {% if apps %}
+    <p class="card-note">These PCs keep their own copy of your hours and sync it with this site.
+      Sign one out if it's lost or you've stopped using it &mdash; it can't send or fetch anything
+      again until it's signed in with your password.</p>
+    <ul class="user-list">
+      {% for a in apps %}
+      <li class="user-row">
+        <div class="user-row-info">
+          <span class="user-row-name">{{ a.name }}</span>
+          <span class="user-row-username">
+            Signed in {{ a.created_at.strftime('%d %b %Y') }}
+            {%- if a.last_used_at %} &middot; last synced {{ a.last_used_at.strftime('%d %b %Y') }}{% endif %}
+          </span>
+        </div>
+        <div class="user-row-actions">
+          <form method="post" data-confirm="Sign out {{ a.name }}? It will need your password again before it can sync.">
+            <input type="hidden" name="form_type" value="revoke_app">
+            <input type="hidden" name="token_id" value="{{ a.id }}">
+            <button type="submit" class="btn btn-danger-ghost btn-sm">Sign out</button>
+          </form>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="card-note">None yet. Once you sign in to the STM Windows app, the PC shows up here so you
+      can sign it out from anywhere.</p>
+    {% endif %}
+  </section>
+
   {% if user.is_admin %}
   <section class="card card-wide" aria-labelledby="team-heading">
     <div class="card-head">

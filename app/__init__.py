@@ -30,6 +30,16 @@ def _run_light_migrations():
             statements.append("ALTER TABLE time_entry ADD COLUMN leave_label VARCHAR(60)")
         if "leave_type" not in entry_columns:
             statements.append("ALTER TABLE time_entry ADD COLUMN leave_type VARCHAR(10)")
+        if "sync_version" not in entry_columns:
+            # Existing days start with no version; the first sync from a new
+            # Windows app asks for everything, so they're still sent.
+            statements.append("ALTER TABLE time_entry ADD COLUMN sync_version INTEGER")
+            statements.append(
+                "CREATE INDEX IF NOT EXISTS ix_time_entry_sync_version "
+                "ON time_entry (sync_version)"
+            )
+        if "modified_at" not in entry_columns:
+            statements.append("ALTER TABLE time_entry ADD COLUMN modified_at DATETIME")
 
     if "user" in table_names:
         user_columns = {c["name"] for c in inspector.get_columns("user")}
@@ -50,6 +60,10 @@ def _run_light_migrations():
             statements.append(
                 "ALTER TABLE user ADD COLUMN saturday_break_minutes "
                 "INTEGER NOT NULL DEFAULT 30"
+            )
+        if "sync_counter" not in user_columns:
+            statements.append(
+                "ALTER TABLE user ADD COLUMN sync_counter INTEGER NOT NULL DEFAULT 0"
             )
         if "email" not in user_columns:
             # Added without UNIQUE: SQLite can't add a unique column in place.
@@ -110,11 +124,18 @@ def create_app(config_object="config.Config"):
     def load_user(user_id):
         return db.session.get(User, int(user_id))
 
+    from app.api import api_bp
     from app.auth import auth_bp
     from app.main import main_bp
+    from app.sync import init_sync_tracking
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(main_bp)
+    # The Windows app's sync endpoints. A copy of STM running *inside* the
+    # Windows app is a client, not a server, so it doesn't offer them.
+    if app.config.get("SYNC_ROLE", "server") == "server":
+        app.register_blueprint(api_bp)
+    init_sync_tracking()
 
     with app.app_context():
         db.create_all()
