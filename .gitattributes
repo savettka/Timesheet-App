@@ -1,0 +1,9 @@
+# Keep text files on Unix line endings everywhere. Without this, a checkout on
+# Windows (core.autocrlf=true) writes CRLF files, and anything packaged or
+# committed from there carries CRLF into the repo -- which is how every file
+# once showed up as rewritten in a five-file change.
+* text=auto eol=lf
+
+*.png binary
+*.svg text
+*.zip binary

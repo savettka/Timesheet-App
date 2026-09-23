@@ -10,3 +10,7 @@ instance/
 
 # uploaded profile pictures - user data, not source
 app/static/uploads/
+
+# update zips and bundles uploaded to the host - deploy artifacts, not source
+*.zip
+*.bundle
