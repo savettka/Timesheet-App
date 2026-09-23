@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% block title %}Calendar{% endblock %}
+{% block page_title %}Calendar{% endblock %}
+
+{% block content %}
+{% set balance_minutes = (summary.balance_hours * 60)|round|int %}
+<section class="card cal-card" aria-labelledby="cal-title">
+  <div class="month-nav">
+    <a class="btn btn-icon" href="{{ url_for('main.calendar', year=prev_year, month=prev_month) }}"
+       aria-label="Previous month">{{ icon('chevron-left') }}</a>
+    <h2 id="cal-title" class="month-title">{{ month_name }} {{ year }}</h2>
+    <a class="btn btn-icon" href="{{ url_for('main.calendar', year=next_year, month=next_month) }}"
+       aria-label="Next month">{{ icon('chevron-right') }}</a>
+  </div>
+  {% if not is_current_month %}
+    <p class="month-jump"><a class="link" href="{{ url_for('main.calendar') }}">Jump to this month</a></p>
+  {% endif %}
+  <p class="cal-summary">
+    <strong>{{ fmt_hours(summary.worked_hours) }}</strong> worked &middot;
+    <strong class="{{ 'is-ahead' if balance_minutes > 0 else ('is-behind' if balance_minutes < 0 else '') }}">{{ fmt_balance(summary.balance_hours) }}</strong>
+    {% if balance_minutes > 0 %}ahead{% elif balance_minutes < 0 %}behind{% else %}on target{% endif %}
+  </p>
+
+  <table class="cal">
+    <thead>
+      <tr>
+        {% for short_name, full_name in [('Mon', 'Monday'), ('Tue', 'Tuesday'), ('Wed', 'Wednesday'), ('Thu', 'Thursday'),
+                                         ('Fri', 'Friday'), ('Sat', 'Saturday'), ('Sun', 'Sunday')] %}
+        <th scope="col"><abbr title="{{ full_name }}">{{ short_name }}</abbr></th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for week in weeks %}
+      <tr>
+        {% for row in week %}
+        {% if row is none %}
+        <td class="cal-pad"></td>
+        {% else %}
+          {% set e = row.entry %}
+          {% set worked_any = e and e.login_time %}
+          {% set is_leave = e and e.target_override is not none %}
+          {% set is_rest = row.target_hours == 0 and not e and not row.is_future %}
+          {% set is_missing = not e and row.target_hours > 0 and not row.is_future and not row.is_today %}
+          {% set minutes = (row.balance_hours * 60)|round|int %}
+          {% set tone = 'is-ahead' if minutes > 0 else ('is-behind' if minutes < 0 else '') %}
+          {% set gap = fmt_duration((row.balance_hours|abs)) ~ (' ahead' if minutes > 0 else ' behind') %}
+          {% set short, bal, spoken, state = '', '', '', '' %}
+          {% if row.needs_logout %}
+            {% set short, spoken, state = 'Fix', 'logout time missing', 'needs-fix' %}
+          {% elif worked_any %}
+            {% set short = fmt_hours_compact(row.worked_hours) %}
+            {% if row.in_progress and minutes <= 0 %}
+              {% set spoken = fmt_hours(row.worked_hours) ~ ' worked so far, still going' %}
+            {% elif minutes != 0 %}
+              {% set bal, spoken = fmt_balance_compact(row.balance_hours), fmt_hours(row.worked_hours) ~ ' worked, ' ~ gap %}
+            {% else %}
+              {% set spoken = fmt_hours(row.worked_hours) ~ ' worked, on target' %}
+            {% endif %}
+          {% elif is_leave %}
+            {% set short = {'half': '½ day', 'full': 'Leave'}.get(e.effective_leave_type, 'Custom') %}
+            {% set spoken, state = e.leave_label or 'leave', 'is-leave' %}
+            {% if not row.is_future and minutes != 0 %}
+              {% set bal, spoken = fmt_balance_compact(row.balance_hours), spoken ~ ', ' ~ gap %}
+            {% endif %}
+          {% elif is_rest %}
+            {% set short, spoken = 'Rest', 'rest day' %}
+          {% elif is_missing %}
+            {% set short, bal, spoken = '–', fmt_balance_compact(row.balance_hours), 'nothing logged, ' ~ gap %}
+          {% elif row.is_today %}
+            {% set spoken = 'today, nothing logged yet' %}
+          {% else %}
+            {% set spoken = 'not yet' %}
+          {% endif %}
+        <td class="cal-day{{ ' is-today' if row.is_today }}{{ ' is-future' if row.is_future }}{{ ' is-rest' if is_rest }}{{ ' ' ~ state if state }}">
+          <a class="cal-link" href="{{ url_for('main.edit_entry', date_str=row.date.isoformat(), back='calendar') }}"
+             {% if row.is_today %}aria-current="date"{% endif %}>
+            <span class="visually-hidden">{{ row.date.strftime('%A %d %B') }}: {{ spoken }}</span>
+            <span class="cal-num" aria-hidden="true">{{ row.date.day }}</span>
+            {% if short %}<span class="cal-hours" aria-hidden="true">{{ short }}</span>{% endif %}
+            {% if bal %}<span class="cal-bal {{ tone }}" aria-hidden="true">{{ bal }}</span>{% endif %}
+          </a>
+        </td>
+        {% endif %}
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="cal-legend">Tap a day to open it &middot; <span class="is-ahead">+</span> ahead,
+    <span class="is-behind">&minus;</span> behind that day's target</p>
+</section>
+{% endblock %}

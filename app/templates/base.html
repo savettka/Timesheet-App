@@ -73,7 +73,8 @@
   {% set settings_endpoint = 'desktop.settings' if desktop else 'main.settings' %}
   {% set nav_items = [
       ('main.dashboard', 'Home', 'home', ['main.dashboard']),
-      ('main.history', 'History', 'calendar', ['main.history', 'main.edit_entry']),
+      ('main.history', 'History', 'list', ['main.history', 'main.edit_entry']),
+      ('main.calendar', 'Calendar', 'calendar', ['main.calendar']),
       (settings_endpoint, 'Settings', 'sliders', ['main.settings', 'desktop.settings']),
   ] %}
   <div class="app-shell">

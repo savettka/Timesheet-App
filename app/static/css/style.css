@@ -480,27 +480,6 @@ table { border-collapse: collapse; width: 100%; }
 .action-pair { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s3); }
 .actions form { margin: 0; }
 .stale-text { font-size: 16px; color: var(--text-2); }
-.stale-form { display: flex; flex-direction: column; gap: var(--s2); }
-.stale-form label { font-weight: 600; }
-
-.time-row { display: flex; gap: var(--s2); }
-.time-row input { flex: 1; min-width: 0; }
-
-.other-time { border-top: 1px solid var(--line); padding-top: var(--s2); }
-.other-time summary {
-  display: flex; align-items: center; gap: var(--s2);
-  min-height: 44px;
-  color: var(--text-2); font-size: 15px; font-weight: 500;
-  cursor: pointer; list-style: none;
-  border-radius: var(--r-sm);
-}
-.other-time summary::-webkit-details-marker { display: none; }
-.other-time summary:hover { color: var(--text); }
-.summary-chevron { margin-left: auto; transition: transform .2s ease; }
-.other-time[open] .summary-chevron { transform: rotate(180deg); }
-.other-time-body { display: flex; flex-direction: column; gap: var(--s4); padding: var(--s2) 0 var(--s1); }
-.time-form { display: flex; flex-direction: column; gap: 6px; }
-.time-form label { font-size: 15px; font-weight: 600; }
 
 .finish-line {
   display: flex; align-items: flex-start; gap: var(--s2);
@@ -659,6 +638,57 @@ table { border-collapse: collapse; width: 100%; }
 .badge-warn { background: var(--warn-bg); color: var(--warn-text); }
 .badge-quiet { background: transparent; box-shadow: inset 0 0 0 1px var(--line); color: var(--text-3); }
 .card-head .badge { margin-left: 0; }
+
+/* ==========================================================================
+   Calendar
+   ========================================================================== */
+
+.cal-summary { margin: 0 0 var(--s4); text-align: center; font-size: 16px; color: var(--text-2); }
+.cal-summary strong { color: var(--text); font-variant-numeric: tabular-nums; }
+.cal-summary strong.is-ahead { color: var(--ahead); }
+.cal-summary strong.is-behind { color: var(--behind); }
+
+/* Spacing between squares comes from border-spacing; the negative margin
+   lines the outer squares up with the card's edges. */
+.cal { table-layout: fixed; border-collapse: separate; border-spacing: 6px; width: calc(100% + 12px); margin: 0 -6px; }
+.cal th { padding: 0 0 2px; font-size: 13px; font-weight: 600; color: var(--text-2); text-align: center; }
+.cal th abbr { text-decoration: none; }
+.cal td { padding: 0; vertical-align: top; }
+
+.cal-link {
+  display: flex; flex-direction: column; gap: 2px;
+  min-height: 88px; padding: var(--s2) 10px;
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  color: var(--text); text-decoration: none;
+  transition: box-shadow .15s ease;
+}
+.cal-link:hover { box-shadow: inset 0 0 0 1.5px var(--line-strong); }
+.cal-num { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.cal-hours { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cal-bal { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.cal-day.is-today .cal-link { background: var(--accent-soft); box-shadow: inset 0 0 0 2px var(--accent); }
+.cal-day.is-today .cal-num { color: var(--accent-text); }
+.cal-day.is-future .cal-link,
+.cal-day.is-rest .cal-link { background: transparent; box-shadow: inset 0 0 0 1px var(--line); }
+.cal-day.is-future .cal-num,
+.cal-day.is-rest .cal-num,
+.cal-day.is-rest .cal-hours { color: var(--text-3); font-weight: 600; }
+.cal-day.is-leave .cal-link { box-shadow: inset 0 0 0 1.5px var(--line-strong); }
+.cal-day.needs-fix .cal-link { background: var(--warn-bg); }
+.cal-day.needs-fix .cal-hours { color: var(--warn-text); font-weight: 700; }
+
+.cal-legend { margin-top: var(--s3); text-align: center; font-size: 14px; color: var(--text-3); }
+.cal-legend .is-ahead, .cal-legend .is-behind { font-weight: 700; }
+
+@media (max-width: 720px) {
+  .cal { border-spacing: 3px; width: calc(100% + 6px); margin: 0 -3px; }
+  .cal th { font-size: 12.5px; }
+  .cal-link { min-height: 66px; padding: 6px 1px; align-items: center; gap: 1px; border-radius: 10px; }
+  .cal-num { font-size: 15px; }
+  .cal-hours, .cal-bal { font-size: 12px; }
+}
 
 /* ==========================================================================
    Forms
@@ -882,7 +912,7 @@ input[type="number"] { -moz-appearance: textfield; }
 
   .tab-bar {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
-    display: grid; grid-template-columns: repeat(3, 1fr);
+    display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr);
     padding-bottom: env(safe-area-inset-bottom);
     background: var(--surface);
     border-top: 1px solid var(--line);
@@ -1004,7 +1034,7 @@ input[type="number"] { -moz-appearance: textfield; }
 
 @media print {
   .sidebar, .tab-bar, .topbar .theme-toggle-icon, .topbar-user, .flash-stack,
-  .actions, .other-time, .skip-link, .c-go { display: none !important; }
+  .actions, .skip-link, .c-go { display: none !important; }
   body, .card { background: #fff; color: #000; box-shadow: none; }
   .content { padding: 0; }
 }

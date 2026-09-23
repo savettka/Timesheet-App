@@ -548,18 +548,17 @@ def punch_out():
     return redirect(url_for("main.dashboard"))
 
 
-# ---------------------------------------------------------------- history
+# ------------------------------------------------------- history, calendar
 
-@main_bp.route("/history")
-@main_bp.route("/history/<int:year>/<int:month>")
-@login_required
-def history(year=None, month=None):
+def _month_page(year, month):
+    """Everything History and Calendar show for a month -- the same figures,
+    laid out two ways. None for a month that can't exist (a hand-typed /13,
+    which would otherwise be a server error)."""
     today = date.today()
     year = year or today.year
     month = month or today.month
-    # A hand-typed or mangled link (month 13) would otherwise be a server error.
     if not (1 <= month <= 12 and 1970 <= year <= 2100):
-        return redirect(url_for("main.history"))
+        return None
 
     first_day = date(year, month, 1)
     last_day = date(year, month, calendar.monthrange(year, month)[1])
@@ -569,9 +568,7 @@ def history(year=None, month=None):
 
     prev_month = (first_day - timedelta(days=1)).replace(day=1)
     next_month_first = last_day + timedelta(days=1)
-
-    return render_template(
-        "history.html",
+    return dict(
         summary=summary,
         rows=summary["rows"],
         year=year,
@@ -590,6 +587,36 @@ def history(year=None, month=None):
     )
 
 
+@main_bp.route("/history")
+@main_bp.route("/history/<int:year>/<int:month>")
+@login_required
+def history(year=None, month=None):
+    page = _month_page(year, month)
+    if page is None:
+        return redirect(url_for("main.history"))
+    return render_template("history.html", **page)
+
+
+@main_bp.route("/calendar", endpoint="calendar")
+@main_bp.route("/calendar/<int:year>/<int:month>", endpoint="calendar")
+@login_required
+def calendar_page(year=None, month=None):
+    page = _month_page(year, month)
+    if page is None:
+        return redirect(url_for("main.calendar"))
+    # Monday-first weeks, like the rest of STM, with blank cells before the
+    # 1st and after the month's last day.
+    cells = [None] * page["rows"][0]["date"].weekday() + page["rows"]
+    cells += [None] * (-len(cells) % 7)
+    page["weeks"] = [cells[i:i + 7] for i in range(0, len(cells), 7)]
+    return render_template(
+        "calendar.html",
+        fmt_hours_compact=logic.fmt_hours_compact,
+        fmt_balance_compact=logic.fmt_balance_compact,
+        **page,
+    )
+
+
 @main_bp.route("/entry/<date_str>", methods=["GET", "POST"])
 @login_required
 def edit_entry(date_str):
@@ -601,6 +628,10 @@ def edit_entry(date_str):
 
     entry = TimeEntry.query.filter_by(user_id=current_user.id, date=entry_date).first()
     default_target = logic.entry_target_hours(current_user, entry_date)
+    # Opened from the calendar: go back there afterwards, not to History.
+    back = "calendar" if request.args.get("back") == "calendar" else None
+    month_url = url_for("main.calendar" if back else "main.history",
+                        year=entry_date.year, month=entry_date.month)
 
     def show_form(draft=None):
         return render_template(
@@ -611,6 +642,8 @@ def edit_entry(date_str):
             default_target=default_target,
             prev_date=entry_date - timedelta(days=1),
             next_date=entry_date + timedelta(days=1),
+            back=back,
+            month_url=month_url,
         )
 
     if request.method == "POST":
@@ -667,6 +700,11 @@ def edit_entry(date_str):
         if logout_t is not None and login_t is None:
             flash("Add a login time to go with the logout time.", "error")
             return show_form(draft)
+        if logout_t is not None and any(end is None for _, end in breaks):
+            # A finished day can't have a break still running: it would count
+            # up to this minute and wipe out the whole day's hours.
+            flash("Add when each break ended — the day has a logout time.", "error")
+            return show_form(draft)
 
         if leave_type in TimeEntry.LEAVE_TYPES and not leave_label:
             leave_label = TimeEntry.LEAVE_TYPES[leave_type]
@@ -701,9 +739,9 @@ def edit_entry(date_str):
                 "logout should be AM/PM the other way round, change it here.",
                 "warning",
             )
-            return redirect(url_for("main.edit_entry", date_str=entry_date.isoformat()))
+            return redirect(url_for("main.edit_entry", date_str=entry_date.isoformat(), back=back))
         flash(f"Saved {day}.", "success")
-        return redirect(url_for("main.history", year=entry_date.year, month=entry_date.month))
+        return redirect(month_url)
 
     return show_form()
 
@@ -723,7 +761,8 @@ def delete_entry(date_str):
         db.session.commit()
         flash(f"Deleted entry for {entry_date.strftime('%d %b %Y')}.", "success")
 
-    return redirect(url_for("main.history", year=entry_date.year, month=entry_date.month))
+    view = "main.calendar" if request.args.get("back") == "calendar" else "main.history"
+    return redirect(url_for(view, year=entry_date.year, month=entry_date.month))
 
 
 # --------------------------------------------------------------- settings

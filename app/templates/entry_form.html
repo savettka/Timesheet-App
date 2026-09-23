@@ -12,14 +12,14 @@
 
 <section class="card form-card" aria-labelledby="day-title">
   <div class="day-nav">
-    <a class="btn btn-icon" href="{{ url_for('main.edit_entry', date_str=prev_date.isoformat()) }}"
+    <a class="btn btn-icon" href="{{ url_for('main.edit_entry', date_str=prev_date.isoformat(), back=back) }}"
        aria-label="Previous day, {{ prev_date.strftime('%A %d %B') }}">{{ icon('chevron-left') }}</a>
     <h2 id="day-title" class="day-title">{{ entry_date.strftime('%A %d %B %Y') }}</h2>
-    <a class="btn btn-icon" href="{{ url_for('main.edit_entry', date_str=next_date.isoformat()) }}"
+    <a class="btn btn-icon" href="{{ url_for('main.edit_entry', date_str=next_date.isoformat(), back=back) }}"
        aria-label="Next day, {{ next_date.strftime('%A %d %B') }}">{{ icon('chevron-right') }}</a>
   </div>
   <p class="day-nav-back">
-    <a class="link" href="{{ url_for('main.history', year=entry_date.year, month=entry_date.month) }}">
+    <a class="link" href="{{ month_url }}">
       {{ icon('calendar', 'icon icon-inline') }}All of {{ entry_date.strftime('%B') }}</a>
   </p>
 
@@ -115,12 +115,12 @@
 
     <div class="form-actions">
       <button type="submit" class="btn btn-primary btn-lg">{{ icon('check') }}Save</button>
-      <a class="btn btn-ghost btn-lg" href="{{ url_for('main.history', year=entry_date.year, month=entry_date.month) }}">Cancel</a>
+      <a class="btn btn-ghost btn-lg" href="{{ month_url }}">Cancel</a>
     </div>
   </form>
 
   {% if entry %}
-  <form method="post" action="{{ url_for('main.delete_entry', date_str=entry_date.isoformat()) }}" class="danger-zone"
+  <form method="post" action="{{ url_for('main.delete_entry', date_str=entry_date.isoformat(), back=back) }}" class="danger-zone"
         data-confirm="Delete everything recorded for {{ entry_date.strftime('%a %d %b') }}? This can't be undone.">
     <button type="submit" class="btn btn-danger-ghost">Delete this day</button>
   </form>

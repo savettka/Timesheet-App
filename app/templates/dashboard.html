@@ -80,65 +80,15 @@
         </form>
         <p class="hint">Came back to work? The time since you logged out will count as a break.</p>
       {% elif day_state == 'stale' %}
+        {# Times are put right in the day editor, the same place as any other
+           correction -- not in a box on Home. #}
         {% set stale_day = open_entry.date.strftime('%a %d %b') %}
-        {% if open_break %}
-          <p class="stale-text">You also started a break at {{ fmt_time(open_break.break_start) }} that day
-            without tapping Back. Open the day to put in the real times.</p>
-          <a class="btn btn-action btn-go" href="{{ url_for('main.edit_entry', date_str=open_entry.date.isoformat()) }}">
-            {{ icon('pencil') }}Fix {{ stale_day }}</a>
-        {% else %}
-          <form method="post" action="{{ url_for('main.punch_out') }}" class="stale-form js-once">
-            <label for="stale-time">What time did you finish on {{ stale_day }}?</label>
-            <div class="time-row">
-              <input type="time" id="stale-time" name="time" required>
-              <button type="submit" class="btn btn-stop btn-lg">{{ icon('logout') }}Save logout</button>
-            </div>
-          </form>
-          <a class="link" href="{{ url_for('main.edit_entry', date_str=open_entry.date.isoformat()) }}">
-            Or open {{ stale_day }} to edit everything</a>
-        {% endif %}
+        <p class="stale-text">Open the day and put in the time you finished
+          {%- if open_break %}, and when your {{ fmt_time(open_break.break_start) }} break ended{% endif %}.</p>
+        <a class="btn btn-action btn-go" href="{{ url_for('main.edit_entry', date_str=open_entry.date.isoformat()) }}">
+          {{ icon('pencil') }}Fix {{ stale_day }}</a>
       {% endif %}
     </div>
-
-    {% if day_state in ['ready', 'working', 'break', 'done'] %}
-    <details class="other-time">
-      <summary>{{ icon('clock') }}<span>Forgot to tap? Enter a different time</span>{{ icon('chevron-down', 'icon summary-chevron') }}</summary>
-      <div class="other-time-body">
-        {% if day_state in ['ready', 'done'] %}
-          <form method="post" action="{{ url_for('main.punch_in') }}" class="time-form js-once">
-            <label for="t-login">{{ 'Login again' if day_state == 'done' else 'Login' }} time</label>
-            <div class="time-row">
-              <input type="time" id="t-login" name="time" required>
-              <button type="submit" class="btn btn-secondary">Save</button>
-            </div>
-          </form>
-        {% elif day_state == 'working' %}
-          <form method="post" action="{{ url_for('main.punch_break_start') }}" class="time-form js-once">
-            <label for="t-break">Break start time</label>
-            <div class="time-row">
-              <input type="time" id="t-break" name="time" required>
-              <button type="submit" class="btn btn-secondary">Save</button>
-            </div>
-          </form>
-          <form method="post" action="{{ url_for('main.punch_out') }}" class="time-form js-once">
-            <label for="t-logout">Logout time</label>
-            <div class="time-row">
-              <input type="time" id="t-logout" name="time" required>
-              <button type="submit" class="btn btn-secondary">Save</button>
-            </div>
-          </form>
-        {% elif day_state == 'break' %}
-          <form method="post" action="{{ url_for('main.punch_break_end') }}" class="time-form js-once">
-            <label for="t-back">Back from break time</label>
-            <div class="time-row">
-              <input type="time" id="t-back" name="time" required>
-              <button type="submit" class="btn btn-secondary">Save</button>
-            </div>
-          </form>
-        {% endif %}
-      </div>
-    </details>
-    {% endif %}
 
     {% if day_state == 'working' and suggestion %}
     <p class="finish-line" id="finish-line">

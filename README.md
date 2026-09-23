@@ -34,7 +34,9 @@ This mirrors the logic in the original spreadsheet:
   so the month's balance shows your real overtime at any moment.
 - **History** — a full month view of every day, with an **Add/Edit** screen to enter or
   correct all 4 times (and multiple breaks) for any date by hand, or mark it as leave/a
-  holiday with a custom target.
+  holiday with a custom target. That screen is where missed or wrong times are fixed.
+- **Calendar** — the same month as a grid, each day showing its hours and whether it
+  was ahead (+) or behind (−) its target; tap a day to open it.
 - **Dashboard** — today's hours, this week's progress bar toward your target, and a
   suggested logout time once you're close to (or past) the weekly target.
 - **Settings** — change daily/weekly targets, workdays, display name, profile picture

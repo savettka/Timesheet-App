@@ -585,6 +585,17 @@ def fmt_hours_compact(value):
     return f"{h}h{m:02d}"
 
 
+def fmt_balance_compact(value):
+    """A balance squeezed for a calendar square: +3h40, −2h15, +40m.
+    Signed like fmt_balance, so it never relies on colour alone."""
+    total_minutes = round((value or 0) * 60)
+    if total_minutes == 0:
+        return "0"
+    sign = "+" if total_minutes > 0 else "−"
+    h, m = divmod(abs(total_minutes), 60)
+    return f"{sign}{m}m" if h == 0 else f"{sign}{h}h{m:02d}"
+
+
 def fmt_target_hours(value):
     """A weekly target written the way it's spoken: 48h, 40h, 47.5h.
 

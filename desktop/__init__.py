@@ -5,4 +5,4 @@ Nothing in here is used by the website -- the server never imports it.
 """
 
 # Shown in the app's Settings; keep in step with version_info.txt.
-__version__ = "1.0.1"
+__version__ = "1.0.2"
