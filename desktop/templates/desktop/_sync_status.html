@@ -1,0 +1,29 @@
+{% if sync_status %}
+<a class="sync-pill sync-state-{{ sync_status.state }}" id="sync-pill" href="{{ url_for('desktop.settings') }}"
+   title="{{ sync_status.detail or 'Sync status' }}">
+  <span class="sync-dot" aria-hidden="true"></span>
+  {# Not a live region: "Synced 2 min ago" ticking over would be read out
+     every minute. The text is there when the pill is focused. #}
+  <span class="sync-label" id="sync-label">{{ sync_status.label }}</span>
+</a>
+<script>
+  // Keeps the pill current without reloading the page.
+  (function () {
+    var pill = document.getElementById("sync-pill");
+    var label = document.getElementById("sync-label");
+    function refresh() {
+      if (document.hidden) return;
+      fetch("{{ url_for('desktop.status') }}", { headers: { Accept: "application/json" } })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (s) {
+          if (!s) return;
+          pill.className = "sync-pill sync-state-" + s.state;
+          pill.title = s.detail || "Sync status";
+          if (label.textContent !== s.label) label.textContent = s.label;
+        })
+        .catch(function () {});
+    }
+    setInterval(refresh, 4000);
+  })();
+</script>
+{% endif %}

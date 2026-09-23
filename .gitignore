@@ -14,3 +14,7 @@ app/static/uploads/
 # update zips and bundles uploaded to the host - deploy artifacts, not source
 *.zip
 *.bundle
+
+# Windows app build output (see desktop/README.md)
+build/
+dist/

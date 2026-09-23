@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% from "partials/logo.html" import stm_logo %}
+{% block title %}Connect{% endblock %}
+{% block page_title %}Sign in again{% endblock %}
+
+{% macro connect_form() %}
+  <form method="post" class="form">
+    <div class="field">
+      <label for="server">Your STM web address</label>
+      <input type="url" id="server" name="server" required value="{{ server }}"
+             inputmode="url" autocomplete="url" spellcheck="false" autocapitalize="none"
+             placeholder="https://yourname.pythonanywhere.com" aria-describedby="server-hint"
+             {% if not server %}autofocus{% endif %}>
+      <p class="hint" id="server-hint">The address you open STM at in your browser.</p>
+    </div>
+    <div class="field">
+      <label for="username">Username</label>
+      <input type="text" id="username" name="username" required value="{{ username }}"
+             autocomplete="username" autocapitalize="none" spellcheck="false"
+             {% if server and not username %}autofocus{% endif %}>
+    </div>
+    <div class="field">
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" required autocomplete="current-password"
+             aria-describedby="password-hint" {% if server and username %}autofocus{% endif %}>
+      <p class="hint" id="password-hint">Used once to connect this PC, then forgotten &mdash; STM keeps a
+        sign-in key instead, locked to your Windows account.</p>
+    </div>
+    <button type="submit" class="btn btn-primary btn-block btn-lg">Connect this PC</button>
+  </form>
+{% endmacro %}
+
+{% block auth_content %}
+<div class="auth-card">
+  <div class="auth-brand">
+    {{ stm_logo('logo-mark logo-lg') }}
+    <h1>Welcome to STM for Windows</h1>
+    <p>Connect to your STM site once. After that your hours live on this PC too, so it works
+      without internet and syncs whenever you're online.</p>
+  </div>
+  {{ connect_form() }}
+</div>
+{% endblock %}
+
+{% block content %}
+<section class="card form-card" aria-labelledby="reconnect-heading">
+  <h2 id="reconnect-heading" class="card-title">This PC needs to sign in again</h2>
+  <p class="card-note">It was signed out from the website, or its sign-in expired.
+    {%- if pending %} The {{ pending }} change{{ 's' if pending != 1 }} made here since then
+    {{ 'are' if pending != 1 else 'is' }} kept and will be sent once you're signed in.{% endif %}</p>
+  {{ connect_form() }}
+</section>
+{% endblock %}

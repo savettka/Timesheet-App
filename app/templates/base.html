@@ -69,10 +69,12 @@
   {% endmacro %}
 
   {% if current_user.is_authenticated %}
+  {# `desktop` is only set inside the Windows app, which has its own Settings. #}
+  {% set settings_endpoint = 'desktop.settings' if desktop else 'main.settings' %}
   {% set nav_items = [
       ('main.dashboard', 'Home', 'home', ['main.dashboard']),
       ('main.history', 'History', 'calendar', ['main.history', 'main.edit_entry']),
-      ('main.settings', 'Settings', 'sliders', ['main.settings']),
+      (settings_endpoint, 'Settings', 'sliders', ['main.settings', 'desktop.settings']),
   ] %}
   <div class="app-shell">
     <aside class="sidebar">
@@ -90,9 +92,11 @@
       </nav>
       <div class="sidebar-footer">
         {{ theme_toggle() }}
+        {% if not desktop %}
         <a class="nav-link" href="{{ url_for('auth.logout') }}">
           {{ icon('power') }}<span>Sign out</span>
         </a>
+        {% endif %}
       </div>
     </aside>
 
@@ -102,8 +106,9 @@
           {{ stm_logo('logo-mark') }}
         </a>
         <h1 class="page-title">{% block page_title %}STM{% endblock %}</h1>
+        {% if desktop %}{% include "desktop/_sync_status.html" %}{% endif %}
         {{ theme_toggle('theme-toggle-icon') }}
-        <a class="topbar-user" href="{{ url_for('main.settings') }}">
+        <a class="topbar-user" href="{{ url_for(settings_endpoint) }}">
           <span class="user-name">{{ current_user.display_name or current_user.username }}</span>
           {{ avatar(current_user) }}
         </a>
@@ -111,6 +116,9 @@
 
       <main id="main" class="content" tabindex="-1">
         {{ flashes() }}
+        {% if desktop and sync_conflicts %}
+          <div class="flash-stack">{% include "desktop/_conflicts.html" %}</div>
+        {% endif %}
         {% block content %}{% endblock %}
       </main>
     </div>

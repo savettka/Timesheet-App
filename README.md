@@ -46,6 +46,9 @@ This mirrors the logic in the original spreadsheet:
 - **Easy to read and use**: 16px text, every colour pair checked for contrast in both
   light and dark mode, 44px+ touch targets, full keyboard use with visible focus, a
   bottom tab bar on phones, and a proper home-screen icon on iOS and Android.
+- **STM for Windows** — a desktop app with its own copy of your hours, so it works
+  offline, syncing with the website whenever it's online. See
+  [desktop/README.md](desktop/README.md).
 
 ## Sign-in codes by email (optional)
 

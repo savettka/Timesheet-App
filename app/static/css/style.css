@@ -669,7 +669,8 @@ table { border-collapse: collapse; width: 100%; }
 .field > label, .field-label { font-size: 15px; font-weight: 600; color: var(--text); }
 .field-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s3); align-items: end; }
 
-input[type="text"], input[type="password"], input[type="number"],
+input[type="text"], input[type="password"], input[type="number"], input[type="url"],
+input[type="search"], input[type="tel"],
 input[type="time"], input[type="date"], input[type="email"], textarea, select {
   -webkit-appearance: none; appearance: none;
   width: 100%; min-height: 50px;
@@ -792,6 +793,46 @@ input[type="number"] { -moz-appearance: textfield; }
   cursor: pointer;
 }
 .flash-close:hover { background: color-mix(in srgb, currentColor 12%, transparent); }
+
+/* ==========================================================================
+   Windows app: sync status and clashes
+   ========================================================================== */
+
+.sync-pill {
+  display: inline-flex; align-items: center; gap: var(--s2);
+  min-height: 40px; padding: 0 var(--s3);
+  border: 1px solid var(--line); border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-2); font-size: 14px; font-weight: 600;
+  text-decoration: none; white-space: nowrap;
+}
+.sync-pill:hover { background: var(--surface-2); }
+.sync-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--go); flex-shrink: 0; }
+.sync-state-pending .sync-dot, .sync-state-syncing .sync-dot { background: var(--accent); }
+.sync-state-offline .sync-dot { background: var(--pause); }
+.sync-state-offline { color: var(--warn-text); }
+.sync-state-signed_out .sync-dot, .sync-state-error .sync-dot { background: var(--stop); }
+.sync-state-signed_out, .sync-state-error { color: var(--stop-text); }
+.sync-state-not_connected .sync-dot { background: var(--line-strong); }
+@media (prefers-reduced-motion: no-preference) {
+  .sync-state-syncing .sync-dot { animation: sync-blink 1s ease-in-out infinite; }
+}
+@keyframes sync-blink { 50% { opacity: .35; } }
+@media (max-width: 600px) {
+  .sync-pill { width: 44px; min-height: 44px; padding: 0; justify-content: center; }
+  .sync-label {
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip: rect(0 0 0 0); white-space: nowrap;
+  }
+}
+
+.conflict .flash-text p + .conflict-actions { margin-top: var(--s2); }
+.conflict-actions { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.conflict-actions form { margin: 0; }
+
+.figures-list { grid-template-columns: minmax(0, 1fr); gap: var(--s2); }
+.figures-list .figure { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s3); }
+.figures-list .figure dd { margin: 0; font-size: 17px; text-align: right; }
 
 /* ==========================================================================
    Sign-in pages

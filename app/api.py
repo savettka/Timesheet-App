@@ -173,6 +173,21 @@ def sync():
     else:
         tombs = tombs.filter(sa.false())  # a first sync has nothing to delete
 
+    entries, tombs = list(entries), list(tombs)
+    # Where the server's copy won a clash, the app must be sent that copy even
+    # if it's older than the app's last sync -- otherwise the app would keep
+    # its losing edit and the two would quietly stay different.
+    kept_here = {parse_day(c["date"]) for c in conflicts if c["kept"] == "server"}
+    have = {e.date for e in entries} | {t.date for t in tombs}
+    for day in kept_here - have:
+        e = TimeEntry.query.filter_by(user_id=user.id, date=day).first()
+        if e is not None:
+            entries.append(e)
+        else:
+            t = DeletedDay.query.filter_by(user_id=user.id, date=day).first()
+            if t is not None:
+                tombs.append(t)
+
     counter = db.session.execute(
         sa.select(User.__table__.c.sync_counter).where(User.__table__.c.id == user.id)
     ).scalar() or 0

@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% block title %}Settings{% endblock %}
+{% block page_title %}Settings{% endblock %}
+
+{% block content %}
+<div class="settings-grid">
+  <section class="card" aria-labelledby="sync-heading">
+    <h2 id="sync-heading" class="card-title">Sync</h2>
+    <dl class="figures figures-list">
+      <div class="figure">
+        <dt>Status</dt>
+        <dd class="sync-state-{{ status.state }}">{{ status.label }}</dd>
+      </div>
+      <div class="figure">
+        <dt>Waiting to send</dt>
+        <dd>{{ status.pending }} day{{ 's' if status.pending != 1 }}</dd>
+      </div>
+    </dl>
+    {% if status.detail %}<p class="card-note">{{ status.detail }}</p>{% endif %}
+    <p class="card-note">STM syncs by itself every minute and straight after each change. Everything
+      you do works offline too &mdash; it's saved on this PC and sent when the connection is back.</p>
+    <div class="form-actions">
+      <form method="post" action="{{ url_for('desktop.sync_now') }}" class="js-once">
+        <button type="submit" class="btn btn-primary">Sync now</button>
+      </form>
+      {% if status.state == 'signed_out' %}
+      <a class="btn btn-secondary" href="{{ url_for('desktop.connect') }}">Sign in again</a>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="card" aria-labelledby="account-heading">
+    <h2 id="account-heading" class="card-title">Account</h2>
+    <p class="card-note">Connected to <strong>{{ server }}</strong> as <strong>{{ user.username }}</strong>.</p>
+    <p class="card-note">Your targets, profile and password are changed on the website, and come
+      across here on the next sync.</p>
+    <div class="form-actions">
+      <a class="btn btn-secondary" href="{{ server }}/settings" target="_blank" rel="noopener">Open Settings on the web</a>
+      <form method="post" action="{{ url_for('desktop.sign_out') }}"
+            data-confirm="{% if status.pending %}{{ status.pending }} change{{ 's' if status.pending != 1 }} haven't reached the server yet. STM will try to send {{ 'them' if status.pending != 1 else 'it' }} first, but if it can't, {{ 'they' if status.pending != 1 else 'it' }} will be lost. {% endif %}Sign out and remove your hours from this PC?">
+        <button type="submit" class="btn btn-danger-ghost">{{ icon('power') }}Sign out of this PC</button>
+      </form>
+    </div>
+  </section>
+
+  <section class="card" aria-labelledby="targets-heading">
+    <h2 id="targets-heading" class="card-title">Hours &amp; targets</h2>
+    {% set day_names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] %}
+    <dl class="figures figures-list">
+      <div class="figure"><dt>Daily target</dt><dd>{{ '%g'|format(user.daily_target_hours) }}h</dd></div>
+      <div class="figure"><dt>Weekly target</dt><dd>{{ '%g'|format(user.weekly_target_hours) }}h</dd></div>
+      <div class="figure"><dt>Workdays</dt>
+        <dd>{% for d in user.workday_set()|sort %}{{ day_names[d] }}{{ ', ' if not loop.last }}{% else %}None{% endfor %}</dd></div>
+      <div class="figure"><dt>Usual break</dt>
+        <dd>{{ user.weekday_break_minutes }} min, Sat {{ user.saturday_break_minutes }} min</dd></div>
+    </dl>
+  </section>
+</div>
+{% endblock %}
