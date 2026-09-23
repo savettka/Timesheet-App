@@ -35,6 +35,7 @@
     <p class="card-note">Connected to <strong>{{ server }}</strong> as <strong>{{ user.username }}</strong>.</p>
     <p class="card-note">Your targets, profile and password are changed on the website, and come
       across here on the next sync.</p>
+    <p class="card-note">STM for Windows {{ app_version }}</p>
     <div class="form-actions">
       <a class="btn btn-secondary" href="{{ server }}/settings" target="_blank" rel="noopener">Open Settings on the web</a>
       <form method="post" action="{{ url_for('desktop.sign_out') }}"

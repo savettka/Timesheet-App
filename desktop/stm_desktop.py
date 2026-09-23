@@ -12,15 +12,127 @@ import os
 import sys
 import tempfile
 import threading
+import time
+from ctypes import wintypes
 
 if not getattr(sys, "frozen", False):
     # Run from source: make the repo importable.
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 APP_ID = "STM.TimeTracking"  # so the taskbar shows and pins it as STM, not Python
-MUTEX_NAME = "Local\\STM-Windows-App"
 WINDOW_TITLE = "STM"
 log = logging.getLogger("stm")
+
+# The window's own title bar, in the page's colours (the --bg, --text and
+# --line values from style.css), so it doesn't sit white over a dark app.
+TITLE_BAR = {
+    "dark": {"caption": "#0e1016", "text": "#f2f4f8", "border": "#2d323f"},
+    "light": {"caption": "#f4f5f9", "text": "#151823", "border": "#dde1ea"},
+}
+
+
+# ------------------------------------------------------------- title bar
+
+def _colorref(hex_color):
+    """#rrggbb as the 0x00bbggrr number Windows wants."""
+    red, green, blue = (int(hex_color[i:i + 2], 16) for i in (1, 3, 5))
+    return red | (green << 8) | (blue << 16)
+
+
+def _find_window():
+    """This copy's STM window, looked up by process and title -- plain Win32,
+    so it's safe from any thread."""
+    user32 = ctypes.windll.user32
+    pid, found = os.getpid(), []
+
+    @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+    def check(hwnd, _unused):
+        owner = wintypes.DWORD()
+        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(owner))
+        if owner.value == pid and user32.IsWindowVisible(hwnd):
+            title = ctypes.create_unicode_buffer(64)
+            user32.GetWindowTextW(hwnd, title, 64)
+            if title.value == WINDOW_TITLE:
+                found.append(hwnd)
+                return False
+        return True
+
+    user32.EnumWindows(check, 0)
+    return found[0] if found else None
+
+
+def _paint_title_bar(hwnd, theme):
+    dwm = ctypes.windll.dwmapi
+    dwm.DwmSetWindowAttribute.argtypes = [wintypes.HWND, wintypes.DWORD, ctypes.c_void_p, wintypes.DWORD]
+    dwm.DwmSetWindowAttribute.restype = ctypes.c_long
+
+    def put(attribute, value):
+        return dwm.DwmSetWindowAttribute(hwnd, attribute, ctypes.byref(value), ctypes.sizeof(value))
+
+    # Dark or light frame and buttons; 20 on current Windows, 19 on early Windows 10.
+    dark = ctypes.c_int(1 if theme == "dark" else 0)
+    if put(20, dark) != 0:
+        put(19, dark)
+    # Exact colours -- Windows 11 only; older versions keep the plain dark or light bar.
+    colours = TITLE_BAR[theme]
+    put(35, wintypes.DWORD(_colorref(colours["caption"])))
+    put(36, wintypes.DWORD(_colorref(colours["text"])))
+    put(34, wintypes.DWORD(_colorref(colours["border"])))
+    # Repaint the frame now rather than at the next resize.
+    SWP_NOSIZE, SWP_NOMOVE, SWP_NOZORDER, SWP_NOACTIVATE, SWP_FRAMECHANGED = 0x1, 0x2, 0x4, 0x10, 0x20
+    ctypes.windll.user32.SetWindowPos(hwnd, None, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER
+                                      | SWP_NOACTIVATE | SWP_FRAMECHANGED)
+
+
+def _windows_prefers_dark():
+    """The PC's own light/dark setting -- the page follows it until someone
+    picks a theme in the app."""
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                            r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize") as key:
+            return winreg.QueryValueEx(key, "AppsUseLightTheme")[0] == 0
+    except OSError:
+        return False
+
+
+class TitleBar:
+    """The one thing the pages can ask of the window: to match its title bar
+    to the theme they're showing. (Exposed to them as window.pywebview.api.)"""
+
+    def __init__(self):
+        self._theme = None
+        self._lock = threading.Lock()
+
+    def set_theme(self, theme):
+        if theme not in TITLE_BAR:
+            return False
+        with self._lock:
+            self._theme = theme
+            self._paint()
+        return True
+
+    def _default(self, theme):
+        """The PC's own setting, used only until the page says otherwise."""
+        with self._lock:
+            if self._theme is None:
+                self._theme = theme
+                self._paint()
+
+    def _paint(self):
+        hwnd = _find_window()
+        if hwnd:
+            _paint_title_bar(hwnd, self._theme)
+
+
+def _first_paint(title_bar, theme):
+    """Colour the title bar as soon as the window exists, before the page
+    has loaded and said which theme it's showing."""
+    for _attempt in range(50):
+        if _find_window():
+            title_bar._default(theme)
+            return
+        time.sleep(0.1)
 
 
 def data_dir():
@@ -41,11 +153,15 @@ def _message(text):
     ctypes.windll.user32.MessageBoxW(None, text, WINDOW_TITLE, 0x40)
 
 
-def _already_running():
-    """A second copy would fight the first over the same files, so bring the
-    open window forward instead."""
+def _already_running(folder):
+    """A second copy using the same data folder would fight the first over
+    its files, so bring the open window forward instead. The lock is named
+    after the folder: copies with separate folders don't clash."""
+    import hashlib
+
     kernel32 = ctypes.windll.kernel32
-    handle = kernel32.CreateMutexW(None, False, MUTEX_NAME)
+    tag = hashlib.sha1(os.path.normcase(os.path.abspath(folder)).encode("utf-8")).hexdigest()[:16]
+    handle = kernel32.CreateMutexW(None, False, "Local\\STM-Windows-App-" + tag)
     if kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
         window = ctypes.windll.user32.FindWindowW(None, WINDOW_TITLE)
         if window:
@@ -82,7 +198,7 @@ def main():
     folder = data_dir()
     os.makedirs(folder, exist_ok=True)
     _setup_logging(folder)
-    if _already_running():
+    if _already_running(folder):
         return 0
     try:
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(APP_ID)
@@ -102,10 +218,15 @@ def main():
     log.info("STM started on port %s", server.server_port)
 
     url = "http://127.0.0.1:%d/desktop/enter?key=%s" % (server.server_port, app.config["DESKTOP_KEY"])
+    theme = "dark" if _windows_prefers_dark() else "light"
+    title_bar = TitleBar()
+    # Background in the same colour as the title bar, so a dark PC gets no
+    # white flash while the first page loads.
     webview.create_window(WINDOW_TITLE, url, width=1200, height=840, min_size=(420, 640),
-                          background_color="#F4F5F9", text_select=True)
+                          background_color=TITLE_BAR[theme]["caption"], text_select=True,
+                          js_api=title_bar)
     try:
-        webview.start(gui="edgechromium", private_mode=False,
+        webview.start(_first_paint, (title_bar, theme), gui="edgechromium", private_mode=False,
                       storage_path=os.path.join(folder, "webview"))
     except Exception:
         log.exception("the window couldn't open")

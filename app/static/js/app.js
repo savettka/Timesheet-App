@@ -25,13 +25,24 @@
       ? "dark" : "light";
   }
 
+  // In the Windows app, the window's own title bar follows the theme too.
+  // A browser has no such bridge, so on the website this does nothing.
+  function tellWindow() {
+    var api = window.pywebview && window.pywebview.api;
+    if (api && typeof api.set_theme === "function") {
+      try { api.set_theme(currentTheme()); } catch (e) { /* the window can't be told - fine */ }
+    }
+  }
+
   function initTheme() {
+    // The app's bridge can arrive after the page has loaded.
+    window.addEventListener("pywebviewready", tellWindow);
     var toggles = document.querySelectorAll(".js-theme-toggle");
-    if (!toggles.length) return;
 
     function sync() {
       var dark = currentTheme() === "dark";
       toggles.forEach(function (t) { t.setAttribute("aria-pressed", dark ? "true" : "false"); });
+      tellWindow();
     }
 
     toggles.forEach(function (toggle) {

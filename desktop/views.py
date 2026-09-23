@@ -57,9 +57,12 @@ def status():
 
 @desktop_bp.route("/settings")
 def settings():
+    from desktop import __version__
+
     engine = _engine()
     return render_template("desktop/settings.html", user=engine.local_user(),
-                           server=engine.get("server_url"), status=engine.status())
+                           server=engine.get("server_url"), status=engine.status(),
+                           app_version=__version__)
 
 
 @desktop_bp.route("/sync-now", methods=["POST"])
