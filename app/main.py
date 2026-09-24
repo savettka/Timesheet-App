@@ -21,7 +21,7 @@ from flask_login import current_user, login_required
 
 from app import db
 from app import logic
-from app.models import ApiToken, BreakSegment, TimeEntry, User
+from app.models import BreakSegment, TimeEntry, User
 
 main_bp = Blueprint("main", __name__)
 
@@ -931,22 +931,9 @@ def settings():
                     db.session.commit()
                     flash(f"Removed {label}.", "success")
 
-        elif form_type == "revoke_app":
-            # Filtered by owner, so nobody can sign out someone else's PC by
-            # guessing an id.
-            token = ApiToken.query.filter_by(
-                id=request.form.get("token_id", type=int), user_id=user.id
-            ).first()
-            if token:
-                name = token.name
-                db.session.delete(token)
-                db.session.commit()
-                flash(f"Signed out {name}. It will ask for your password next time it syncs.", "success")
-
         return redirect(url_for("main.settings"))
 
     # Non-admins are never sent the list, so other accounts aren't merely
     # hidden in the markup -- they never reach the page.
     all_users = User.query.order_by(User.username).all() if user.is_admin else []
-    apps = ApiToken.query.filter_by(user_id=user.id).order_by(ApiToken.created_at.desc()).all()
-    return render_template("settings.html", user=user, all_users=all_users, apps=apps)
+    return render_template("settings.html", user=user, all_users=all_users)

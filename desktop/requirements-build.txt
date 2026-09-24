@@ -1,3 +1,0 @@
-# Only for building STM.exe on Windows -- the website doesn't need these.
-pywebview==5.4
-pyinstaller==6.22.3

@@ -24,12 +24,11 @@ This mirrors the logic in the original spreadsheet:
 
 ## Features
 
-- Big **Login / Break / Back / Logout** buttons, plus "Forgot to tap?" for entering a
-  time you missed. Typed times are checked against the rest of the day, so an AM/PM slip
-  is caught (with a "did you mean 6:00 PM?") instead of becoming a 21-hour day.
+- Big **Login / Break / Back / Logout** buttons. A missed or wrong tap is fixed afterwards
+  on that day's Edit screen, which flags any day over 16 hours — nearly always an AM/PM slip.
 - **Login again** after logging out carries on the same day, with the time away counted
-  as a break. A shift left open overnight by mistake is spotted, and Home asks when it
-  really ended rather than recording a 24-hour day.
+  as a break. A shift left open overnight by mistake is spotted, and Home takes you to that
+  day's Edit screen to put in when it really ended, rather than recording a 24-hour day.
 - **Balances that make sense mid-day** — today only owes the hours it has reached so far,
   so the month's balance shows your real overtime at any moment.
 - **History** — a full month view of every day, with an **Add/Edit** screen to enter or
@@ -48,9 +47,6 @@ This mirrors the logic in the original spreadsheet:
 - **Easy to read and use**: 16px text, every colour pair checked for contrast in both
   light and dark mode, 44px+ touch targets, full keyboard use with visible focus, a
   bottom tab bar on phones, and a proper home-screen icon on iOS and Android.
-- **STM for Windows** — a desktop app with its own copy of your hours, so it works
-  offline, syncing with the website whenever it's online. See
-  [desktop/README.md](desktop/README.md).
 
 ## Sign-in codes by email (optional)
 
@@ -93,7 +89,7 @@ app/
   models.py         User / TimeEntry / BreakSegment (SQLAlchemy)
   logic.py          All the hour/target/weekly-target math
   auth.py           First-run setup + login/logout
-  main.py           Home, login/break/logout actions, history, settings routes
+  main.py           Home, login/break/logout actions, history, calendar, settings routes
   templates/        Jinja2 templates
   static/           CSS + JS (no build step, no frontend framework)
 config.py           Reads SECRET_KEY / DATABASE_URL from the environment

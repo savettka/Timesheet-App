@@ -12,7 +12,7 @@ BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 #
 # Only where the zone can actually be switched (Linux, like PythonAnywhere).
 # Windows can't read a name like "Asia/Kolkata" -- it silently falls back to
-# UTC instead -- so the Windows app just keeps the PC's own clock, which is
+# UTC instead -- so run on a Windows PC, STM keeps the PC's own clock, which is
 # already the user's wall clock.
 TIMEZONE = os.environ.get("TIMEZONE", "Asia/Kolkata")
 if hasattr(time, "tzset"):

@@ -33,9 +33,8 @@ IP_REQUEST_WINDOW_SECONDS = 3600
 _ip_requests = {}
 
 
-# Wrong passwords allowed from one address before sign-in pauses for it. Web
-# and Windows-app sign-in share the count, so switching between them buys an
-# attacker nothing. In memory, like the code limit above.
+# Wrong passwords allowed from one address before sign-in pauses for it. In
+# memory, like the code limit above.
 LOGIN_FAILURE_LIMIT = 10
 LOGIN_FAILURE_WINDOW_SECONDS = 15 * 60
 _login_failures = {}

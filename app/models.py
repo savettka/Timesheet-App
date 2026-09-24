@@ -44,22 +44,11 @@ class User(UserMixin, db.Model):
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    # Goes up by one with every change to any of this user's days, so a synced
-    # Windows app can ask for "everything since number N" instead of the whole
-    # history each time.
-    sync_counter = db.Column(db.Integer, nullable=False, default=0)
-
     entries = db.relationship(
         "TimeEntry", backref="user", lazy=True, cascade="all, delete-orphan"
     )
     login_codes = db.relationship(
         "LoginCode", backref="user", lazy=True, cascade="all, delete-orphan"
-    )
-    api_tokens = db.relationship(
-        "ApiToken", backref="user", lazy=True, cascade="all, delete-orphan"
-    )
-    deleted_days = db.relationship(
-        "DeletedDay", backref="user", lazy=True, cascade="all, delete-orphan"
     )
 
     def set_password(self, raw_password):
@@ -134,14 +123,6 @@ class TimeEntry(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    # Sync bookkeeping (see app/sync.py). On the server, `sync_version` is the
-    # user's change counter at this day's last change; in the Windows app it's
-    # the server version the local copy was built from. `modified_at` (UTC) is
-    # when a person last edited the day, on whichever device -- what decides
-    # which copy wins when the same day was changed in two places.
-    sync_version = db.Column(db.Integer, nullable=True, index=True)
-    modified_at = db.Column(db.DateTime, nullable=True)
-
     breaks = db.relationship(
         "BreakSegment",
         backref="entry",
@@ -173,39 +154,6 @@ class BreakSegment(db.Model):
 
     break_start = db.Column(db.Time, nullable=False)
     break_end = db.Column(db.Time, nullable=True)
-
-
-class DeletedDay(db.Model):
-    """A day that was deleted, remembered so synced copies delete it too.
-
-    Without this a sync could only ever add and change days: a day removed
-    on the web would live on in the Windows app, and come back from there.
-    """
-
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
-    date = db.Column(db.Date, nullable=False)
-    sync_version = db.Column(db.Integer, nullable=True, index=True)
-    modified_at = db.Column(db.DateTime, nullable=True)
-
-    __table_args__ = (db.UniqueConstraint("user_id", "date", name="uq_deleted_user_date"),)
-
-
-class ApiToken(db.Model):
-    """A Windows app signed in to this account.
-
-    The app keeps the token; the server keeps only its SHA-256, so the
-    database never holds anything that would let someone else sign in. The
-    token is 32 random bytes, which is why a fast hash is enough here --
-    there's no guessable password behind it to protect with a slow one.
-    """
-
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
-    token_hash = db.Column(db.String(64), nullable=False, unique=True, index=True)
-    name = db.Column(db.String(80), nullable=False, default="Windows PC")
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    last_used_at = db.Column(db.DateTime, nullable=True)
 
 
 class LoginCode(db.Model):
