@@ -40,6 +40,14 @@
   <p class="card-note">Today is still running, so only the hours it has reached count so far &mdash;
     the balance is your overtime as it stands right now.</p>
   {% endif %}
+  <div class="month-actions">
+    <a class="btn btn-secondary" download
+       href="{{ url_for('main.export_month', year=year, month=month, kind='xlsx') }}"
+       aria-label="Download {{ month_name }} {{ year }} as Excel">{{ icon('download') }}Excel</a>
+    <a class="btn btn-secondary" download
+       href="{{ url_for('main.export_month', year=year, month=month, kind='pdf') }}"
+       aria-label="Download {{ month_name }} {{ year }} as PDF">{{ icon('download') }}PDF</a>
+  </div>
 </section>
 
 <section class="card days-card" aria-labelledby="days-title">

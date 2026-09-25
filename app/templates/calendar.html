@@ -65,9 +65,10 @@
               {% set bal, spoken = fmt_balance_compact(row.balance_hours), spoken ~ ', ' ~ gap %}
             {% endif %}
           {% elif is_rest %}
-            {% set short, spoken = 'Rest', 'rest day' %}
+            {# Just the quiet date: a rest day needs no word of its own. #}
+            {% set spoken = 'rest day' %}
           {% elif is_missing %}
-            {% set short, bal, spoken = '–', fmt_balance_compact(row.balance_hours), 'nothing logged, ' ~ gap %}
+            {% set short, bal, spoken, state = '–', fmt_balance_compact(row.balance_hours), 'nothing logged, ' ~ gap, 'is-missing' %}
           {% elif row.is_today %}
             {% set spoken = 'today, nothing logged yet' %}
           {% else %}
@@ -88,7 +89,5 @@
       {% endfor %}
     </tbody>
   </table>
-  <p class="cal-legend">Tap a day to open it &middot; <span class="is-ahead">+</span> ahead,
-    <span class="is-behind">&minus;</span> behind that day's target</p>
 </section>
 {% endblock %}

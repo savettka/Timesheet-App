@@ -4,6 +4,7 @@ import os
 import secrets
 import uuid
 from datetime import date, datetime, timedelta
+from io import BytesIO
 from types import SimpleNamespace
 
 from flask import (
@@ -15,6 +16,7 @@ from flask import (
     redirect,
     render_template,
     request,
+    send_file,
     url_for,
 )
 from flask_login import current_user, login_required
@@ -584,6 +586,7 @@ def _month_page(year, month):
         fmt_duration=logic.fmt_duration,
         fmt_time=logic.fmt_time,
         entry_break_hours=lambda e: logic.entry_break_hours(e, now=now),
+        now=now,
     )
 
 
@@ -595,6 +598,44 @@ def history(year=None, month=None):
     if page is None:
         return redirect(url_for("main.history"))
     return render_template("history.html", **page)
+
+
+EXPORTS = {
+    "xlsx": ("Excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+    "pdf": ("PDF", "application/pdf"),
+}
+
+
+@main_bp.route("/history/<int:year>/<int:month>/export.<kind>")
+@login_required
+def export_month(year, month, kind):
+    """The month History shows, as a file to keep: Excel or PDF."""
+    if kind not in EXPORTS:
+        abort(404)
+    page = _month_page(year, month)
+    if page is None:
+        abort(404)
+    label, mimetype = EXPORTS[kind]
+    from app import exports
+
+    try:
+        data = exports.build(kind, page, current_user, page["now"])
+    except ImportError:
+        # The libraries arrive with `pip install -r requirements.txt`. Until
+        # then only the download is missing -- the rest of the site runs.
+        current_app.logger.exception("%s export library missing", label)
+        flash(f"{label} downloads aren't set up on this server yet. Run the update's "
+              "install step, then Reload the web app.", "error")
+        return redirect(url_for("main.history", year=year, month=month))
+    response = send_file(
+        BytesIO(data),
+        mimetype=mimetype,
+        as_attachment=True,
+        download_name=f"STM timesheet {page['month_name']} {year}.{kind}",
+    )
+    # Someone's hours: never kept by a shared cache or proxy.
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @main_bp.route("/calendar", endpoint="calendar")

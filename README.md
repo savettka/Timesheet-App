@@ -34,8 +34,11 @@ This mirrors the logic in the original spreadsheet:
 - **History** — a full month view of every day, with an **Add/Edit** screen to enter or
   correct all 4 times (and multiple breaks) for any date by hand, or mark it as leave/a
   holiday with a custom target. That screen is where missed or wrong times are fixed.
-- **Calendar** — the same month as a grid, each day showing its hours and whether it
-  was ahead (+) or behind (−) its target; tap a day to open it.
+- **Downloads** — any month from History as an **Excel** sheet (every punch, break,
+  worked hours, target and over/short as real times that add up) or a **PDF** in STM's
+  colours: a page of every day with the month's totals, then the month as a calendar.
+- **Calendar** — the same month as a plain grid, each day showing its hours and a small
+  +/− for how far ahead or behind its target it was; tap a day to open it.
 - **Dashboard** — today's hours, this week's progress bar toward your target, and a
   suggested logout time once you're close to (or past) the weekly target.
 - **Settings** — change daily/weekly targets, workdays, display name, profile picture
@@ -90,6 +93,7 @@ app/
   logic.py          All the hour/target/weekly-target math
   auth.py           First-run setup + login/logout
   main.py           Home, login/break/logout actions, history, calendar, settings routes
+  exports.py        The month as an Excel sheet or a PDF (XlsxWriter, ReportLab)
   templates/        Jinja2 templates
   static/           CSS + JS (no build step, no frontend framework)
 config.py           Reads SECRET_KEY / DATABASE_URL from the environment
