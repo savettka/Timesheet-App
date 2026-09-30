@@ -35,8 +35,9 @@ This mirrors the logic in the original spreadsheet:
   correct all 4 times (and multiple breaks) for any date by hand, or mark it as leave/a
   holiday with a custom target. That screen is where missed or wrong times are fixed.
 - **Downloads** — any month from History as an **Excel** sheet (every punch, break,
-  worked hours, target and over/short as real times that add up) or a **PDF** in STM's
-  colours: a page of every day with the month's totals, then the month as a calendar.
+  worked hours, target and over/short as real times that add up) or a **PDF** in soft
+  pastels: a page of every day with the month's totals, then the month as a calendar
+  of colour-coded days.
 - **Calendar** — the same month as a plain grid, each day showing its hours and a small
   +/− for how far ahead or behind its target it was; tap a day to open it.
 - **Dashboard** — today's hours, this week's progress bar toward your target, and a

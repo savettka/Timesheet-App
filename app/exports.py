@@ -24,16 +24,26 @@ INK = "#151823"
 INK_2 = "#3d4354"
 INK_3 = "#555c6f"
 LINE = "#dde1ea"
-SURFACE_2 = "#f1f3f8"
-ZEBRA = "#f7f8fb"
 ACCENT = "#4f46e5"
 ACCENT_SOFT = "#eceeff"
-ACCENT_TEXT = "#4338ca"
-ON_ACCENT_SOFT = "#e0e3ff"  # quiet text on the indigo band
 AHEAD = "#157a3a"
 BEHIND = "#b91c1c"
-WARN_BG = "#fff3dc"
 WARN_TEXT = "#7a4300"
+
+# The PDF's pastels: a fill, and the text colour that sits on it. Every pair
+# reads at 4.5:1 or better (WCAG AA); the lowest, rose on rose, is 5.30:1.
+BRAND, BRAND_TEXT, BRAND_MUTED = "#eef0ff", "#3f3697", "#57519f"
+SKY, SKY_TEXT = "#e4f0fb", "#1f4f7a"
+PEACH, PEACH_TEXT = "#fdeee0", "#86461c"
+LILAC, LILAC_TEXT = "#f1eafc", "#553a93"
+MINT, MINT_TEXT = "#e3f2e9", "#2f6b4e"
+ROSE, ROSE_TEXT = "#f9e4e7", "#9e3f48"
+AMBER, AMBER_TEXT = "#fdefd2", "#7a4a00"
+EVEN = "#f1f3f8"  # a balance of exactly 0
+# Quieter tints for whole table rows, and the calendar's day tiles.
+ROW_REST, ROW_LEAVE, ROW_TODAY = "#faf6ef", "#eef5fc", "#f3f2ff"
+TILE_REST, TILE_FUTURE, TILE_TODAY = "#f5efe4", "#f5f6f9", "#e8e9ff"
+HAIR = "#e6e8ee"
 
 APP_NAME = "STM"
 APP_FULL_NAME = "Simple Time Manager"
@@ -176,6 +186,10 @@ def month_report(page, user, now):
 
 def _balance_words(minutes):
     return "ahead of target" if minutes > 0 else ("behind target" if minutes < 0 else "on target")
+
+
+def _days_worked(n):
+    return f"{n} day worked" if n == 1 else f"{n} days worked"
 
 
 def _stamp(now):
@@ -325,7 +339,7 @@ def build_xlsx(report):
     for col in (4, 6, 7, 8, 9):
         letter = chr(ord("A") + col)
         ws.write_formula(row, col, f"=SUM({letter}{first_day_row + 1}:{letter}{last_day_row + 1})", total_duration)
-    ws.write_string(row, 10, f"{report['days_worked']} days worked", total)
+    ws.write_string(row, 10, _days_worked(report["days_worked"]), total)
 
     ws.freeze_panes(head_row + 1, 0)
     ws.autofilter(head_row, 0, last_day_row, len(columns) - 1)
@@ -383,7 +397,9 @@ class _Pdf:
     """Drawing helpers that measure from the top of the page, like the SVG
     and the screen do, instead of ReportLab's bottom-left origin."""
 
-    MARGIN = 36
+    MARGIN = 40
+    BAND_H = 78
+    LEAD = 12  # where words start inside a tile, a band or the table
 
     def __init__(self, report):
         from reportlab.lib.pagesizes import A4
@@ -488,192 +504,243 @@ class _Pdf:
         c.restoreState()
 
     # -- page furniture
+    def balance_color(self, minutes):
+        return MINT_TEXT if minutes > 0 else (ROSE_TEXT if minutes < 0 else INK)
+
+    def balance_fill(self, minutes):
+        return MINT if minutes > 0 else (ROSE if minutes < 0 else None)
+
+    def pill(self, x, baseline, value, font, size, color, fill, align="right"):
+        """A soft pill of colour behind one value. x is where the text ends (or
+        starts), as for a plain value, so a column of figures still lines up
+        whether or not a figure has a pill."""
+        w = self.width(value, font, size)
+        pad_x, pad_y, cap = 5.5, 3.4, 0.718 * size
+        h = cap + 2 * pad_y
+        left = x - w if align == "right" else x
+        self.rect(left - pad_x, baseline - cap - pad_y, w + 2 * pad_x, h, fill=fill, radius=h / 2)
+        self.text(x, baseline, value, font, size, color, align)
+        return w + 2 * pad_x
+
+    def lines(self, value, max_width, font="Helvetica", size=9):
+        """One line, or two split at a space -- a label in a narrow tile."""
+        if self.width(value, font, size) <= max_width or " " not in value:
+            return [self.fit(value, max_width, font, size)]
+        words = value.split(" ")
+        for cut in range(len(words) - 1, 0, -1):
+            first = " ".join(words[:cut])
+            if self.width(first, font, size) <= max_width:
+                return [first, self.fit(" ".join(words[cut:]), max_width, font, size)]
+        return [self.fit(value, max_width, font, size)]
+
     def band(self, heading):
+        """The lavender band across the top: the app on the left, the month and
+        whose it is on the right."""
         r = self.report
-        self.rect(0, 0, self.W, 78, fill=ACCENT)
-        self.logo(self.MARGIN, 19, 40)
-        self.text(self.MARGIN + 50, 42, APP_NAME, "Helvetica-Bold", 20, "#ffffff")
-        self.text(self.MARGIN + 50, 57, APP_FULL_NAME, "Helvetica", 9, ON_ACCENT_SOFT)
-        right = self.W - self.MARGIN
-        self.text(right, 38, f"{r['month_name']} {r['year']}", "Helvetica-Bold", 16, "#ffffff", "right")
-        self.text(right, 55, self.fit(f"{heading} · {r['who']}", 260), "Helvetica", 9, ON_ACCENT_SOFT, "right")
+        self.rect(0, 0, self.W, self.BAND_H, fill=BRAND)
+        x0, mid = self.MARGIN, self.BAND_H / 2
+        size = 34
+        s = size / 120.0
+        # The mark's ink spans x 17-104, y 20-100 of its 120 box: its left edge
+        # lines up with the margin, its middle with the band's.
+        self.logo(x0 - 17 * s, mid - 60 * s, size, color=ACCENT)
+        text_x = x0 + (104 - 17) * s + 9
+        top_line, sub_line = mid - 1.6, mid + 12.4
+        self.text(text_x, top_line, APP_NAME, "Helvetica-Bold", 18, BRAND_TEXT)
+        self.text(text_x, sub_line, APP_FULL_NAME, "Helvetica", 9, BRAND_MUTED)
+        right = self.W - x0
+        self.text(right, top_line, f"{r['month_name']} {r['year']}", "Helvetica-Bold", 16, INK, "right")
+        self.text(right, sub_line, self.fit(f"{heading} · {r['who']}", 240), "Helvetica", 9, BRAND_MUTED, "right")
+        return self.BAND_H
 
     def footer(self, page_no, pages):
-        y = self.H - 26
-        self.hline(self.MARGIN, self.W - self.MARGIN, y - 12)
-        self.text(self.MARGIN, y, f"{APP_NAME} · {APP_FULL_NAME}", "Helvetica-Bold", 8, ACCENT_TEXT)
-        self.text(self.W - self.MARGIN, y, f"Generated {_stamp(self.report['generated'])} · Page {page_no} of {pages}",
-                  "Helvetica", 8, INK_3, "right")
-
-    def balance_color(self, minutes):
-        return AHEAD if minutes > 0 else (BEHIND if minutes < 0 else INK)
+        y = self.H - 24
+        self.text(self.MARGIN, y, f"Generated {_stamp(self.report['generated'])}", "Helvetica", 8, INK_3)
+        self.text(self.W - self.MARGIN, y, f"Page {page_no} of {pages}", "Helvetica", 8, INK_3, "right")
 
     # -- page 1: every day
     def days_page(self):
         r = self.report
-        self.band("Timesheet")
         x0, content = self.MARGIN, self.W - 2 * self.MARGIN
+        top = self.band("Timesheet") + 18
 
-        # The month's figures.
-        top, gap = 96, 10
-        card_w = (content - 3 * gap) / 4
-        target_sub = f"so far, of {fmt_duration(r['month_target'])}" if r["running"] else "for the month"
-        cards = [
-            ("WORKED", fmt_minutes(r["worked"]), INK, f"{r['days_worked']} days worked"),
-            ("TARGET", fmt_minutes(r["target"]), INK, target_sub),
-            ("OVERTIME", fmt_signed(r["balance"]), self.balance_color(r["balance"]), _balance_words(r["balance"])),
-            ("AVERAGE DAY", fmt_minutes(r["average"]), INK, "per day worked"),
+        # The month's figures, a pastel tile each.
+        gap, tile_h = 10, 58
+        tile_w = (content - 3 * gap) / 4
+        bal = r["balance"]
+        tiles = [
+            ("Worked", fmt_minutes(r["worked"]), SKY, SKY_TEXT, INK),
+            ("Target so far" if r["running"] else "Target", fmt_minutes(r["target"]), PEACH, PEACH_TEXT, INK),
+            ("Overtime", fmt_signed(bal), self.balance_fill(bal) or EVEN, self.balance_color(bal) if bal else INK_2,
+             self.balance_color(bal)),
+            ("Avg / day", fmt_minutes(r["average"]), LILAC, LILAC_TEXT, INK),
         ]
-        for i, (name, value, color, sub) in enumerate(cards):
-            x = x0 + i * (card_w + gap)
-            self.rect(x, top, card_w, 62, fill=SURFACE_2, radius=8)
-            self.text(x + 11, top + 17, name, "Helvetica-Bold", 7.5, INK_3)
-            self.text(x + 11, top + 38, value, "Helvetica-Bold", 16, color)
-            self.text(x + 11, top + 53, self.fit(sub, card_w - 22, size=7.5), "Helvetica", 7.5, INK_3)
-        y = top + 62 + 16
-        if r["running"]:
-            self.text(x0, y, f"The month is still running: figures are as of {_stamp(r['generated'])}.",
-                      "Helvetica-Oblique", 8, INK_3)
-            y += 12
+        for i, (name, value, fill, name_color, value_color) in enumerate(tiles):
+            x = x0 + i * (tile_w + gap)
+            self.rect(x, top, tile_w, tile_h, fill=fill, radius=9)
+            self.text(x + self.LEAD, top + 21, name, "Helvetica-Bold", 8.5, name_color)
+            self.text(x + self.LEAD, top + 45, value, "Helvetica-Bold", 18, value_color)
+        y = top + tile_h + 18
 
         # The table.
-        cols = [("Date", 70, "l"), ("Login", 54, "l"), ("Logout", 54, "l"), ("Breaks", 50, "r"),
-                ("Worked", 56, "r"), ("Target", 52, "r"), ("Overtime", 60, "r"), ("Notes", 127, "l")]
-        pad = 6
+        cols = [("Date", 80, "l"), ("Login", 50, "r"), ("Logout", 50, "r"), ("Break", 42, "r"),
+                ("Worked", 58, "r"), ("Target", 56, "r"), ("Overtime", 64, "r")]
+        cols.append(("Notes", content - sum(w for _, w, _ in cols), "l"))
         edges, x = [], x0
         for _, w, _ in cols:
             edges.append(x)
             x += w
+        inset = 10
 
-        def put(i, value, yy, font="Helvetica", size=8.5, color=INK):
-            name, w, align = cols[i]
+        def at(i):
+            """Where column i's text is anchored: the right end of a figure, the
+            start of words. The first column starts where the tiles' words do."""
+            _, w, align = cols[i]
             if align == "r":
-                self.text(edges[i] + w - pad, yy, value, font, size, color, "right")
-            else:
-                self.text(edges[i] + pad, yy, self.fit(value, w - 2 * pad, font, size), font, size, color)
+                return edges[i] + w - inset
+            return edges[i] + (self.LEAD if i == 0 else inset)
 
-        head_h = 20
-        self.rect(x0, y, content, head_h, fill=ACCENT_SOFT, radius=4)
+        def put(i, value, yy, font="Helvetica", size=9, color=INK):
+            _, w, align = cols[i]
+            if align == "r":
+                self.text(at(i), yy, value, font, size, color, "right")
+            else:
+                self.text(at(i), yy, self.fit(value, edges[i] + w - 4 - at(i), font, size), font, size, color)
+
+        def balance(i, minutes, yy, size):
+            fill = self.balance_fill(minutes)
+            if fill:
+                self.pill(at(i), yy, fmt_signed(minutes), "Helvetica-Bold", size, self.balance_color(minutes), fill)
+            else:
+                put(i, fmt_signed(minutes), yy, "Helvetica-Bold", size, self.balance_color(minutes))
+
+        head_h = 24
+        self.rect(x0, y, content, head_h, fill=BRAND, radius=6)
         for i, (name, _, _) in enumerate(cols):
-            put(i, name, y + 13.5, "Helvetica-Bold", 8, ACCENT_TEXT)
+            put(i, name, y + 15.5, "Helvetica-Bold", 8.5, BRAND_TEXT)
         y += head_h
 
+        # Room for the totals band and the footer comes off first, so the last
+        # day can never land underneath them.
         days = r["days"]
-        bottom = self.H - 58
-        row_h = min(19.0, (bottom - y - 22) / max(1, len(days)))
-        for n, day in enumerate(days):
-            if day["is_today"]:
-                self.rect(x0, y, content, row_h, fill=ACCENT_SOFT)
-            elif n % 2:
-                self.rect(x0, y, content, row_h, fill=ZEBRA)
+        row_h = min(19.0, (self.H - 82 - y) / max(1, len(days)))
+        notes_x = at(7)
+        for day in days:
+            tint = (ROW_TODAY if day["is_today"] else ROW_LEAVE if day["is_leave"]
+                    else ROW_REST if day["is_rest"] else None)
+            if tint:
+                self.rect(x0, y, content, row_h, fill=tint)
+            if day is not days[-1]:
+                self.hline(x0, x0 + content, y + row_h, HAIR, 0.5)
             muted = day["is_rest"] or day["is_future"]
             ink = INK_3 if muted else INK
-            # A rest day, a day off or a day still to come has nothing to
-            # report, so its cells stay empty; a dash marks something missing
-            # on a working day.
-            none = "" if muted or (day["is_leave"] and not day["worked_any"]) else "–"
-            base = y + row_h / 2 + 3
-            put(0, f"{day['date']:%a %d %b}", base, "Helvetica-Bold" if day["is_today"] else "Helvetica", 8.5, ink)
-            put(1, logic.fmt_time(day["login"]) if day["login"] else none, base, color=ink if day["login"] else INK_3)
-            put(2, logic.fmt_time(day["logout"]) if day["logout"] else none, base, color=ink if day["logout"] else INK_3)
-            put(3, fmt_duration(day["break_minutes"]) if day["break_minutes"] else none, base,
-                color=ink if day["break_minutes"] else INK_3)
-            put(4, fmt_minutes(day["worked"]) if day["worked"] is not None else none, base,
-                "Helvetica-Bold" if day["worked"] is not None else "Helvetica",
-                color=ink if day["worked"] is not None else INK_3)
-            put(5, fmt_minutes(day["target"]) if day["target"] is not None else none, base,
-                color=ink if day["target"] is not None else INK_3)
-            if day["still_going"]:
-                put(6, "Still going", base, "Helvetica-Oblique", 8, INK_3)
-            elif day["balance"] is not None:
-                put(6, fmt_signed(day["balance"]), base, "Helvetica-Bold", 8.5, self.balance_color(day["balance"]))
+            base = y + row_h / 2 + 3.2
+            put(0, f"{day['date']:%a %d %b}", base, "Helvetica-Bold" if day["is_today"] else "Helvetica", 9,
+                BRAND_TEXT if day["is_today"] else ink)
+            # Only what the day has: a blank cell means nothing was recorded.
+            if day["login"]:
+                put(1, logic.fmt_time(day["login"]), base, color=ink)
+            if day["logout"]:
+                put(2, logic.fmt_time(day["logout"]), base, color=ink)
+            if day["break_minutes"]:
+                put(3, fmt_duration(day["break_minutes"]), base, color=ink)
+            if day["worked"] is not None:
+                put(4, fmt_minutes(day["worked"]), base, "Helvetica-Bold", 9, ink)
+            if day["target"] is not None:
+                put(5, fmt_minutes(day["target"]), base, color=ink)
+            if day["balance"] is not None:
+                balance(6, day["balance"], base, 9)
+
+            # A forgotten logout is a tag in its own row, not a footnote.
+            x = notes_x
+            if day["needs_logout"]:
+                x += self.pill(x, base, day["status"], "Helvetica-Bold", 8, AMBER_TEXT, AMBER, "left") + 2
+                note = day["notes"]
             else:
-                put(6, none, base, color=INK_3)
-            note = " · ".join(part for part in (day["status"], day["notes"]) if part)
-            put(7, note, base, "Helvetica-Bold" if day["needs_logout"] else "Helvetica", 8,
-                WARN_TEXT if day["needs_logout"] else INK_2)
+                note = " · ".join(part for part in (day["status"], day["notes"]) if part)
+            if note:
+                self.text(x, base, self.fit(note, x0 + content - 4 - x, "Helvetica", 8.5), "Helvetica", 8.5,
+                          BRAND_TEXT if day["is_today"] else (INK_3 if muted else INK_2))
             y += row_h
 
-        # The month's totals, under the days they add up.
-        self.hline(x0, x0 + content, y, INK, 1.2)
-        y += 16
-        put(0, "Total", y, "Helvetica-Bold", 9)
-        put(3, fmt_minutes(r["break_total"]), y, "Helvetica-Bold", 9)
-        put(4, fmt_minutes(r["worked"]), y, "Helvetica-Bold", 9)
-        put(5, fmt_minutes(r["target"]), y, "Helvetica-Bold", 9)
-        put(6, fmt_signed(r["balance"]), y, "Helvetica-Bold", 9, self.balance_color(r["balance"]))
-        put(7, f"{r['days_worked']} days worked", y, "Helvetica", 8, INK_2)
+        # The month's totals, in a band that closes the table.
+        y += 6
+        band_h = 26
+        self.rect(x0, y, content, band_h, fill=BRAND, radius=6)
+        base = y + band_h / 2 + 3.4
+        put(0, "Total", base, "Helvetica-Bold", 9.5, BRAND_TEXT)
+        put(3, fmt_duration(r["break_total"]), base, "Helvetica-Bold", 9.5)
+        put(4, fmt_minutes(r["worked"]), base, "Helvetica-Bold", 9.5)
+        put(5, fmt_minutes(r["target"]), base, "Helvetica-Bold", 9.5)
+        balance(6, r["balance"], base, 9.5)
+        self.text(notes_x, base, _days_worked(r["days_worked"]), "Helvetica", 8.5, BRAND_MUTED)
         self.footer(1, 2)
 
-    # -- page 2: the month as a calendar
+    # -- page 2: the month as pastel tiles
     def calendar_page(self):
         r = self.report
-        self.band("Calendar")
         x0, content = self.MARGIN, self.W - 2 * self.MARGIN
-        self.text(x0, 106, f"{r['month_name']} {r['year']} at a glance", "Helvetica-Bold", 15, INK)
-
-        # "176h 48m worked · +16h 10m ahead · target 160h 38m", in pieces.
-        direction = "ahead" if r["balance"] > 0 else ("behind" if r["balance"] < 0 else "on target")
-        pieces = [(fmt_minutes(r["worked"]), "Helvetica-Bold", INK), (" worked  ·  ", "Helvetica", INK_2),
-                  (fmt_signed(r["balance"]), "Helvetica-Bold", self.balance_color(r["balance"])),
-                  (f" {direction}  ·  target ", "Helvetica", INK_2),
-                  (fmt_minutes(r["target"]), "Helvetica-Bold", INK),
-                  (" so far" if r["running"] else "", "Helvetica", INK_2)]
-        x = x0
-        for value, font, color in pieces:
-            self.text(x, 124, value, font, 9.5, color)
-            x += self.width(value, font, 9.5)
+        head_y = self.band("Calendar") + 28
+        gap, pad = 5, 9
+        pitch = (content + gap) / 7
+        tile_w = pitch - gap
+        for i, name in enumerate(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]):
+            self.text(x0 + i * pitch + pad, head_y, name, "Helvetica-Bold", 8.5, INK_3)
+        grid_top = head_y + 10
 
         weeks = calendar.Calendar(firstweekday=0).monthdatescalendar(r["year"], r["month"])
         by_date = {d["date"]: d for d in r["days"]}
-        cell_w = content / 7
-        top = 146
-        for i, name in enumerate(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]):
-            self.text(x0 + i * cell_w + 8, top + 10, name, "Helvetica-Bold", 8.5, INK_3)
-        grid_top = top + 18
-        cell_h = min(120.0, (self.H - 64 - grid_top) / len(weeks))
+        pitch_h = min(104.0, (self.H - 46 - grid_top + gap) / len(weeks))
+        tile_h = pitch_h - gap
+        mid = tile_h * 0.5 + 2  # the hours, or what the day was, sit mid-tile
+        inner = tile_w - 2 * pad
+        small = ("Helvetica", 8)
 
         for w, week in enumerate(weeks):
             for i, d in enumerate(week):
-                x = x0 + i * cell_w
-                y = grid_top + w * cell_h
                 day = by_date.get(d)
                 if day is None:  # a day of the months either side
                     continue
+                x, y = x0 + i * pitch, grid_top + w * pitch_h
+                bal = day["balance"]
+                muted = day["is_rest"] or day["is_future"]
+                # The tile's colour says what kind of day it was.
                 if day["needs_logout"]:
-                    self.rect(x, y, cell_w, cell_h, fill=WARN_BG)
-                num_color = INK_3 if (day["is_rest"] or day["is_future"]) else INK_2
-                if day["is_today"]:
-                    self.color(ACCENT)
-                    self.c.circle(x + 16, self.H - (y + 15), 9.5, stroke=0, fill=1)
-                    self.text(x + 16, y + 18.2, str(d.day), "Helvetica-Bold", 9.5, "#ffffff", "center")
-                else:
-                    self.text(x + 8, y + 18.2, str(d.day), "Helvetica-Bold", 9.5, num_color)
-
-                if day["needs_logout"]:
-                    self.text(x + 8, y + 44, "Fix", "Helvetica-Bold", 13, WARN_TEXT)
-                    self.text(x + 8, y + 58, "logout missing", "Helvetica", 7.5, WARN_TEXT)
-                elif day["worked"] is not None:
-                    self.text(x + 8, y + 44, fmt_compact(day["worked"]), "Helvetica-Bold", 13, INK)
+                    fill, color = AMBER, AMBER_TEXT
+                elif day["is_today"]:
+                    fill, color = TILE_TODAY, BRAND_TEXT
                 elif day["is_leave"]:
-                    self.text(x + 8, y + 44, self.fit(day["status"], cell_w - 16, "Helvetica", 9.5),
-                              "Helvetica", 9.5, INK_2)
-                elif day["is_missing"]:
-                    self.text(x + 8, y + 44, "–", "Helvetica", 13, INK_3)
-                if day["balance"] is not None and not day["needs_logout"]:
-                    self.text(x + 8, y + 60, fmt_signed_compact(day["balance"]), "Helvetica-Bold", 9,
-                              self.balance_color(day["balance"]))
-                if day["notes"] and cell_h >= 84:
-                    self.text(x + 8, y + cell_h - 9, self.fit(day["notes"], cell_w - 16, size=7), "Helvetica", 7,
-                              INK_3)
+                    fill, color = SKY, SKY_TEXT
+                elif day["is_rest"]:
+                    fill, color = TILE_REST, INK_3
+                elif day["is_future"]:
+                    fill, color = TILE_FUTURE, INK_3
+                elif bal:
+                    fill, color = self.balance_fill(bal), self.balance_color(bal)
+                else:
+                    fill, color = EVEN, INK_2
+                self.rect(x, y, tile_w, tile_h, fill=fill, radius=8)
+                self.text(x + pad, y + 18, str(d.day), "Helvetica-Bold", 9.5,
+                          BRAND_TEXT if day["is_today"] else (INK_3 if muted else INK_2))
 
-        # Hairlines, like the Calendar page: between weeks, and a light frame.
-        grid_bottom = grid_top + len(weeks) * cell_h
-        for w in range(len(weeks) + 1):
-            self.hline(x0, x0 + content, grid_top + w * cell_h, LINE if 0 < w < len(weeks) else INK_3,
-                       0.75 if 0 < w < len(weeks) else 1)
-        for i in range(1, 7):
-            self.vline(x0 + i * cell_w, grid_top, grid_bottom, LINE, 0.5)
+                if day["needs_logout"] or day["worked"] is None:
+                    # No hours to show: say what the day was instead. A rest day
+                    # or a day still to come says enough by its colour.
+                    if not day["status"] or (muted and not day["is_leave"]):
+                        continue
+                    label = self.lines(day["status"], inner, *small)
+                    for n, line in enumerate(label):
+                        self.text(x + pad, y + mid + n * 10, line, *small, color)
+                    under, extra = y + mid + 10 * len(label) + 6, None
+                else:
+                    self.text(x + pad, y + mid, fmt_compact(day["worked"]), "Helvetica-Bold", 14, INK)
+                    under = y + mid + 16
+                    # With no balance to show: the leave it was, or "In progress".
+                    extra = day["status"] if day["is_leave"] or (day["is_today"] and not day["logout"]) else None
+                if bal and not day["needs_logout"]:
+                    self.text(x + pad, under, fmt_signed_compact(bal), "Helvetica-Bold", 9, self.balance_color(bal))
+                elif extra:
+                    self.text(x + pad, under, self.fit(extra, inner, *small), *small, color)
         self.footer(2, 2)
 
     def render(self):
