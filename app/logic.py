@@ -35,9 +35,6 @@ TIMESHEET_DAY = (13 * 60, 22 * 60)
 # gives a first line of 12:47 to 2:00 PM rather than a 13-minute one, and a
 # break at 8:30 PM leaves 7:00 to 8:30 PM before it.
 TIMESHEET_SHORT_PIECE = 30
-# After the day's last break, up to this long is one line, so the day ends
-# with 9:00 PM to the logout rather than an hour and a stub.
-TIMESHEET_LAST_STRETCH = 120
 # The block of a line that is a recorded break, rather than None (time to
 # fill in) or a saved WorkBlock.
 TIMESHEET_BREAK = "break"
@@ -517,7 +514,6 @@ def timesheet_lines(entry, day, now, blocks=()):
             b = end
         breaks.append((a, b))
     breaks = sorted((max(a, start), min(b, end)) for a, b in breaks if min(b, end) > max(a, start))
-    last_break_end = max((b for _, b in breaks), default=None)
 
     lines = [(clock_minutes(b.start_time), clock_minutes(b.end_time, ending=True), b) for b in blocks]
     lines.sort(key=lambda line: line[:2])
@@ -536,8 +532,6 @@ def timesheet_lines(entry, day, now, blocks=()):
         # saved and no breaks always gets its span, however short.
         if b - a < TIMESHEET_SMALL_GAP and (blocks or breaks or b <= a):
             return []
-        if a == last_break_end and b == end and b - a <= TIMESHEET_LAST_STRETCH:
-            return [(a, b, None)]
         return [(p, q, None) for p, q in hour_pieces(a, b)]
 
     for a, b in gaps:
