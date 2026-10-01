@@ -50,8 +50,8 @@ class User(UserMixin, db.Model):
     login_codes = db.relationship(
         "LoginCode", backref="user", lazy=True, cascade="all, delete-orphan"
     )
-    hour_notes = db.relationship(
-        "HourNote", backref="user", lazy=True, cascade="all, delete-orphan"
+    work_blocks = db.relationship(
+        "WorkBlock", backref="user", lazy=True, cascade="all, delete-orphan"
     )
 
     def set_password(self, raw_password):
@@ -159,11 +159,12 @@ class BreakSegment(db.Model):
     break_end = db.Column(db.Time, nullable=True)
 
 
-class HourNote(db.Model):
-    """What was worked on in one hour of one day: a line on the Timesheet page.
+class WorkBlock(db.Model):
+    """A stretch of one day and what was worked on in it: a saved line on the
+    Timesheet page, such as 12:47 to 2:00 PM.
 
-    ``hour`` is the hour the line starts, 0-23, so 14 is 2-3 PM. Only hours
-    with something written have a row; clearing a line deletes it.
+    Only lines with something written are saved; clearing one deletes it. An
+    end of 00:00 is the midnight that ends the day.
     """
 
     MAX_LENGTH = 300
@@ -171,14 +172,13 @@ class HourNote(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     date = db.Column(db.Date, nullable=False)
-    hour = db.Column(db.Integer, nullable=False)
+    start_time = db.Column(db.Time, nullable=False)
+    end_time = db.Column(db.Time, nullable=False)
     text = db.Column(db.String(MAX_LENGTH), nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    # Also the index for "this user's notes on this day", the only lookup.
-    __table_args__ = (
-        db.UniqueConstraint("user_id", "date", "hour", name="uq_user_date_hour"),
-    )
+    # The only lookup is "this user's lines on this day".
+    __table_args__ = (db.Index("ix_work_block_user_date", "user_id", "date"),)
 
 
 class LoginCode(db.Model):

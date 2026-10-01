@@ -40,10 +40,11 @@ This mirrors the logic in the original spreadsheet:
   of colour-coded days.
 - **Calendar** — the same month as a plain grid, each day showing its hours and a small
   +/− for how far ahead or behind its target it was; tap a day to open it.
-- **Timesheet** — what you worked on, hour by hour: a line for each hour (9–10 AM,
-  10–11 AM …) from when you logged in to the hour you're in now, which is marked. Type
-  and press Enter to save; earlier days work the same way, and an earlier or later hour
-  can be added to any day.
+- **Timesheet** — what you worked on, through the day: a line per hour from when you
+  logged in (a 12:47 login gives 12:47–2:00 PM, then 2–3 PM …) to the hour you're in now,
+  which is marked. Every line's times can be changed, more lines added, and each has a
+  copy button that copies it as "Emails for a client (13:00 to 14:00 PM)". Type and press
+  Enter to save; a day with no login starts at 1 PM, and earlier days work the same way.
 - **Dashboard** — today's hours, this week's progress bar toward your target, and a
   suggested logout time once you're close to (or past) the weekly target.
 - **Settings** — change daily/weekly targets, workdays, display name, profile picture
@@ -94,7 +95,7 @@ How the codes are kept safe:
 ```
 app/
   __init__.py       Flask app factory
-  models.py         User / TimeEntry / BreakSegment / HourNote (SQLAlchemy)
+  models.py         User / TimeEntry / BreakSegment / WorkBlock (SQLAlchemy)
   logic.py          All the hour/target/weekly-target math
   auth.py           First-run setup + login/logout
   main.py           Home, login/break/logout actions, timesheet, history, calendar, settings routes

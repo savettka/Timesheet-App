@@ -72,6 +72,9 @@ def _run_light_migrations():
             for statement in statements:
                 conn.execute(sa.text(statement))
 
+    if "hour_note" in table_names:
+        _move_hour_notes()
+
     # A database that predates roles has every account non-admin, which would
     # lock everyone out of user management. Promote the first account created
     # -- the one that ran setup and owns the install -- so ownership lands
@@ -88,6 +91,72 @@ def _run_light_migrations():
                         "(SELECT MIN(id) FROM user)"
                     )
                 )
+
+
+def _move_hour_notes():
+    """Bring the Timesheet's first version's lines across, once.
+
+    That version saved one line per whole hour (table hour_note); lines are
+    now stretches with their own times (work_block). An old note takes the
+    shape of the line the page now offers for its hour when it's the only
+    note on that line and its hour is the bulk of that line -- a 1-2 PM note
+    on a day logged in at 12:47 becomes 12:47 to 2:00 PM -- and otherwise
+    keeps its own hour, trimmed to the day's line. Reading, copying and
+    dropping the old table happen under one write lock: nothing can be
+    written to it in between, and if anything fails, the old notes stay
+    exactly as they were, to be brought across next start.
+    """
+    from datetime import datetime
+    from types import SimpleNamespace
+
+    from app import logic
+    from app.models import TimeEntry, WorkBlock
+
+    entries = TimeEntry.__table__
+    old_notes = sa.text("SELECT user_id, date, hour, text, updated_at FROM hour_note").columns(
+        user_id=sa.Integer, date=sa.Date, hour=sa.Integer, text=sa.String, updated_at=sa.DateTime
+    )
+    now = datetime.now()
+
+    def overlap(line, hour):
+        return min(line[1], hour * 60 + 60) - max(line[0], hour * 60)
+
+    with db.engine.begin() as conn:
+        # SQLite's driver otherwise starts the transaction only at the first
+        # write, leaving the read below outside it.
+        conn.exec_driver_sql("BEGIN IMMEDIATE")
+        days = {}
+        for note in conn.execute(old_notes):
+            days.setdefault((note.user_id, note.date), []).append(note)
+        rows = []
+        for (user_id, day), notes in days.items():
+            times = conn.execute(
+                sa.select(entries.c.login_time, entries.c.logout_time)
+                .where(entries.c.user_id == user_id, entries.c.date == day)
+            ).first()
+            entry = SimpleNamespace(date=day, login_time=times[0], logout_time=times[1]) if times else None
+            lines = logic.timesheet_lines(entry, day, now)
+            home = {}
+            for note in notes:
+                best = max(lines, key=lambda line: overlap(line, note.hour), default=None)
+                home[note.hour] = best if best and overlap(best, note.hour) > 0 else None
+            for note in notes:
+                line = home[note.hour]
+                start, end = note.hour * 60, note.hour * 60 + 60
+                # A note on just the 13-minute end of a 12:47-2:00 PM line
+                # mustn't grow over the hour it never described.
+                if (line and list(home.values()).count(line) == 1
+                        and overlap(line, note.hour) >= logic.TIMESHEET_SHORT_PIECE):
+                    start, end = line[0], line[1]
+                elif line:
+                    start, end = max(start, line[0]), min(end, line[1])
+                rows.append({
+                    "user_id": user_id, "date": day, "text": note.text, "updated_at": note.updated_at,
+                    "start_time": logic.minutes_clock(start), "end_time": logic.minutes_clock(end),
+                })
+        if rows:
+            conn.execute(WorkBlock.__table__.insert(), rows)
+        conn.execute(sa.text("DROP TABLE hour_note"))
 
 
 def create_app(config_object="config.Config"):

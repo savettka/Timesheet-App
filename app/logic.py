@@ -14,7 +14,7 @@ Mirrors the rules from the user's original spreadsheet:
 """
 
 import calendar
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 
 # A typed time may run a little ahead of the server's clock without being in
 # the future in any sense that matters.
@@ -27,9 +27,16 @@ STALE_SHIFT_HOURS = 16
 MAX_LIVE_SHIFT_HOURS = 20
 # A saved day longer than this gets a heads-up: usually an AM/PM slip.
 LONG_SHIFT_WARNING_HOURS = 16
-# The Timesheet's lines for a day with no login or logout to go by:
-# 9 AM to 6 PM, as the first and last hour (9-10 AM ... 5-6 PM).
-TIMESHEET_DAY = (9, 17)
+# The Timesheet's span for a day with no login to go by, in minutes from
+# midnight: 1 PM to 10 PM.
+TIMESHEET_DAY = (13 * 60, 22 * 60)
+# A Timesheet line is an hour, o'clock to o'clock, except at the ends: a
+# piece shorter than this joins the hour beside it, so a 12:47 login gives a
+# first line of 12:47 to 2:00 PM rather than a 13-minute one.
+TIMESHEET_SHORT_PIECE = 30
+# Time left uncovered between saved lines, shorter than this, isn't offered
+# as a line of its own.
+TIMESHEET_SMALL_GAP = 10
 
 
 def _combine(date_, time_, reference_dt=None):
@@ -424,36 +431,82 @@ def saturday_plan(user, entries_by_date, week_start, today, now=None):
     }
 
 
-def timesheet_hours(entry, day, now, noted_hours=(), first=None, last=None):
-    """The hours the Timesheet lists for a day, as (first, last): hour h is
-    the line for h:00 to h+1:00.
+def clock_minutes(t, ending=False):
+    """A time of day as minutes from midnight. As the end of a stretch, 00:00
+    is the midnight that ends the day (1440), not the one that starts it."""
+    minutes = t.hour * 60 + t.minute
+    return 1440 if ending and minutes == 0 else minutes
 
-    From the hour the day was logged in to the hour it was logged out -- or,
-    today, to the hour in progress. A day with no times gets an ordinary 9 to
-    6. An hour that already has a note is always listed, and first/last (the
-    page's "add earlier hour" and "add later hour") can only widen the span.
-    """
+
+def minutes_clock(minutes):
+    """Minutes from midnight back to a time of day; 1440 comes back as 00:00."""
+    return time((minutes // 60) % 24, minutes % 60)
+
+
+def timesheet_span(entry, day, now):
+    """Where a day's Timesheet lines begin and end, in minutes from midnight:
+    from the login to the logout or -- today -- to the end of the hour in
+    progress. A day with no login gets an ordinary 1 PM to 10 PM."""
     start, end = TIMESHEET_DAY
     login = entry.login_time if entry else None
     logout = entry.logout_time if entry else None
     if login is not None:
-        start = login.hour
+        start = clock_minutes(login)
         if logout is not None:
-            # 6:00 PM ends with the 5-6 PM line; 6:10 PM needs the 6-7 PM one.
-            # Past midnight, the day's lines run to the end of its own date.
-            minutes = logout.hour * 60 + logout.minute
-            end = 23 if logout < login else max(start, (minutes - 1) // 60)
+            end = clock_minutes(logout)
+            if end < start:
+                end = 1440  # past midnight: to the end of its own date
         elif day == now.date():
-            end = max(start, now.hour)
+            end = (now.hour + 1) * 60
+            if end - start < TIMESHEET_SHORT_PIECE:
+                # 12:47 at 12:52: the first line is already 12:47-2:00 PM, as
+                # it will be once 1 PM comes, not a 13-minute 12:47-1:00 PM.
+                end += 60
+        elif now - datetime.combine(day, login) <= timedelta(hours=STALE_SHIFT_HOURS):
+            end = 1440  # still being worked past midnight: to the end of its own date
         else:
-            end = max(start, TIMESHEET_DAY[1])
-    for hour in noted_hours:
-        start, end = min(start, hour), max(end, hour)
-    if first is not None:
-        start = min(start, first)
-    if last is not None:
-        end = max(end, last)
-    return max(0, start), min(23, end)
+            end = TIMESHEET_DAY[1]  # a forgotten logout
+        if end <= start:
+            end = start + 60
+    return start, min(end, 1440)
+
+
+def hour_pieces(start, end):
+    """[start, end) in minutes, cut at each o'clock -- with a piece shorter than
+    TIMESHEET_SHORT_PIECE at either end joined to the hour beside it."""
+    points = [start, *range((start // 60 + 1) * 60, end, 60), end]
+    if len(points) > 2 and points[1] - points[0] < TIMESHEET_SHORT_PIECE:
+        del points[1]
+    if len(points) > 2 and points[-1] - points[-2] < TIMESHEET_SHORT_PIECE:
+        del points[-2]
+    return list(zip(points, points[1:]))
+
+
+def timesheet_lines(entry, day, now, blocks=()):
+    """A day's Timesheet lines in time order, as (start, end, block) with the
+    times in minutes from midnight.
+
+    Every saved block is a line, and the rest of the day's span -- whatever no
+    block covers yet -- is offered as hourly lines (block None) to fill in.
+    """
+    start, end = timesheet_span(entry, day, now)
+    lines = [(clock_minutes(b.start_time), clock_minutes(b.end_time, ending=True), b) for b in blocks]
+    lines.sort(key=lambda line: line[:2])
+    gaps, cursor = [], start
+    for a, b, _ in lines:
+        if cursor >= end:
+            break
+        if a > cursor:
+            gaps.append((cursor, min(a, end)))
+        cursor = max(cursor, b)
+    if cursor < end:
+        gaps.append((cursor, end))
+    for a, b in gaps:
+        # A sliver between saved lines isn't worth a line; a day with nothing
+        # saved always gets its span, however short.
+        if b - a >= TIMESHEET_SMALL_GAP or not blocks:
+            lines += [(p, q, None) for p, q in hour_pieces(a, b)]
+    return sorted(lines, key=lambda line: line[:2])
 
 
 def fmt_clock(value):
@@ -467,16 +520,13 @@ def fmt_clock(value):
     return f"{hour}:{value.minute:02d} {suffix}"
 
 
-def fmt_hour_span(hour):
-    """One Timesheet line's hour: 9–10 AM, 11 AM–12 PM, 12–1 PM, 11 PM–12 AM."""
-    def clock(h):
-        h %= 24
-        return h % 12 or 12, "AM" if h < 12 else "PM"
-
-    (a, a_half), (b, b_half) = clock(hour), clock(hour + 1)
-    if a_half == b_half:
-        return f"{a}–{b} {a_half}"
-    return f"{a} {a_half}–{b} {b_half}"
+def fmt_span(start, end):
+    """A Timesheet line's time, from minutes after midnight: 12:47–2:00 PM,
+    11:30 AM–12:30 PM, 11:00 PM–12:00 AM."""
+    a, b = fmt_clock(minutes_clock(start)), fmt_clock(minutes_clock(end))
+    if a[-2:] == b[-2:] and end < 1440:
+        return f"{a[:-3]}–{b}"
+    return f"{a}–{b}"
 
 
 def fmt_suggested_datetime(dt, reference_date=None):

@@ -20,11 +20,10 @@ from flask import (
     url_for,
 )
 from flask_login import current_user, login_required
-from sqlalchemy.exc import IntegrityError
 
 from app import db
 from app import logic
-from app.models import BreakSegment, HourNote, TimeEntry, User
+from app.models import BreakSegment, TimeEntry, User, WorkBlock
 
 main_bp = Blueprint("main", __name__)
 
@@ -663,7 +662,8 @@ def calendar_page(year=None, month=None):
 @main_bp.route("/timesheet/<date_str>", endpoint="timesheet", methods=["GET", "POST"])
 @login_required
 def timesheet(date_str=None):
-    """A day as one line per hour, each saying what was worked on in it."""
+    """A day as lines of time -- an hour each, to begin with -- each saying
+    what was worked on in it. Every line's times can be changed."""
     now = datetime.now()
     today = now.date()
     day = today
@@ -682,99 +682,180 @@ def timesheet(date_str=None):
     # Today's page is plain /timesheet; any other day carries its date.
     day_args = {} if day == today else {"date_str": day.isoformat()}
     entry = TimeEntry.query.filter_by(user_id=current_user.id, date=day).first()
-    notes = {n.hour: n for n in HourNote.query.filter_by(user_id=current_user.id, date=day)}
-    values = request.form if request.method == "POST" else request.args
+    blocks = WorkBlock.query.filter_by(user_id=current_user.id, date=day).all()
 
-    def hour_value(name):
-        try:
-            hour = int(values.get(name, ""))
-        except ValueError:
-            return None
-        return hour if 0 <= hour <= 23 else None
+    def clean(text):
+        return " ".join((text or "").split())[:WorkBlock.MAX_LENGTH].rstrip()
 
-    first, last = logic.timesheet_hours(entry, day, now, notes, hour_value("from"), hour_value("to"))
+    def clock(value):
+        return parse_time_field((value or "")[:5])  # "13:00", or "13:00:00" with seconds
+
+    def hhmm(minutes):
+        return logic.minutes_clock(minutes).strftime("%H:%M")
+
+    def line_view(start, end, block=None, text=""):
+        text = block.text if block else text
+        return SimpleNamespace(
+            id=str(block.id) if block else "", start=start, end=end, text=text,
+            was_start=start if block or not text else "", was_end=end if block or not text else "",
+            was_text=text if block else "", is_now=False, placeholder="", error="", error_on="",
+        )
+
+    def day_views(lines):
+        views = [line_view(hhmm(start), hhmm(end), block) for start, end, block in lines]
+        minute = now.hour * 60 + now.minute
+        current = next((v for v, (start, end, _) in zip(views, lines)
+                        if day == today and start <= minute < end), None)
+        if current is not None:
+            current.is_now = True
+        empty = [v for v in views if not v.text]
+        if current is not None and not current.text:
+            current.placeholder = "What are you working on?"
+        elif empty:
+            empty[0].placeholder = "What did you work on?"
+        return views
+
+    def show(views):
+        return render_template(
+            "timesheet.html",
+            day=day,
+            is_today=day == today,
+            prev_date=day - timedelta(days=1),
+            next_date=None if day == today else day + timedelta(days=1),
+            lines=views,
+            max_length=WorkBlock.MAX_LENGTH,
+        )
 
     if request.method == "POST":
-        changed = []
-        for hour in range(24):
-            if f"h{hour}" not in request.form:
+        form = request.form
+        names = ("id", "start", "end", "text", "was_start", "was_end", "was_text")
+        fields = [form.getlist(name) for name in names]
+        if len({len(f) for f in fields}) != 1 or len(fields[0]) > 200:
+            abort(400)
+
+        if not fields[0]:
+            # A page from before this version (one box per hour: h13, was13)
+            # left open across the update. Its words come back as new lines
+            # to check and save, never quietly dropped.
+            typed = []
+            for key in form:
+                if len(key) <= 3 and key[:1] == "h" and key[1:].isascii() and key[1:].isdigit():
+                    hour, text = int(key[1:]), clean(form[key])
+                    if hour <= 23 and text and text != clean(form.get(f"was{hour}")):
+                        typed.append((hour, text))
+            if not typed:
+                return redirect(url_for("main.timesheet", **day_args))
+            views = day_views(logic.timesheet_lines(entry, day, now, blocks))
+            views += [line_view(hhmm(h * 60), hhmm(h * 60 + 60), text=t) for h, t in sorted(typed)]
+            flash("This page was open from before an update, so it wasn't saved. Your words are in the "
+                  "lines at the bottom: check their times, then press Save.", "error")
+            return show(views)
+
+        by_id = {str(b.id): b for b in blocks}
+        changed, drafts, gone = [], [], 0
+        for block_id, start_raw, end_raw, text_raw, was_start, was_end, was_text in zip(*fields):
+            text = clean(text_raw)
+            start, end = clock(start_raw), clock(end_raw)
+            # As typed, so a line with a problem comes back without retyping.
+            draft = SimpleNamespace(
+                id=block_id, start=start_raw, end=end_raw, text=text, was_start=was_start, was_end=was_end,
+                was_text=was_text, is_now=False, placeholder="", error="", error_on="",
+            )
+            drafts.append(draft)
+            # Field by field, only what was changed on this page counts, so a
+            # page left open can't undo something written since elsewhere.
+            start_changed = (start.strftime("%H:%M") if start else "") != was_start.strip()
+            end_changed = (end.strftime("%H:%M") if end else "") != was_end.strip()
+            text_changed = text != clean(was_text)
+            if not (start_changed or end_changed or text_changed):
                 continue
-            text = " ".join(request.form[f"h{hour}"].split())[:HourNote.MAX_LENGTH].rstrip()
-            # Only lines changed on this page are saved, so a page left open
-            # can't wipe out a line written since on another device.
-            if text == " ".join(request.form.get(f"was{hour}", "").split()):
+            block = by_id.get(block_id)
+            if block_id and block is None:
+                gone += 1  # cleared on another device since: it stays gone
                 continue
-            note = notes.get(hour)
-            if text and note:
-                note.text = text
-            elif text:
-                notes[hour] = HourNote(user_id=current_user.id, date=day, hour=hour, text=text)
-                db.session.add(notes[hour])
-            elif note:
-                db.session.delete(notes.pop(hour))
-            else:
+            if block is not None:
+                if text_changed and not text:
+                    changed.append((block.start_time, block.end_time, "Cleared"))
+                    db.session.delete(block)
+                    continue
+                start = start if start_changed else block.start_time
+                end = end if end_changed else block.end_time
+                text = text if text_changed else block.text
+            elif not text:
+                if start_changed or end_changed:
+                    draft.error, draft.error_on = "Write what you worked on, to keep these times.", "text"
                 continue
-            changed.append(hour)
-        try:
-            db.session.commit()
-        except IntegrityError:
-            # The same hour, first written from two places at once.
+            if start is None or end is None:
+                draft.error, draft.error_on = "Give this line a start and an end time.", "times"
+                continue
+            if logic.clock_minutes(end, ending=True) <= logic.clock_minutes(start):
+                draft.error, draft.error_on = "The end has to be after the start.", "times"
+                continue
+            if block is None:
+                if any((b.start_time, b.end_time, b.text) == (start, end, text) for b in blocks):
+                    continue  # the same form sent again (a double tap, or Back then Save)
+                block = WorkBlock(user_id=current_user.id, date=day)
+                db.session.add(block)
+                blocks.append(block)
+            block.start_time, block.end_time, block.text = start, end, text
+            changed.append((start, end, "Saved"))
+
+        bad = [d for d in drafts if d.error]
+        if bad:
             db.session.rollback()
-            flash("That hour was just saved from somewhere else. Check it, then save again.", "error")
-            return redirect(url_for("main.timesheet", **day_args))
+            flash("Nothing was saved yet. " + ("Fix the line marked below" if len(bad) == 1
+                                               else f"Fix the {len(bad)} lines marked below") + ", then save again.",
+                  "error")
+            return show(drafts)
+        db.session.commit()
 
-        add = request.form.get("add")
-        if add == "earlier":
-            first = max(0, first - 1)
-        elif add == "later":
-            last = min(23, last + 1)
+        def span(start, end):
+            return logic.fmt_span(logic.clock_minutes(start), logic.clock_minutes(end, ending=True))
+
+        def count(n):
+            return f"{n} line" + ("" if n == 1 else "s")
+
+        saved = sum(1 for *_, verb in changed if verb == "Saved")
+        cleared = len(changed) - saved
         if len(changed) == 1:
-            verb = "Saved" if changed[0] in notes else "Cleared"
-            flash(f"{verb} {logic.fmt_hour_span(changed[0])}.", "success")
+            start, end, verb = changed[0]
+            flash(f"{verb} {span(start, end)}.", "success")
+        elif saved and cleared:
+            flash(f"Saved {count(saved)}, cleared {count(cleared)}.", "success")
         elif changed:
-            flash(f"Saved {len(changed)} hours.", "success")
-        elif not add:
+            flash(f"{'Saved' if saved else 'Cleared'} {count(len(changed))}.", "success")
+        elif not form.get("add") and not gone:
             flash("Already saved.", "success")
+        if gone:
+            flash(f"{count(gone).capitalize()} you changed had been removed on another device, so "
+                  f"{'it was' if gone == 1 else 'they were'} left out.", "warning")
 
-        # Keep any hours added by hand on the page; the rest come back by
-        # themselves from the day's times and notes.
-        natural = logic.timesheet_hours(entry, day, now, notes)
-        args = dict(day_args)
-        if first < natural[0]:
-            args["from"] = first
-        if last > natural[1]:
-            args["to"] = last
-        return redirect(url_for("main.timesheet", **args))
+        if form.get("add"):
+            # Lines added before, still empty, come back too: count them in.
+            fresh = [b for b in blocks if b in db.session]
+            last = max((end for _, end, _ in logic.timesheet_lines(entry, day, now, fresh)),
+                       default=logic.timesheet_span(entry, day, now)[0])
+            waiting = sum(1 for block_id, text, was_start in zip(fields[0], fields[3], fields[4])
+                          if not block_id and not clean(text) and clock(was_start)
+                          and logic.clock_minutes(clock(was_start)) >= last)
+            day_args["add"] = min(24, waiting + 1)
+        return redirect(url_for("main.timesheet", **day_args))
 
-    is_today = day == today
-    empty = [h for h in range(first, last + 1) if h not in notes]
-    if is_today and now.hour in empty:
-        prompt_hour, prompt = now.hour, "What are you working on?"
-    elif empty:
-        prompt_hour, prompt = empty[0], "What did you work on?"
-    else:
-        prompt_hour, prompt = None, ""
-    slots = [
-        SimpleNamespace(
-            hour=h,
-            label=logic.fmt_hour_span(h),
-            text=notes[h].text if h in notes else "",
-            is_now=is_today and h == now.hour,
-            placeholder=prompt if h == prompt_hour else "",
-        )
-        for h in range(first, last + 1)
-    ]
-    return render_template(
-        "timesheet.html",
-        day=day,
-        is_today=is_today,
-        prev_date=day - timedelta(days=1),
-        next_date=None if is_today else day + timedelta(days=1),
-        slots=slots,
-        first=first,
-        last=last,
-        max_length=HourNote.MAX_LENGTH,
-    )
+    lines = logic.timesheet_lines(entry, day, now, blocks)
+    for _ in range(min(24, request.args.get("add", default=0, type=int))):
+        # "Add a line": an hour straight after the last line -- or, once the
+        # day runs to midnight, the hour just before the first.
+        last = max((end for _, end, _ in lines), default=logic.timesheet_span(entry, day, now)[0])
+        first = min((start for start, _, _ in lines), default=0)
+        if last < 1440:
+            lines.append((last, min(1440, last + 60), None))
+        elif first > 0:
+            lines.insert(0, (max(0, first - 60), first, None))
+        else:
+            flash("This day's lines already run from midnight to midnight. Change a line's times to "
+                  "make room.", "warning")
+            break
+    return show(day_views(lines))
 
 
 @main_bp.route("/entry/<date_str>", methods=["GET", "POST"])

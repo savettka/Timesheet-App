@@ -4,7 +4,7 @@
 {% block page_title %}Timesheet{% endblock %}
 
 {% block content %}
-<section class="card form-card" aria-labelledby="day-title">
+<section class="card form-card ts-card" aria-labelledby="day-title">
   <div class="day-nav">
     <a class="btn btn-icon" href="{{ url_for('main.timesheet', date_str=prev_date.isoformat()) }}"
        aria-label="Previous day, {{ prev_date.strftime('%A %d %B') }}">{{ icon('chevron-left') }}</a>
@@ -21,34 +21,45 @@
     <p class="day-nav-back"><a class="link" href="{{ url_for('main.timesheet') }}">Jump to today</a></p>
   {% endif %}
 
-  <form method="post" class="ts-form">
-    {# Enter in any line presses the form's first button, so that one saves. #}
+  {# Always to this page's own date, so a page left open past midnight still
+     saves to the day it shows. #}
+  <form method="post" class="ts-form js-once" action="{{ url_for('main.timesheet', date_str=day.isoformat()) }}">
+    {# Enter in any box presses the form's first button, so that one saves. #}
     <button type="submit" class="visually-hidden" tabindex="-1" aria-hidden="true">Save</button>
-    <input type="hidden" name="from" value="{{ first }}">
-    <input type="hidden" name="to" value="{{ last }}">
 
-    {% if first > 0 %}
-    <button type="submit" name="add" value="earlier" class="btn btn-ghost btn-sm ts-add">
-      {{ icon('plus') }}Add earlier hour</button>
-    {% endif %}
-
-    <ol class="ts-hours" aria-label="Hours on {{ day.strftime('%A %d %B') }}">
-      {% for slot in slots %}
-      <li class="ts-hour{{ ' is-now' if slot.is_now }}">
-        <label class="ts-time" for="h-{{ slot.hour }}">{{ slot.label }}
-          {%- if slot.is_now %} <span class="badge ts-now">Now</span>{% endif %}</label>
-        <input type="text" id="h-{{ slot.hour }}" name="h{{ slot.hour }}" value="{{ slot.text }}"
-               maxlength="{{ max_length }}" autocomplete="off"
-               {%- if slot.placeholder %} placeholder="{{ slot.placeholder }}"{% endif %}>
-        <input type="hidden" name="was{{ slot.hour }}" value="{{ slot.text }}">
+    <ol class="ts-lines" aria-label="Your time on {{ day.strftime('%A %d %B') }}">
+      {% for line in lines %}
+      {% set n = loop.index %}
+      {% set span = (line.start or '?') ~ ' to ' ~ (line.end or '?') %}
+      {% set err_times = ' aria-invalid="true" aria-describedby="ts-err-%d"'|format(n) if line.error_on == 'times' else '' %}
+      {% set err_text = ' aria-invalid="true" aria-describedby="ts-err-%d"'|format(n) if line.error_on == 'text' else '' %}
+      <li class="ts-line{{ ' is-now' if line.is_now }}{{ ' has-error' if line.error }}">
+        <input type="hidden" name="id" value="{{ line.id }}">
+        <input type="hidden" name="was_start" value="{{ line.was_start }}">
+        <input type="hidden" name="was_end" value="{{ line.was_end }}">
+        <input type="hidden" name="was_text" value="{{ line.was_text }}">
+        <div class="ts-when">
+          <input type="time" name="start" value="{{ line.start }}" aria-label="From, line {{ n }}"{{ err_times|safe }}>
+          <span class="ts-to" aria-hidden="true">–</span>
+          <input type="time" name="end" value="{{ line.end }}" aria-label="To, line {{ n }}"{{ err_times|safe }}>
+          {% if line.is_now %}<span class="badge ts-now">Now</span>{% endif %}
+        </div>
+        <input type="text" name="text" class="ts-text" value="{{ line.text }}" maxlength="{{ max_length }}"
+               autocomplete="off" aria-label="What you worked on, {{ span }}"{{ err_text|safe }}
+               {%- if line.placeholder %} placeholder="{{ line.placeholder }}"{% endif %}>
+        {# Shown by app.js: copying needs the script. #}
+        <button type="button" class="btn btn-icon ts-copy" aria-label="Copy {{ span }}" title="Copy" hidden>
+          {{ icon('copy', 'icon ts-copy-icon') }}{{ icon('check', 'icon ts-copied-icon') }}{{ icon('alert', 'icon ts-failed-icon') }}
+        </button>
+        {% if line.error %}<p class="ts-error" id="ts-err-{{ n }}">{{ icon('alert', 'icon icon-inline') }}{{ line.error }}</p>{% endif %}
       </li>
       {% endfor %}
     </ol>
+    <p class="visually-hidden" aria-live="polite" id="ts-copy-status"></p>
+    <p class="ts-copy-note" id="ts-copy-note" hidden></p>
 
-    {% if last < 23 %}
-    <button type="submit" name="add" value="later" class="btn btn-ghost btn-sm ts-add">
-      {{ icon('plus') }}Add later hour</button>
-    {% endif %}
+    <button type="submit" name="add" value="line" class="btn btn-ghost btn-sm ts-add">
+      {{ icon('plus') }}Add a line</button>
 
     <div class="form-actions">
       <button type="submit" class="btn btn-primary btn-lg">{{ icon('check') }}Save</button>

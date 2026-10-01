@@ -96,6 +96,12 @@
     // left -- mid-submit -- so make its buttons pressable again.
     window.addEventListener("pageshow", function (e) {
       if (!e.persisted) return;
+      // A Timesheet brought back by Back still shows lines as they were
+      // before saving; saving that again would add them twice. Fetch it fresh.
+      if (document.querySelector(".ts-form")) {
+        window.location.reload();
+        return;
+      }
       document.querySelectorAll("form.js-once").forEach(function (form) {
         delete form.dataset.sent;
         form.querySelectorAll('[aria-disabled="true"]').forEach(function (b) {
@@ -317,11 +323,113 @@
   }
 
   // ------------------------------------------------------------ timesheet
-  // On a phone the hour in progress is the last line, below the fold by the
-  // afternoon, so the page opens with it on screen -- unless there's a
-  // message at the top (such as "Saved") that would scroll out of sight.
-  function initTimesheet() {
-    var now = document.querySelector(".ts-hour.is-now");
+  // The old way of copying: select a hidden box's text and copy that.
+  function copyBySelecting(text) {
+    var before = document.activeElement;
+    var area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.style.position = "fixed";
+    area.style.top = "0";
+    area.style.opacity = "0";
+    document.body.appendChild(area);
+    area.select();
+    area.setSelectionRange(0, text.length);  // iPhones ignore select() alone
+    var copied = false;
+    try { copied = document.execCommand("copy"); } catch (e) { /* not allowed */ }
+    document.body.removeChild(area);
+    if (before && before.focus) before.focus();  // back where it was, not lost on the page
+    return copied;
+  }
+
+  // The clipboard API, where the page may use it -- it needs a secure page
+  // and can be refused -- and the old way where it can't.
+  function copyText(text) {
+    var api = navigator.clipboard && window.isSecureContext
+      ? navigator.clipboard.writeText(text)
+      : Promise.reject();
+    return api.catch(function () {
+      if (!copyBySelecting(text)) throw new Error("copy refused");
+    });
+  }
+
+  // A line's time as its labels say it, from its boxes right now: "13:00 to 14:00".
+  function lineSpan(line) {
+    return (line.querySelector('[name="start"]').value || "?") + " to " +
+      (line.querySelector('[name="end"]').value || "?");
+  }
+
+  // Each line's copy button puts it on the clipboard the way it was asked
+  // for -- "Emails for a client (13:00 to 14:00 PM)" -- from what's in its
+  // boxes right now, saved or not. AM or PM follows the end time.
+  function initTimesheetCopy() {
+    var list = document.querySelector(".ts-lines");
+    if (!list) return;
+    var status = document.getElementById("ts-copy-status");
+    var note = document.getElementById("ts-copy-note");
+    function say(message) { if (status) status.textContent = message; }
+    list.querySelectorAll(".ts-copy").forEach(function (b) { b.hidden = false; });
+
+    // Each line's text box and copy button are named for its time, and
+    // the names follow when a time is changed.
+    list.addEventListener("input", function (e) {
+      if (e.target.type !== "time") return;
+      var line = e.target.closest(".ts-line");
+      var span = lineSpan(line);
+      line.querySelector('[name="text"]').setAttribute("aria-label", "What you worked on, " + span);
+      var button = line.querySelector(".ts-copy");
+      if (!button.classList.contains("is-copied")) button.setAttribute("aria-label", "Copy " + span);
+    });
+
+    list.addEventListener("click", function (e) {
+      var button = e.target.closest(".ts-copy");
+      if (!button) return;
+      var line = button.closest(".ts-line");
+      var text = line.querySelector('[name="text"]').value.trim();
+      var from = line.querySelector('[name="start"]').value;
+      var to = line.querySelector('[name="end"]').value;
+      button.classList.remove("is-copied", "is-failed");
+      if (note) note.hidden = true;
+      if (!text) {
+        say("Nothing to copy yet: this line is empty.");
+        line.querySelector('[name="text"]').focus();
+        return;
+      }
+      var half = parseInt(to, 10) >= 12 ? " PM" : " AM";
+      var copy = from && to ? text + " (" + from + " to " + to + half + ")" : text;
+      button.focus();  // Safari doesn't focus a clicked button by itself
+      copyText(copy).then(function () {
+        button.classList.add("is-copied");
+        button.setAttribute("aria-label", "Copied");
+        say("Copied: " + copy);
+        setTimeout(function () {
+          button.classList.remove("is-copied");
+          button.setAttribute("aria-label", "Copy " + lineSpan(line));
+        }, 1600);
+      }, function () {
+        // Shown, not only spoken: otherwise the clipboard quietly keeps
+        // whatever was in it before.
+        button.classList.add("is-failed");
+        var message = "Couldn't copy here. Select and copy this yourself: " + copy;
+        say(message);
+        if (note) { note.textContent = message; note.hidden = false; }
+      });
+    });
+  }
+
+  // A save refused for a line's times or words: start on that line. On a
+  // phone the line in progress is the last one, below the fold by the
+  // afternoon, so otherwise the page opens with it on screen -- unless
+  // there's a message at the top (such as "Saved") that would scroll out
+  // of sight.
+  function initTimesheetScroll() {
+    var invalid = document.querySelector('.ts-line [aria-invalid="true"]');
+    if (invalid) {
+      invalid.focus();
+      invalid.scrollIntoView({ block: "center" });
+      return;
+    }
+    var now = document.querySelector(".ts-line.is-now");
     if (!now || document.querySelector(".flash")) return;
     var tabBar = document.querySelector(".tab-bar");
     var covered = tabBar ? tabBar.offsetHeight : 0;
@@ -339,6 +447,7 @@
     initBreakRows();
     initAvatarPicker();
     initDayType();
-    initTimesheet();
+    initTimesheetCopy();
+    initTimesheetScroll();
   });
 })();
