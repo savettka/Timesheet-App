@@ -694,11 +694,19 @@ def timesheet(date_str=None):
         return logic.minutes_clock(minutes).strftime("%H:%M")
 
     def line_view(start, end, block=None, text=""):
-        text = block.text if block else text
+        # A recorded break comes already written as "Break": saved only if
+        # its words or times are changed.
+        is_break = block == logic.TIMESHEET_BREAK
+        if is_break:
+            block, text = None, "Break"
+        elif block is not None:
+            text = block.text
+        shown = block is not None or is_break or not text  # already on the page, as opposed to new
         return SimpleNamespace(
             id=str(block.id) if block else "", start=start, end=end, text=text,
-            was_start=start if block or not text else "", was_end=end if block or not text else "",
-            was_text=text if block else "", is_now=False, placeholder="", error="", error_on="",
+            was_start=start if shown else "", was_end=end if shown else "",
+            was_text=text if block is not None or is_break else "", is_now=False, is_break=is_break,
+            placeholder="", error="", error_on="",
         )
 
     def day_views(lines):
@@ -759,7 +767,7 @@ def timesheet(date_str=None):
             # As typed, so a line with a problem comes back without retyping.
             draft = SimpleNamespace(
                 id=block_id, start=start_raw, end=end_raw, text=text, was_start=was_start, was_end=was_end,
-                was_text=was_text, is_now=False, placeholder="", error="", error_on="",
+                was_text=was_text, is_now=False, is_break=False, placeholder="", error="", error_on="",
             )
             drafts.append(draft)
             # Field by field, only what was changed on this page counts, so a

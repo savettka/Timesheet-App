@@ -31,9 +31,16 @@ LONG_SHIFT_WARNING_HOURS = 16
 # midnight: 1 PM to 10 PM.
 TIMESHEET_DAY = (13 * 60, 22 * 60)
 # A Timesheet line is an hour, o'clock to o'clock, except at the ends: a
-# piece shorter than this joins the hour beside it, so a 12:47 login gives a
-# first line of 12:47 to 2:00 PM rather than a 13-minute one.
+# piece this short or shorter joins the hour beside it, so a 12:47 login
+# gives a first line of 12:47 to 2:00 PM rather than a 13-minute one, and a
+# break at 8:30 PM leaves 7:00 to 8:30 PM before it.
 TIMESHEET_SHORT_PIECE = 30
+# After the day's last break, up to this long is one line, so the day ends
+# with 9:00 PM to the logout rather than an hour and a stub.
+TIMESHEET_LAST_STRETCH = 120
+# The block of a line that is a recorded break, rather than None (time to
+# fill in) or a saved WorkBlock.
+TIMESHEET_BREAK = "break"
 # Time left uncovered between saved lines, shorter than this, isn't offered
 # as a line of its own.
 TIMESHEET_SMALL_GAP = 10
@@ -458,7 +465,7 @@ def timesheet_span(entry, day, now):
                 end = 1440  # past midnight: to the end of its own date
         elif day == now.date():
             end = (now.hour + 1) * 60
-            if end - start < TIMESHEET_SHORT_PIECE:
+            if end - start <= TIMESHEET_SHORT_PIECE:
                 # 12:47 at 12:52: the first line is already 12:47-2:00 PM, as
                 # it will be once 1 PM comes, not a 13-minute 12:47-1:00 PM.
                 end += 60
@@ -472,12 +479,12 @@ def timesheet_span(entry, day, now):
 
 
 def hour_pieces(start, end):
-    """[start, end) in minutes, cut at each o'clock -- with a piece shorter than
+    """[start, end) in minutes, cut at each o'clock -- with a piece of up to
     TIMESHEET_SHORT_PIECE at either end joined to the hour beside it."""
     points = [start, *range((start // 60 + 1) * 60, end, 60), end]
-    if len(points) > 2 and points[1] - points[0] < TIMESHEET_SHORT_PIECE:
+    if len(points) > 2 and points[1] - points[0] <= TIMESHEET_SHORT_PIECE:
         del points[1]
-    if len(points) > 2 and points[-1] - points[-2] < TIMESHEET_SHORT_PIECE:
+    if len(points) > 2 and points[-1] - points[-2] <= TIMESHEET_SHORT_PIECE:
         del points[-2]
     return list(zip(points, points[1:]))
 
@@ -486,10 +493,32 @@ def timesheet_lines(entry, day, now, blocks=()):
     """A day's Timesheet lines in time order, as (start, end, block) with the
     times in minutes from midnight.
 
-    Every saved block is a line, and the rest of the day's span -- whatever no
-    block covers yet -- is offered as hourly lines (block None) to fill in.
+    Every saved block is a line. The rest of the day's span -- whatever no
+    block covers yet -- is offered to fill in: each recorded break as a line
+    of its own (block TIMESHEET_BREAK), and the time worked around the breaks
+    as hourly lines (block None). On a break right now, the day so far ends
+    with that break.
     """
     start, end = timesheet_span(entry, day, now)
+    minute = now.hour * 60 + now.minute
+    breaks = []
+    for segment in getattr(entry, "breaks", None) or ():
+        if segment.break_start is None:
+            continue
+        a = clock_minutes(segment.break_start)
+        if segment.break_end is not None:
+            b = clock_minutes(segment.break_end, ending=True)
+            if b < a:
+                b = 1440  # past midnight: to the end of its own date
+        elif day == now.date():
+            b = max(a + 1, minute)
+            end = min(end, max(b, start + 1))
+        else:
+            b = end
+        breaks.append((a, b))
+    breaks = sorted((max(a, start), min(b, end)) for a, b in breaks if min(b, end) > max(a, start))
+    last_break_end = max((b for _, b in breaks), default=None)
+
     lines = [(clock_minutes(b.start_time), clock_minutes(b.end_time, ending=True), b) for b in blocks]
     lines.sort(key=lambda line: line[:2])
     gaps, cursor = [], start
@@ -501,11 +530,25 @@ def timesheet_lines(entry, day, now, blocks=()):
         cursor = max(cursor, b)
     if cursor < end:
         gaps.append((cursor, end))
-    for a, b in gaps:
+
+    def worked(a, b):
         # A sliver between saved lines isn't worth a line; a day with nothing
-        # saved always gets its span, however short.
-        if b - a >= TIMESHEET_SMALL_GAP or not blocks:
-            lines += [(p, q, None) for p, q in hour_pieces(a, b)]
+        # saved and no breaks always gets its span, however short.
+        if b - a < TIMESHEET_SMALL_GAP and (blocks or breaks or b <= a):
+            return []
+        if a == last_break_end and b == end and b - a <= TIMESHEET_LAST_STRETCH:
+            return [(a, b, None)]
+        return [(p, q, None) for p, q in hour_pieces(a, b)]
+
+    for a, b in gaps:
+        cursor = a
+        for break_start, break_end in breaks:
+            if break_end <= cursor or break_start >= b:
+                continue
+            lines += worked(cursor, max(cursor, break_start))
+            lines.append((max(cursor, break_start), min(break_end, b), TIMESHEET_BREAK))
+            cursor = min(break_end, b)
+        lines += worked(cursor, b)
     return sorted(lines, key=lambda line: line[:2])
 
 

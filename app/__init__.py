@@ -135,7 +135,7 @@ def _move_hour_notes():
                 .where(entries.c.user_id == user_id, entries.c.date == day)
             ).first()
             entry = SimpleNamespace(date=day, login_time=times[0], logout_time=times[1]) if times else None
-            lines = logic.timesheet_lines(entry, day, now)
+            lines = [line for line in logic.timesheet_lines(entry, day, now) if line[2] is None]
             home = {}
             for note in notes:
                 best = max(lines, key=lambda line: overlap(line, note.hour), default=None)
@@ -146,7 +146,7 @@ def _move_hour_notes():
                 # A note on just the 13-minute end of a 12:47-2:00 PM line
                 # mustn't grow over the hour it never described.
                 if (line and list(home.values()).count(line) == 1
-                        and overlap(line, note.hour) >= logic.TIMESHEET_SHORT_PIECE):
+                        and overlap(line, note.hour) > logic.TIMESHEET_SHORT_PIECE):
                     start, end = line[0], line[1]
                 elif line:
                     start, end = max(start, line[0]), min(end, line[1])

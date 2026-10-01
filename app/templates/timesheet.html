@@ -33,7 +33,9 @@
       {% set span = (line.start or '?') ~ ' to ' ~ (line.end or '?') %}
       {% set err_times = ' aria-invalid="true" aria-describedby="ts-err-%d"'|format(n) if line.error_on == 'times' else '' %}
       {% set err_text = ' aria-invalid="true" aria-describedby="ts-err-%d"'|format(n) if line.error_on == 'text' else '' %}
-      <li class="ts-line{{ ' is-now' if line.is_now }}{{ ' has-error' if line.error }}">
+      <li class="ts-line{{ ' is-now' if line.is_now }}{{ ' is-break' if line.is_break }}{{ ' has-error' if line.error }}">
+        {# Its own row above the line, so the line's boxes stay level. #}
+        {% if line.is_now %}<span class="badge ts-now">Now</span>{% endif %}
         <input type="hidden" name="id" value="{{ line.id }}">
         <input type="hidden" name="was_start" value="{{ line.was_start }}">
         <input type="hidden" name="was_end" value="{{ line.was_end }}">
@@ -42,7 +44,6 @@
           <input type="time" name="start" value="{{ line.start }}" aria-label="From, line {{ n }}"{{ err_times|safe }}>
           <span class="ts-to" aria-hidden="true">–</span>
           <input type="time" name="end" value="{{ line.end }}" aria-label="To, line {{ n }}"{{ err_times|safe }}>
-          {% if line.is_now %}<span class="badge ts-now">Now</span>{% endif %}
         </div>
         <input type="text" name="text" class="ts-text" value="{{ line.text }}" maxlength="{{ max_length }}"
                autocomplete="off" aria-label="What you worked on, {{ span }}"{{ err_text|safe }}

@@ -797,15 +797,17 @@ input[type="number"] { -moz-appearance: textfield; }
   align-items: center; gap: 6px var(--s2);
   padding: 6px var(--s2) var(--s2); border-radius: var(--r-md);
 }
-.ts-line.is-now { background: var(--accent-soft); }
+.ts-line.is-break { background: var(--tint-break); }
+.ts-line.is-now { background: var(--accent-soft); grid-template-areas: "now now" "when when" "text copy"; }
 .ts-when { grid-area: when; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .ts-text { grid-area: text; }
 .ts-copy { grid-area: copy; }
 .ts-when input[type="time"] { flex: 1 1 9.5rem; width: auto; min-width: 0; max-width: 11rem; padding: 0 var(--s3); }
 .ts-to { color: var(--text-3); }
-.ts-now { margin-left: 0; background: var(--accent); color: var(--on-accent); }
+.ts-now { grid-area: now; justify-self: start; margin-left: 0; background: var(--accent); color: var(--on-accent); }
 @container (min-width: 720px) {
   .ts-line { grid-template-columns: 21rem minmax(0, 1fr) auto; grid-template-areas: "when text copy"; gap: var(--s3); padding: var(--s1) var(--s2); }
+  .ts-line.is-now { grid-template-areas: "now now now" "when text copy"; row-gap: var(--s1); padding-top: var(--s2); }
 }
 .ts-copied-icon, .ts-failed-icon { display: none; }
 .ts-copy.is-copied { color: var(--success-text); border-color: currentColor; }
