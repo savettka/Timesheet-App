@@ -76,7 +76,9 @@
   function initForms() {
     document.addEventListener("submit", function (e) {
       var form = e.target;
-      var question = form.getAttribute("data-confirm");
+      // The question can sit on the form, or on the one button that needs it.
+      var question = form.getAttribute("data-confirm") ||
+        (e.submitter && e.submitter.getAttribute("data-confirm"));
       if (question && !window.confirm(question)) {
         e.preventDefault();
         return;
@@ -438,6 +440,206 @@
     }
   }
 
+  // ----------------------------------------------------- timesheet picture
+  // "Download PNG": the day as a picture in STM's pastels -- the lavender
+  // band with the mark, then every line with words in it -- drawn from the
+  // boxes as they are, saved or not.
+  var PNG = {
+    width: 1080, pad: 56, scale: 2,
+    band: "#eef0ff", brandText: "#3f3697", brandMuted: "#57519f", ink: "#151823", ink2: "#3d4354",
+    ink3: "#555c6f", hair: "#e6e8ee", breakFill: "#fdefd2", breakText: "#7a4a00", font: "Inter, system-ui, sans-serif",
+  };
+
+  function clock12(hhmm) {
+    var parts = hhmm.split(":"), h = parseInt(parts[0], 10);
+    return (h % 12 || 12) + ":" + parts[1] + " " + (h < 12 ? "AM" : "PM");
+  }
+
+  // 12:47 – 2:00 PM, 11:30 AM – 12:30 PM: the line's time, as the app says it.
+  function spanWords(from, to) {
+    if (!from || !to) return (from ? clock12(from) : "?") + " – " + (to ? clock12(to) : "?");
+    var a = clock12(from), b = clock12(to);
+    return (a.slice(-2) === b.slice(-2) && to !== "00:00" ? a.slice(0, -3) : a) + " – " + b;
+  }
+
+  function wrapWords(ctx, text, width) {
+    var lines = [], line = "";
+    text.split(/\s+/).forEach(function (word) {
+      while (ctx.measureText(word).width > width && word.length > 1) {  // one very long word
+        var cut = word.length - 1;
+        while (cut > 1 && ctx.measureText(word.slice(0, cut)).width > width) cut -= 1;
+        if (line) { lines.push(line); line = ""; }
+        lines.push(word.slice(0, cut));
+        word = word.slice(cut);
+      }
+      var tryLine = line ? line + " " + word : word;
+      if (line && ctx.measureText(tryLine).width > width) {
+        lines.push(line);
+        line = word;
+      } else {
+        line = tryLine;
+      }
+    });
+    if (line) lines.push(line);
+    return lines;
+  }
+
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function drawTimesheet(info, rows, logo) {
+    var W = PNG.width, pad = PNG.pad, timeW = 250, gap = 28;
+    var textW = W - 2 * pad - timeW - gap - 32;
+    var canvas = document.createElement("canvas");
+    var ctx = canvas.getContext("2d");
+    ctx.font = "400 21px " + PNG.font;
+    rows.forEach(function (row) { row.wrapped = wrapWords(ctx, row.text, textW); });
+
+    var bandH = 140, top = bandH + (info.summary ? 76 : 40), headH = 46, lineH = 31;
+    var bodyH = rows.reduce(function (sum, row) { return sum + Math.max(1, row.wrapped.length) * lineH + 30; }, 0);
+    var H = top + headH + bodyH + 96;
+    canvas.width = W * PNG.scale;
+    canvas.height = H * PNG.scale;
+    ctx.scale(PNG.scale, PNG.scale);
+    ctx.textBaseline = "alphabetic";
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = PNG.band;
+    ctx.fillRect(0, 0, W, bandH);
+    var textX = pad;
+    if (logo) {
+      ctx.drawImage(logo, pad - 6, 38, 64, 64);
+      textX = pad + 70;
+    }
+    ctx.fillStyle = PNG.brandText;
+    ctx.font = "700 34px " + PNG.font;
+    ctx.fillText("STM", textX, 72);
+    ctx.fillStyle = PNG.brandMuted;
+    ctx.font = "400 18px " + PNG.font;
+    ctx.fillText("Simple Time Manager", textX, 100);
+    ctx.textAlign = "right";
+    ctx.fillStyle = PNG.ink;
+    ctx.font = "700 27px " + PNG.font;
+    ctx.fillText(info.day, W - pad, 70);
+    ctx.fillStyle = PNG.brandMuted;
+    ctx.font = "400 18px " + PNG.font;
+    ctx.fillText("Timesheet · " + info.who, W - pad, 100);
+    ctx.textAlign = "left";
+
+    if (info.summary) {
+      ctx.fillStyle = PNG.ink2;
+      ctx.font = "600 20px " + PNG.font;
+      ctx.fillText(info.summary, pad, bandH + 46);
+    }
+
+    var y = top;
+    ctx.fillStyle = PNG.band;
+    roundRect(ctx, pad - 12, y, W - 2 * pad + 24, headH, 10);
+    ctx.fill();
+    ctx.fillStyle = PNG.brandText;
+    ctx.font = "700 17px " + PNG.font;
+    ctx.fillText("Time", pad + 4, y + 29);
+    ctx.fillText("What I worked on", pad + timeW + gap, y + 29);
+    y += headH;
+
+    rows.forEach(function (row, i) {
+      var h = Math.max(1, row.wrapped.length) * lineH + 30;
+      if (row.isBreak) {
+        ctx.fillStyle = PNG.breakFill;
+        ctx.fillRect(pad - 12, y, W - 2 * pad + 24, h);
+      }
+      ctx.fillStyle = row.isBreak ? PNG.breakText : PNG.ink;
+      ctx.font = "600 21px " + PNG.font;
+      ctx.fillText(row.span, pad + 4, y + 15 + 23);
+      ctx.fillStyle = row.isBreak ? PNG.breakText : PNG.ink2;
+      ctx.font = "400 21px " + PNG.font;
+      row.wrapped.forEach(function (text, n) {
+        ctx.fillText(text, pad + timeW + gap, y + 15 + 23 + n * lineH);
+      });
+      y += h;
+      if (i < rows.length - 1) {
+        ctx.fillStyle = PNG.hair;
+        ctx.fillRect(pad - 12, y - 0.5, W - 2 * pad + 24, 1);
+      }
+    });
+
+    ctx.fillStyle = PNG.ink3;
+    ctx.font = "400 16px " + PNG.font;
+    ctx.fillText("Generated " + info.stamp, pad, H - 40);
+    ctx.textAlign = "right";
+    ctx.fillStyle = PNG.brandText;
+    ctx.font = "700 16px " + PNG.font;
+    ctx.fillText("STM · Simple Time Manager", W - pad, H - 40);
+    return canvas;
+  }
+
+  function loadLogo() {
+    var icon = document.querySelector('link[rel="icon"]');
+    return new Promise(function (resolve) {
+      if (!icon) return resolve(null);
+      var img = new Image();
+      img.onload = function () { resolve(img); };
+      img.onerror = function () { resolve(null); };  // the words still make the picture
+      img.src = icon.href;
+    });
+  }
+
+  function initTimesheetPng() {
+    var form = document.querySelector(".ts-form");
+    var button = document.querySelector(".ts-png");
+    var canvasOk = !!document.createElement("canvas").toBlob;
+    if (!form || !button || !canvasOk) return;
+    var status = document.getElementById("ts-copy-status");
+    var note = document.getElementById("ts-copy-note");
+    button.hidden = false;
+
+    button.addEventListener("click", function () {
+      var rows = [];
+      form.querySelectorAll(".ts-line").forEach(function (line) {
+        var text = line.querySelector('[name="text"]').value.trim();
+        if (!text) return;
+        rows.push({
+          span: spanWords(line.querySelector('[name="start"]').value, line.querySelector('[name="end"]').value),
+          text: text, isBreak: line.classList.contains("is-break"),
+        });
+      });
+      if (note) note.hidden = true;
+      if (!rows.length) {
+        if (status) status.textContent = "Nothing to download yet: write in a line first.";
+        if (note) { note.textContent = "Nothing to download yet: write in a line first."; note.hidden = false; }
+        return;
+      }
+      button.setAttribute("aria-disabled", "true");
+      var fonts = document.fonts && document.fonts.load ? document.fonts.load("600 21px Inter") : Promise.resolve();
+      Promise.all([fonts.catch(function () {}), loadLogo()]).then(function (ready) {
+        var d = form.dataset;
+        var canvas = drawTimesheet({ day: d.pngDay, who: d.pngWho, summary: d.pngSummary, stamp: d.pngStamp },
+                                   rows, ready[1]);
+        canvas.toBlob(function (blob) {
+          button.removeAttribute("aria-disabled");
+          if (!blob) return;
+          var url = URL.createObjectURL(blob);
+          var link = document.createElement("a");
+          link.href = url;
+          link.download = d.pngName || "STM timesheet.png";
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+          if (status) status.textContent = "Downloaded " + link.download;
+        }, "image/png");
+      });
+    });
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     initTheme();
     initFlashes();
@@ -449,5 +651,6 @@
     initDayType();
     initTimesheetCopy();
     initTimesheetScroll();
+    initTimesheetPng();
   });
 })();

@@ -793,21 +793,24 @@ input[type="number"] { -moz-appearance: textfield; }
   margin: 0 calc(var(--s2) * -1); container-type: inline-size;
 }
 .ts-line {
-  display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "when when" "text copy";
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "when del" "text copy";
   align-items: center; gap: 6px var(--s2);
   padding: 6px var(--s2) var(--s2); border-radius: var(--r-md);
 }
 .ts-line.is-break { background: var(--tint-break); }
-.ts-line.is-now { background: var(--accent-soft); grid-template-areas: "now now" "when when" "text copy"; }
+.ts-line.is-now { background: var(--accent-soft); grid-template-areas: "now now" "when del" "text copy"; }
 .ts-when { grid-area: when; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .ts-text { grid-area: text; }
 .ts-copy { grid-area: copy; }
+.ts-delete { grid-area: del; color: var(--text-2); }
+.ts-form .form-actions .btn { flex: 1 1 auto; white-space: nowrap; }  /* "Download PNG" on one line on a phone */
+.ts-delete:hover { color: var(--stop-text); }
 .ts-when input[type="time"] { flex: 1 1 9.5rem; width: auto; min-width: 0; max-width: 11rem; padding: 0 var(--s3); }
 .ts-to { color: var(--text-3); }
 .ts-now { grid-area: now; justify-self: start; margin-left: 0; background: var(--accent); color: var(--on-accent); }
 @container (min-width: 720px) {
-  .ts-line { grid-template-columns: 21rem minmax(0, 1fr) auto; grid-template-areas: "when text copy"; gap: var(--s3); padding: var(--s1) var(--s2); }
-  .ts-line.is-now { grid-template-areas: "now now now" "when text copy"; row-gap: var(--s1); padding-top: var(--s2); }
+  .ts-line { grid-template-columns: 21rem minmax(0, 1fr) auto auto; grid-template-areas: "when text copy del"; gap: var(--s3); padding: var(--s1) var(--s2); }
+  .ts-line.is-now { grid-template-areas: "now now now now" "when text copy del"; row-gap: var(--s1); padding-top: var(--s2); }
 }
 .ts-copied-icon, .ts-failed-icon { display: none; }
 .ts-copy.is-copied { color: var(--success-text); border-color: currentColor; }
@@ -1002,7 +1005,7 @@ input[type="number"] { -moz-appearance: textfield; }
 @media (max-width: 400px) {
   /* A small phone: from and to still share their row, and Now moves under
      them when there isn't room beside. */
-  .ts-when input[type="time"] { flex-basis: 6.5rem; font-size: 16px; padding: 0 var(--s2); }
+  .ts-when input[type="time"] { flex-basis: 5.75rem; font-size: 16px; padding: 0 var(--s2); }
   /* A tap opens the phone's own time picker; the clock icon only takes room. */
   .ts-when input[type="time"]::-webkit-calendar-picker-indicator { display: none; }
 }

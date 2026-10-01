@@ -515,10 +515,13 @@ def timesheet_lines(entry, day, now, blocks=()):
         breaks.append((a, b))
     breaks = sorted((max(a, start), min(b, end)) for a, b in breaks if min(b, end) > max(a, start))
 
-    lines = [(clock_minutes(b.start_time), clock_minutes(b.end_time, ending=True), b) for b in blocks]
-    lines.sort(key=lambda line: line[:2])
+    # A block with no words is a deleted line: not shown, but its time is
+    # taken, so it isn't offered again.
+    taken = sorted(((clock_minutes(b.start_time), clock_minutes(b.end_time, ending=True), b) for b in blocks),
+                   key=lambda line: line[:2])
+    lines = [line for line in taken if line[2].text]
     gaps, cursor = [], start
-    for a, b, _ in lines:
+    for a, b, _ in taken:
         if cursor >= end:
             break
         if a > cursor:

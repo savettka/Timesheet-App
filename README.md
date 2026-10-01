@@ -43,7 +43,8 @@ This mirrors the logic in the original spreadsheet:
 - **Timesheet** — what you worked on, through the day: a line per hour from when you
   logged in (a 12:47 login gives 12:47–2:00 PM, then 2–3 PM …) to the hour you're in now,
   which is marked. Breaks show as lines of their own, the hours carrying on as normal
-  after them, and the last line ends at the logout. Every line's times can be changed, more lines added, and each has a
+  after them, and the last line ends at the logout. Lines can be deleted, the day can be
+  downloaded as a branded PNG with one button, and every line's times can be changed, more lines added, and each has a
   copy button that copies it as "Emails for a client (13:00 to 14:00 PM)". Type and press
   Enter to save; a day with no login starts at 1 PM, and earlier days work the same way.
 - **Dashboard** — today's hours, this week's progress bar toward your target, and a

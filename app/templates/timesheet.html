@@ -23,7 +23,9 @@
 
   {# Always to this page's own date, so a page left open past midnight still
      saves to the day it shows. #}
-  <form method="post" class="ts-form js-once" action="{{ url_for('main.timesheet', date_str=day.isoformat()) }}">
+  <form method="post" class="ts-form js-once" action="{{ url_for('main.timesheet', date_str=day.isoformat()) }}"
+        data-png-name="STM timesheet {{ day.isoformat() }}.png" data-png-day="{{ day.strftime('%A %d %B %Y') }}"
+        data-png-who="{{ who }}" data-png-summary="{{ summary }}" data-png-stamp="{{ stamp }}">
     {# Enter in any box presses the form's first button, so that one saves. #}
     <button type="submit" class="visually-hidden" tabindex="-1" aria-hidden="true">Save</button>
 
@@ -52,6 +54,10 @@
         <button type="button" class="btn btn-icon ts-copy" aria-label="Copy {{ span }}" title="Copy" hidden>
           {{ icon('copy', 'icon ts-copy-icon') }}{{ icon('check', 'icon ts-copied-icon') }}{{ icon('alert', 'icon ts-failed-icon') }}
         </button>
+        <button type="submit" name="delete" value="{{ loop.index0 }}" class="btn btn-icon ts-delete"
+                aria-label="Delete {{ span }}" title="Delete"
+                {%- if line.text and not line.is_break %} data-confirm="Delete the line from {{ span }}?"{% endif %}>
+          {{ icon('trash') }}</button>
         {% if line.error %}<p class="ts-error" id="ts-err-{{ n }}">{{ icon('alert', 'icon icon-inline') }}{{ line.error }}</p>{% endif %}
       </li>
       {% endfor %}
@@ -64,6 +70,8 @@
 
     <div class="form-actions">
       <button type="submit" class="btn btn-primary btn-lg">{{ icon('check') }}Save</button>
+      {# Drawn by app.js from the boxes as they are, so it needs the script. #}
+      <button type="button" class="btn btn-secondary btn-lg ts-png" hidden>{{ icon('download') }}Download PNG</button>
     </div>
   </form>
 </section>

@@ -724,6 +724,12 @@ def timesheet(date_str=None):
         return views
 
     def show(views):
+        # What the day's picture (Download PNG) says above its lines.
+        summary = ""
+        if entry is not None and entry.login_time is not None:
+            until = logic.fmt_time(entry.logout_time) if entry.logout_time else "now"
+            worked = logic.fmt_hours(logic.entry_total_hours(entry, now=now))
+            summary = f"{logic.fmt_time(entry.login_time)} – {until} · {worked} worked"
         return render_template(
             "timesheet.html",
             day=day,
@@ -732,6 +738,9 @@ def timesheet(date_str=None):
             next_date=None if day == today else day + timedelta(days=1),
             lines=views,
             max_length=WorkBlock.MAX_LENGTH,
+            who=current_user.display_name or current_user.username,
+            summary=summary,
+            stamp=f"{now:%a %d %b %Y}, {logic.fmt_time(now.time())}",
         )
 
     if request.method == "POST":
@@ -761,7 +770,8 @@ def timesheet(date_str=None):
 
         by_id = {str(b.id): b for b in blocks}
         changed, drafts, gone = [], [], 0
-        for block_id, start_raw, end_raw, text_raw, was_start, was_end, was_text in zip(*fields):
+        to_delete = form.get("delete", "")
+        for index, (block_id, start_raw, end_raw, text_raw, was_start, was_end, was_text) in enumerate(zip(*fields)):
             text = clean(text_raw)
             start, end = clock(start_raw), clock(end_raw)
             # As typed, so a line with a problem comes back without retyping.
@@ -770,6 +780,20 @@ def timesheet(date_str=None):
                 was_text=was_text, is_now=False, is_break=False, placeholder="", error="", error_on="",
             )
             drafts.append(draft)
+            if to_delete == str(index):
+                # A deleted line stays as a block with no words, so its time
+                # isn't offered as a line again.
+                block = by_id.get(block_id)
+                if block is not None:
+                    changed.append((block.start_time, block.end_time, "Deleted"))
+                    block.text = ""
+                elif not block_id:
+                    start, end = clock(was_start) or start, clock(was_end) or end
+                    if start and end and logic.clock_minutes(end, ending=True) > logic.clock_minutes(start):
+                        db.session.add(WorkBlock(user_id=current_user.id, date=day, start_time=start,
+                                                 end_time=end, text=""))
+                        changed.append((start, end, "Deleted"))
+                continue
             # Field by field, only what was changed on this page counts, so a
             # page left open can't undo something written since elsewhere.
             start_changed = (start.strftime("%H:%M") if start else "") != was_start.strip()
@@ -823,15 +847,14 @@ def timesheet(date_str=None):
         def count(n):
             return f"{n} line" + ("" if n == 1 else "s")
 
-        saved = sum(1 for *_, verb in changed if verb == "Saved")
-        cleared = len(changed) - saved
         if len(changed) == 1:
             start, end, verb = changed[0]
             flash(f"{verb} {span(start, end)}.", "success")
-        elif saved and cleared:
-            flash(f"Saved {count(saved)}, cleared {count(cleared)}.", "success")
         elif changed:
-            flash(f"{'Saved' if saved else 'Cleared'} {count(len(changed))}.", "success")
+            tally = [(verb, sum(1 for *_, v in changed if v == verb)) for verb in ("Saved", "Cleared", "Deleted")]
+            words = [f"{verb if not i else verb.lower()} {count(n)}" for i, (verb, n) in
+                     enumerate((verb, n) for verb, n in tally if n)]
+            flash(", ".join(words) + ".", "success")
         elif not form.get("add") and not gone:
             flash("Already saved.", "success")
         if gone:
