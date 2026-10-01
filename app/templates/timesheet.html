@@ -58,6 +58,11 @@
                 aria-label="Delete {{ span }}" title="Delete"
                 {%- if line.text and not line.is_break %} data-confirm="Delete the line from {{ span }}?"{% endif %}>
           {{ icon('trash') }}</button>
+        {% if line.can_end %}
+        <button type="submit" name="to_logout" value="{{ loop.index0 }}" class="btn btn-ghost btn-sm ts-end"
+                {%- if line.end_confirm %} data-confirm="{{ line.end_confirm }}"{% endif %}>
+          {{ icon('logout') }}End at logout · {{ logout_label }}</button>
+        {% endif %}
         {% if line.error %}<p class="ts-error" id="ts-err-{{ n }}">{{ icon('alert', 'icon icon-inline') }}{{ line.error }}</p>{% endif %}
       </li>
       {% endfor %}

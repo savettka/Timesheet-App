@@ -683,6 +683,11 @@ def timesheet(date_str=None):
     day_args = {} if day == today else {"date_str": day.isoformat()}
     entry = TimeEntry.query.filter_by(user_id=current_user.id, date=day).first()
     blocks = WorkBlock.query.filter_by(user_id=current_user.id, date=day).all()
+    # The logout, in minutes, once the day has one on its own date: what
+    # "End at logout" brings a line's end to.
+    logout_at = None
+    if entry is not None and entry.login_time and entry.logout_time and entry.logout_time > entry.login_time:
+        logout_at = logic.clock_minutes(entry.logout_time)
 
     def clean(text):
         return " ".join((text or "").split())[:WorkBlock.MAX_LENGTH].rstrip()
@@ -706,7 +711,7 @@ def timesheet(date_str=None):
             id=str(block.id) if block else "", start=start, end=end, text=text,
             was_start=start if shown else "", was_end=end if shown else "",
             was_text=text if block is not None or is_break else "", is_now=False, is_break=is_break,
-            placeholder="", error="", error_on="",
+            placeholder="", error="", error_on="", can_end=False, end_confirm="",
         )
 
     def day_views(lines):
@@ -721,6 +726,16 @@ def timesheet(date_str=None):
             current.placeholder = "What are you working on?"
         elif empty:
             empty[0].placeholder = "What did you work on?"
+        if logout_at is not None:
+            # The last lines of a finished day can be brought to its logout:
+            # one ending within the hour before it, or one running past it.
+            for i, (view, (start, end, _)) in enumerate(zip(views, lines)):
+                if view.text and not view.is_break and start < logout_at and end != logout_at                         and end >= logout_at - 60:
+                    later = sum(1 for v in views[i + 1:] if v.text and not v.is_break)
+                    view.can_end = True
+                    if later:
+                        view.end_confirm = (f"End this line at {logic.fmt_time(entry.logout_time)} and remove "
+                                            f"the {later} line{'s' if later > 1 else ''} after it?")
         return views
 
     def show(views):
@@ -741,6 +756,7 @@ def timesheet(date_str=None):
             who=current_user.display_name or current_user.username,
             summary=summary,
             stamp=f"{now:%a %d %b %Y}, {logic.fmt_time(now.time())}",
+            logout_label=logic.fmt_time(entry.logout_time) if logout_at is not None else "",
         )
 
     if request.method == "POST":
@@ -771,6 +787,13 @@ def timesheet(date_str=None):
         by_id = {str(b.id): b for b in blocks}
         changed, drafts, gone = [], [], 0
         to_delete = form.get("delete", "")
+        to_logout = form.get("to_logout", "")
+        if to_logout:
+            # "End at logout": that line's end becomes the logout, as if typed.
+            if logout_at is None or not to_logout.isascii() or not to_logout.isdigit()                     or int(to_logout) >= len(fields[0]):
+                abort(400)
+            fields[2][int(to_logout)] = hhmm(logout_at)
+        ended = None
         for index, (block_id, start_raw, end_raw, text_raw, was_start, was_end, was_text) in enumerate(zip(*fields)):
             text = clean(text_raw)
             start, end = clock(start_raw), clock(end_raw)
@@ -778,6 +801,7 @@ def timesheet(date_str=None):
             draft = SimpleNamespace(
                 id=block_id, start=start_raw, end=end_raw, text=text, was_start=was_start, was_end=was_end,
                 was_text=was_text, is_now=False, is_break=False, placeholder="", error="", error_on="",
+                can_end=False, end_confirm="",
             )
             drafts.append(draft)
             if to_delete == str(index):
@@ -831,6 +855,23 @@ def timesheet(date_str=None):
                 blocks.append(block)
             block.start_time, block.end_time, block.text = start, end, text
             changed.append((start, end, "Saved"))
+            if to_logout == str(index):
+                ended = block
+
+        removed = 0
+        if to_logout and not any(d.error for d in drafts):
+            # ...and the lines after it go: the day ends there.
+            index = int(to_logout)
+            keep = ended or by_id.get(fields[0][index])
+            begin = clock(fields[1][index])
+            for b in list(blocks):
+                if b is keep or not b.text or b in db.session.deleted or begin is None                         or logic.clock_minutes(b.start_time) < logic.clock_minutes(begin):
+                    continue
+                if b in db.session.new:
+                    db.session.expunge(b)
+                else:
+                    db.session.delete(b)
+                removed += 1
 
         bad = [d for d in drafts if d.error]
         if bad:
@@ -847,7 +888,10 @@ def timesheet(date_str=None):
         def count(n):
             return f"{n} line" + ("" if n == 1 else "s")
 
-        if len(changed) == 1:
+        if to_logout:
+            flash(f"Ended the line at your logout, {logic.fmt_time(entry.logout_time)}"
+                  + (f", and removed {count(removed)} after it." if removed else "."), "success")
+        elif len(changed) == 1:
             start, end, verb = changed[0]
             flash(f"{verb} {span(start, end)}.", "success")
         elif changed:
