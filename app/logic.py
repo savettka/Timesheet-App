@@ -27,6 +27,9 @@ STALE_SHIFT_HOURS = 16
 MAX_LIVE_SHIFT_HOURS = 20
 # A saved day longer than this gets a heads-up: usually an AM/PM slip.
 LONG_SHIFT_WARNING_HOURS = 16
+# The Timesheet's lines for a day with no login or logout to go by:
+# 9 AM to 6 PM, as the first and last hour (9-10 AM ... 5-6 PM).
+TIMESHEET_DAY = (9, 17)
 
 
 def _combine(date_, time_, reference_dt=None):
@@ -421,6 +424,38 @@ def saturday_plan(user, entries_by_date, week_start, today, now=None):
     }
 
 
+def timesheet_hours(entry, day, now, noted_hours=(), first=None, last=None):
+    """The hours the Timesheet lists for a day, as (first, last): hour h is
+    the line for h:00 to h+1:00.
+
+    From the hour the day was logged in to the hour it was logged out -- or,
+    today, to the hour in progress. A day with no times gets an ordinary 9 to
+    6. An hour that already has a note is always listed, and first/last (the
+    page's "add earlier hour" and "add later hour") can only widen the span.
+    """
+    start, end = TIMESHEET_DAY
+    login = entry.login_time if entry else None
+    logout = entry.logout_time if entry else None
+    if login is not None:
+        start = login.hour
+        if logout is not None:
+            # 6:00 PM ends with the 5-6 PM line; 6:10 PM needs the 6-7 PM one.
+            # Past midnight, the day's lines run to the end of its own date.
+            minutes = logout.hour * 60 + logout.minute
+            end = 23 if logout < login else max(start, (minutes - 1) // 60)
+        elif day == now.date():
+            end = max(start, now.hour)
+        else:
+            end = max(start, TIMESHEET_DAY[1])
+    for hour in noted_hours:
+        start, end = min(start, hour), max(end, hour)
+    if first is not None:
+        start = min(start, first)
+    if last is not None:
+        end = max(end, last)
+    return max(0, start), min(23, end)
+
+
 def fmt_clock(value):
     """A time of day on a 12-hour clock: 9:05 AM, 12:30 PM, 6:00 PM.
 
@@ -430,6 +465,18 @@ def fmt_clock(value):
     hour = value.hour % 12 or 12
     suffix = "AM" if value.hour < 12 else "PM"
     return f"{hour}:{value.minute:02d} {suffix}"
+
+
+def fmt_hour_span(hour):
+    """One Timesheet line's hour: 9–10 AM, 11 AM–12 PM, 12–1 PM, 11 PM–12 AM."""
+    def clock(h):
+        h %= 24
+        return h % 12 or 12, "AM" if h < 12 else "PM"
+
+    (a, a_half), (b, b_half) = clock(hour), clock(hour + 1)
+    if a_half == b_half:
+        return f"{a}–{b} {a_half}"
+    return f"{a} {a_half}–{b} {b_half}"
 
 
 def fmt_suggested_datetime(dt, reference_date=None):

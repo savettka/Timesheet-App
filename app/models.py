@@ -50,6 +50,9 @@ class User(UserMixin, db.Model):
     login_codes = db.relationship(
         "LoginCode", backref="user", lazy=True, cascade="all, delete-orphan"
     )
+    hour_notes = db.relationship(
+        "HourNote", backref="user", lazy=True, cascade="all, delete-orphan"
+    )
 
     def set_password(self, raw_password):
         self.password_hash = generate_password_hash(raw_password)
@@ -154,6 +157,28 @@ class BreakSegment(db.Model):
 
     break_start = db.Column(db.Time, nullable=False)
     break_end = db.Column(db.Time, nullable=True)
+
+
+class HourNote(db.Model):
+    """What was worked on in one hour of one day: a line on the Timesheet page.
+
+    ``hour`` is the hour the line starts, 0-23, so 14 is 2-3 PM. Only hours
+    with something written have a row; clearing a line deletes it.
+    """
+
+    MAX_LENGTH = 300
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    date = db.Column(db.Date, nullable=False)
+    hour = db.Column(db.Integer, nullable=False)
+    text = db.Column(db.String(MAX_LENGTH), nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Also the index for "this user's notes on this day", the only lookup.
+    __table_args__ = (
+        db.UniqueConstraint("user_id", "date", "hour", name="uq_user_date_hour"),
+    )
 
 
 class LoginCode(db.Model):

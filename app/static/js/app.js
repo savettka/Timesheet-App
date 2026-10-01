@@ -316,6 +316,20 @@
     sync();
   }
 
+  // ------------------------------------------------------------ timesheet
+  // On a phone the hour in progress is the last line, below the fold by the
+  // afternoon, so the page opens with it on screen -- unless there's a
+  // message at the top (such as "Saved") that would scroll out of sight.
+  function initTimesheet() {
+    var now = document.querySelector(".ts-hour.is-now");
+    if (!now || document.querySelector(".flash")) return;
+    var tabBar = document.querySelector(".tab-bar");
+    var covered = tabBar ? tabBar.offsetHeight : 0;
+    if (now.getBoundingClientRect().bottom > window.innerHeight - covered) {
+      now.scrollIntoView({ block: "center" });
+    }
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     initTheme();
     initFlashes();
@@ -325,5 +339,6 @@
     initBreakRows();
     initAvatarPicker();
     initDayType();
+    initTimesheet();
   });
 })();

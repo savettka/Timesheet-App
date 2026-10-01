@@ -71,6 +71,7 @@
   {% if current_user.is_authenticated %}
   {% set nav_items = [
       ('main.dashboard', 'Home', 'home', ['main.dashboard']),
+      ('main.timesheet', 'Timesheet', 'clipboard', ['main.timesheet']),
       ('main.history', 'History', 'list', ['main.history', 'main.edit_entry']),
       ('main.calendar', 'Calendar', 'calendar', ['main.calendar']),
       ('main.settings', 'Settings', 'sliders', ['main.settings']),

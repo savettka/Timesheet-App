@@ -776,6 +776,25 @@ input[type="number"] { -moz-appearance: textfield; }
 
 .form-actions { display: flex; flex-wrap: wrap; gap: var(--s3); }
 .danger-zone { margin-top: var(--s5); padding-top: var(--s4); border-top: 1px solid var(--line); }
+.day-nav-blank { visibility: hidden; }
+
+/* Timesheet: a line per hour. The hour in progress is tinted, and the
+   list sits half a step wider than the card's text so that tint reaches
+   past the words without pushing them out of line. */
+.ts-form { display: flex; flex-direction: column; gap: var(--s4); margin-top: var(--s5); }
+.day-nav-back + .ts-form { margin-top: 0; }
+.ts-add { align-self: flex-start; }
+.ts-hours { list-style: none; display: flex; flex-direction: column; gap: var(--s1); margin: 0 calc(var(--s2) * -1); }
+.ts-hour {
+  display: grid; grid-template-columns: 9.5rem minmax(0, 1fr); align-items: center; gap: var(--s3);
+  padding: var(--s1) var(--s2); border-radius: var(--r-md);
+}
+.ts-hour.is-now { background: var(--accent-soft); }
+.ts-time {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 2px var(--s2);
+  font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.ts-time .ts-now { margin-left: 0; background: var(--accent); color: var(--on-accent); }
 
 .avatar-field { display: flex; align-items: center; gap: var(--s4); padding-bottom: var(--s4); border-bottom: 1px solid var(--line); }
 .avatar-field-controls { display: flex; flex-direction: column; align-items: flex-start; gap: var(--s2); min-width: 0; }
@@ -952,6 +971,16 @@ input[type="number"] { -moz-appearance: textfield; }
 @media (max-width: 400px) {
   .content { padding-left: var(--s3); padding-right: var(--s3); }
   .card { padding-left: 14px; padding-right: 14px; }
+}
+
+@media (max-width: 480px) {
+  /* Each hour's time above a full-width box: room to write in. */
+  .ts-hour { grid-template-columns: minmax(0, 1fr); gap: 6px; padding: 6px var(--s2) var(--s2); }
+}
+
+@media (max-width: 360px) {
+  /* Five tabs: "Timesheet" only just fits a 64px column at the usual size. */
+  .tab-link { font-size: 12px; }
 }
 
 @media (max-width: 420px) {

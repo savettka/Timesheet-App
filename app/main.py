@@ -20,10 +20,11 @@ from flask import (
     url_for,
 )
 from flask_login import current_user, login_required
+from sqlalchemy.exc import IntegrityError
 
 from app import db
 from app import logic
-from app.models import BreakSegment, TimeEntry, User
+from app.models import BreakSegment, HourNote, TimeEntry, User
 
 main_bp = Blueprint("main", __name__)
 
@@ -655,6 +656,124 @@ def calendar_page(year=None, month=None):
         fmt_hours_compact=logic.fmt_hours_compact,
         fmt_balance_compact=logic.fmt_balance_compact,
         **page,
+    )
+
+
+@main_bp.route("/timesheet", endpoint="timesheet", methods=["GET", "POST"])
+@main_bp.route("/timesheet/<date_str>", endpoint="timesheet", methods=["GET", "POST"])
+@login_required
+def timesheet(date_str=None):
+    """A day as one line per hour, each saying what was worked on in it."""
+    now = datetime.now()
+    today = now.date()
+    day = today
+    if date_str is not None:
+        try:
+            day = datetime.strptime(date_str, "%Y-%m-%d").date()
+        except ValueError:
+            day = None
+        if day is None or day.year < 1970:  # 0001-01-01 has no day before it
+            flash("That isn't a valid date.", "error")
+            return redirect(url_for("main.timesheet"))
+    if day > today:
+        # A day still to come has nothing to say yet.
+        return redirect(url_for("main.timesheet"))
+
+    # Today's page is plain /timesheet; any other day carries its date.
+    day_args = {} if day == today else {"date_str": day.isoformat()}
+    entry = TimeEntry.query.filter_by(user_id=current_user.id, date=day).first()
+    notes = {n.hour: n for n in HourNote.query.filter_by(user_id=current_user.id, date=day)}
+    values = request.form if request.method == "POST" else request.args
+
+    def hour_value(name):
+        try:
+            hour = int(values.get(name, ""))
+        except ValueError:
+            return None
+        return hour if 0 <= hour <= 23 else None
+
+    first, last = logic.timesheet_hours(entry, day, now, notes, hour_value("from"), hour_value("to"))
+
+    if request.method == "POST":
+        changed = []
+        for hour in range(24):
+            if f"h{hour}" not in request.form:
+                continue
+            text = " ".join(request.form[f"h{hour}"].split())[:HourNote.MAX_LENGTH].rstrip()
+            # Only lines changed on this page are saved, so a page left open
+            # can't wipe out a line written since on another device.
+            if text == " ".join(request.form.get(f"was{hour}", "").split()):
+                continue
+            note = notes.get(hour)
+            if text and note:
+                note.text = text
+            elif text:
+                notes[hour] = HourNote(user_id=current_user.id, date=day, hour=hour, text=text)
+                db.session.add(notes[hour])
+            elif note:
+                db.session.delete(notes.pop(hour))
+            else:
+                continue
+            changed.append(hour)
+        try:
+            db.session.commit()
+        except IntegrityError:
+            # The same hour, first written from two places at once.
+            db.session.rollback()
+            flash("That hour was just saved from somewhere else. Check it, then save again.", "error")
+            return redirect(url_for("main.timesheet", **day_args))
+
+        add = request.form.get("add")
+        if add == "earlier":
+            first = max(0, first - 1)
+        elif add == "later":
+            last = min(23, last + 1)
+        if len(changed) == 1:
+            verb = "Saved" if changed[0] in notes else "Cleared"
+            flash(f"{verb} {logic.fmt_hour_span(changed[0])}.", "success")
+        elif changed:
+            flash(f"Saved {len(changed)} hours.", "success")
+        elif not add:
+            flash("Already saved.", "success")
+
+        # Keep any hours added by hand on the page; the rest come back by
+        # themselves from the day's times and notes.
+        natural = logic.timesheet_hours(entry, day, now, notes)
+        args = dict(day_args)
+        if first < natural[0]:
+            args["from"] = first
+        if last > natural[1]:
+            args["to"] = last
+        return redirect(url_for("main.timesheet", **args))
+
+    is_today = day == today
+    empty = [h for h in range(first, last + 1) if h not in notes]
+    if is_today and now.hour in empty:
+        prompt_hour, prompt = now.hour, "What are you working on?"
+    elif empty:
+        prompt_hour, prompt = empty[0], "What did you work on?"
+    else:
+        prompt_hour, prompt = None, ""
+    slots = [
+        SimpleNamespace(
+            hour=h,
+            label=logic.fmt_hour_span(h),
+            text=notes[h].text if h in notes else "",
+            is_now=is_today and h == now.hour,
+            placeholder=prompt if h == prompt_hour else "",
+        )
+        for h in range(first, last + 1)
+    ]
+    return render_template(
+        "timesheet.html",
+        day=day,
+        is_today=is_today,
+        prev_date=day - timedelta(days=1),
+        next_date=None if is_today else day + timedelta(days=1),
+        slots=slots,
+        first=first,
+        last=last,
+        max_length=HourNote.MAX_LENGTH,
     )
 
 

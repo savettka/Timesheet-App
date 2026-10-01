@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% block title %}Timesheet{% endblock %}
+{% block page_title %}Timesheet{% endblock %}
+
+{% block content %}
+<section class="card form-card" aria-labelledby="day-title">
+  <div class="day-nav">
+    <a class="btn btn-icon" href="{{ url_for('main.timesheet', date_str=prev_date.isoformat()) }}"
+       aria-label="Previous day, {{ prev_date.strftime('%A %d %B') }}">{{ icon('chevron-left') }}</a>
+    <h2 id="day-title" class="day-title">{{ day.strftime('%A %d %B') }}</h2>
+    {% if next_date %}
+    <a class="btn btn-icon" href="{{ url_for('main.timesheet', date_str=next_date.isoformat()) }}"
+       aria-label="Next day, {{ next_date.strftime('%A %d %B') }}">{{ icon('chevron-right') }}</a>
+    {% else %}
+    {# Today has no next day yet; this keeps the date centred. #}
+    <span class="btn btn-icon day-nav-blank" aria-hidden="true"></span>
+    {% endif %}
+  </div>
+  {% if not is_today %}
+    <p class="day-nav-back"><a class="link" href="{{ url_for('main.timesheet') }}">Jump to today</a></p>
+  {% endif %}
+
+  <form method="post" class="ts-form">
+    {# Enter in any line presses the form's first button, so that one saves. #}
+    <button type="submit" class="visually-hidden" tabindex="-1" aria-hidden="true">Save</button>
+    <input type="hidden" name="from" value="{{ first }}">
+    <input type="hidden" name="to" value="{{ last }}">
+
+    {% if first > 0 %}
+    <button type="submit" name="add" value="earlier" class="btn btn-ghost btn-sm ts-add">
+      {{ icon('plus') }}Add earlier hour</button>
+    {% endif %}
+
+    <ol class="ts-hours" aria-label="Hours on {{ day.strftime('%A %d %B') }}">
+      {% for slot in slots %}
+      <li class="ts-hour{{ ' is-now' if slot.is_now }}">
+        <label class="ts-time" for="h-{{ slot.hour }}">{{ slot.label }}
+          {%- if slot.is_now %} <span class="badge ts-now">Now</span>{% endif %}</label>
+        <input type="text" id="h-{{ slot.hour }}" name="h{{ slot.hour }}" value="{{ slot.text }}"
+               maxlength="{{ max_length }}" autocomplete="off"
+               {%- if slot.placeholder %} placeholder="{{ slot.placeholder }}"{% endif %}>
+        <input type="hidden" name="was{{ slot.hour }}" value="{{ slot.text }}">
+      </li>
+      {% endfor %}
+    </ol>
+
+    {% if last < 23 %}
+    <button type="submit" name="add" value="later" class="btn btn-ghost btn-sm ts-add">
+      {{ icon('plus') }}Add later hour</button>
+    {% endif %}
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary btn-lg">{{ icon('check') }}Save</button>
+    </div>
+  </form>
+</section>
+{% endblock %}
