@@ -59,6 +59,11 @@ def _run_light_migrations():
                 "CREATE UNIQUE INDEX IF NOT EXISTS ix_user_email ON user (email)"
             )
 
+    if "work_block" in table_names:
+        block_columns = {c["name"] for c in inspector.get_columns("work_block")}
+        if "copied" not in block_columns:
+            statements.append("ALTER TABLE work_block ADD COLUMN copied VARCHAR(320)")
+
     if "break_segment" in table_names:
         # create_all() only adds indexes for tables it creates, so an existing
         # database needs this one added explicitly.

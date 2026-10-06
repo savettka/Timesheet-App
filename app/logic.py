@@ -569,6 +569,12 @@ def fmt_span(start, end):
     return f"{a}–{b}"
 
 
+def fmt_length(minutes):
+    """How long a Timesheet line is: 1h, 30m, 1h 13m; nothing for none."""
+    h, m = divmod(max(0, minutes), 60)
+    return " ".join(part for part in (f"{h}h" if h else "", f"{m}m" if m else "") if part)
+
+
 def fmt_suggested_datetime(dt, reference_date=None):
     """Format a suggested clock-out datetime for display, spelling out the
     date whenever it falls on a different day than ``reference_date``.

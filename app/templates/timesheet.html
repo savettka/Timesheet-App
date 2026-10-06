@@ -21,11 +21,19 @@
     <p class="day-nav-back"><a class="link" href="{{ url_for('main.timesheet') }}">Jump to today</a></p>
   {% endif %}
 
+  {# The day at a glance; app.js keeps the copied count up to date. #}
+  {% set posts = lines|rejectattr('is_break')|selectattr('text')|list %}
+  <ul class="ts-sum"{{ ' hidden' if not (day_span or posts) }}>
+    {% if day_span %}<li class="ts-chip">{{ icon('clock') }}{{ day_span }} · <b>{{ day_worked }}</b> worked</li>{% endif %}
+    <li class="ts-chip ts-chip-copied" id="ts-copied-count"{{ ' hidden' if not posts }}>{{ icon('check') }}<span><b>{{ posts|selectattr('copied')|list|length }} of {{ posts|length }}</b> copied</span></li>
+  </ul>
+
   {# Always to this page's own date, so a page left open past midnight still
      saves to the day it shows. #}
   <form method="post" class="ts-form js-once" action="{{ url_for('main.timesheet', date_str=day.isoformat()) }}"
         data-png-name="STM timesheet {{ day.isoformat() }}.png" data-png-day="{{ day.strftime('%A %d %B %Y') }}"
-        data-png-who="{{ who }}" data-png-summary="{{ summary }}" data-png-stamp="{{ stamp }}">
+        data-png-who="{{ who }}" data-png-summary="{{ summary }}" data-png-stamp="{{ stamp }}"
+        data-mark-url="{{ url_for('main.timesheet_mark') }}">
     {# Enter in any box presses the form's first button, so that one saves. #}
     <button type="submit" class="visually-hidden" tabindex="-1" aria-hidden="true">Save</button>
 
@@ -35,29 +43,43 @@
       {% set span = (line.start or '?') ~ ' to ' ~ (line.end or '?') %}
       {% set err_times = ' aria-invalid="true" aria-describedby="ts-err-%d"'|format(n) if line.error_on == 'times' else '' %}
       {% set err_text = ' aria-invalid="true" aria-describedby="ts-err-%d"'|format(n) if line.error_on == 'text' else '' %}
-      <li class="ts-line{{ ' is-now' if line.is_now }}{{ ' is-break' if line.is_break }}{{ ' has-error' if line.error }}">
-        {# Its own row above the line, so the line's boxes stay level. #}
-        {% if line.is_now %}<span class="badge ts-now">Now</span>{% endif %}
+      {# Green once copied, while it still says what was copied (data-copied). #}
+      <li class="ts-line{{ ' is-now' if line.is_now }}{{ ' is-break' if line.is_break }}{{ ' is-copied' if line.copied }}{{ ' has-error' if line.error }}"
+          {%- if line.copied %} data-copied="{{ line.copied }}"{% endif %}>
         <input type="hidden" name="id" value="{{ line.id }}">
         <input type="hidden" name="was_start" value="{{ line.was_start }}">
         <input type="hidden" name="was_end" value="{{ line.was_end }}">
         <input type="hidden" name="was_text" value="{{ line.was_text }}">
+        {# Set by app.js for a line squeezed to nothing by the times beside it. #}
+        <input type="hidden" name="drop" value="">
         <div class="ts-when">
           <input type="time" name="start" value="{{ line.start }}" aria-label="From, line {{ n }}"{{ err_times|safe }}>
           <span class="ts-to" aria-hidden="true">–</span>
           <input type="time" name="end" value="{{ line.end }}" aria-label="To, line {{ n }}"{{ err_times|safe }}>
+          {# Now takes the length's place, so every line's words start level. #}
+          {% if line.is_now %}<span class="badge ts-now">Now</span>
+          {%- else %}<span class="ts-len">{{ line.length }}</span>{% endif %}
         </div>
         <input type="text" name="text" class="ts-text" value="{{ line.text }}" maxlength="{{ max_length }}"
                autocomplete="off" aria-label="What you worked on, {{ span }}"{{ err_text|safe }}
                {%- if line.placeholder %} placeholder="{{ line.placeholder }}"{% endif %}>
-        {# Shown by app.js: copying needs the script. #}
-        <button type="button" class="btn btn-icon ts-copy" aria-label="Copy {{ span }}" title="Copy" hidden>
-          {{ icon('copy', 'icon ts-copy-icon') }}{{ icon('check', 'icon ts-copied-icon') }}{{ icon('alert', 'icon ts-failed-icon') }}
-        </button>
-        <button type="submit" name="delete" value="{{ loop.index0 }}" class="btn btn-icon ts-delete"
-                aria-label="Delete {{ span }}" title="Delete"
-                {%- if line.text and not line.is_break %} data-confirm="Delete the line from {{ span }}?"{% endif %}>
-          {{ icon('trash') }}</button>
+        <div class="ts-acts">
+          {% if not line.is_break %}
+          {# Shown by app.js: copying needs the script. #}
+          <button type="button" class="btn btn-ghost btn-sm ts-copy" aria-label="{{ 'Copied' if line.copied else 'Copy' }} {{ span }}" hidden>
+            {{ icon('copy', 'icon ts-copy-icon') }}{{ icon('check', 'icon ts-copied-icon') }}{{ icon('alert', 'icon ts-failed-icon') }}
+            <span class="ts-copy-word" aria-hidden="true">Copy</span><span class="ts-copied-word" aria-hidden="true">Copied</span>
+          </button>
+          {% if line.id %}
+          <button type="submit" name="uncopied" value="{{ loop.index0 }}" class="btn btn-icon ts-reset"
+                  aria-label="Reset {{ span }} to not copied" title="Reset">{{ icon('undo') }}</button>
+          {% endif %}
+          {% endif %}
+          <button type="submit" name="delete" value="{{ loop.index0 }}" class="btn btn-icon ts-delete"
+                  aria-label="Delete {{ span }}" title="Delete"
+                  {%- if line.text and not line.is_break %} data-confirm="Delete the line from {{ span }}?"{% endif %}>
+            {{ icon('trash') }}</button>
+        </div>
         {% if line.can_end %}
         <button type="submit" name="to_logout" value="{{ loop.index0 }}" class="btn btn-ghost btn-sm ts-end"
                 {%- if line.end_confirm %} data-confirm="{{ line.end_confirm }}"{% endif %}>
@@ -70,13 +92,11 @@
     <p class="visually-hidden" aria-live="polite" id="ts-copy-status"></p>
     <p class="ts-copy-note" id="ts-copy-note" hidden></p>
 
-    <button type="submit" name="add" value="line" class="btn btn-ghost btn-sm ts-add">
-      {{ icon('plus') }}Add a line</button>
-
-    <div class="form-actions">
-      <button type="submit" class="btn btn-primary btn-lg">{{ icon('check') }}Save</button>
+    <div class="ts-foot">
+      <button type="submit" name="add" value="line" class="btn btn-ghost ts-add">{{ icon('plus') }}Add a line</button>
       {# Drawn by app.js from the boxes as they are, so it needs the script. #}
-      <button type="button" class="btn btn-secondary btn-lg ts-png" hidden>{{ icon('download') }}Download PNG</button>
+      <button type="button" class="btn btn-secondary ts-png" hidden>{{ icon('download') }}Download PNG</button>
+      <button type="submit" class="btn btn-primary ts-save">{{ icon('check') }}Save</button>
     </div>
   </form>
 </section>

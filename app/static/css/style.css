@@ -778,47 +778,85 @@ input[type="number"] { -moz-appearance: textfield; }
 .danger-zone { margin-top: var(--s5); padding-top: var(--s4); border-top: 1px solid var(--line); }
 .day-nav-blank { visibility: hidden; }
 
-/* Timesheet: a line per stretch of time -- from and to, what was done, and
-   a copy button. The line in progress is tinted, and the list sits half a
-   step wider than the card's text so that tint reaches past the boxes
-   without pushing them out of line. Where the list is narrow the times get
-   a row of their own above the words; given room, a line is one row, with
-   the times in a fixed column so every line's words start in one place. */
-.ts-card { max-width: 880px; }
-.ts-form { display: flex; flex-direction: column; gap: var(--s4); margin-top: var(--s5); }
+/* Timesheet: the day at a glance, then a line per stretch of time -- from
+   and to and how long, what was done, copy and delete -- as rows of one
+   list. A coloured edge and tint says what a line is: green once copied,
+   amber for a break, blue for the one in progress. Given room a line is one
+   row, with the times in a fixed column so every line's words start level;
+   where it's narrow, the words take a row of their own under the times. */
+.ts-card { max-width: 920px; }
+.ts-sum { list-style: none; display: flex; flex-wrap: wrap; gap: var(--s2); margin: var(--s4) 0 0; padding: 0; }
+.ts-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 14px; border-radius: 999px;
+  background: var(--accent-soft); color: var(--accent-text);
+  font-size: 14px; font-weight: 500; font-variant-numeric: tabular-nums;
+}
+.ts-chip b { font-weight: 700; }
+.ts-chip .icon { width: 16px; height: 16px; }
+.ts-chip-copied { background: var(--success-bg); color: var(--success-text); }
+.ts-form { display: flex; flex-direction: column; gap: var(--s4); margin-top: var(--s4); }
 .day-nav-back + .ts-form { margin-top: 0; }
-.ts-add { align-self: flex-start; }
 .ts-lines {
-  list-style: none; display: flex; flex-direction: column; gap: var(--s1);
-  margin: 0 calc(var(--s2) * -1); container-type: inline-size;
+  list-style: none; margin: 0; padding: 0;
+  border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden;
+  container-type: inline-size;
 }
 .ts-line {
-  display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "when del" "text copy";
-  align-items: center; gap: 6px var(--s2);
-  padding: 6px var(--s2) var(--s2); border-radius: var(--r-md);
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "when when" "text acts";
+  align-items: center; gap: var(--s2);
+  padding: 10px 10px 10px 14px; border-top: 1px solid var(--line);
+  box-shadow: inset 4px 0 0 transparent;
+  transition: background-color .2s ease, box-shadow .2s ease, opacity .2s ease;
 }
-.ts-line.is-break { background: var(--tint-break); }
-.ts-line.is-now { background: var(--accent-soft); grid-template-areas: "now now" "when del" "text copy"; }
-.ts-when { grid-area: when; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.ts-text { grid-area: text; }
-.ts-copy { grid-area: copy; }
-.ts-delete { grid-area: del; color: var(--text-2); }
-.ts-form .form-actions .btn { flex: 1 1 auto; white-space: nowrap; }  /* "Download PNG" on one line on a phone */
-.ts-delete:hover { color: var(--stop-text); }
-.ts-end { grid-column: 1 / -1; justify-self: start; }  /* under its line, so the boxes stay level */
-.ts-when input[type="time"] { flex: 1 1 9.5rem; width: auto; min-width: 0; max-width: 11rem; padding: 0 var(--s3); }
+.ts-line:first-child { border-top: 0; }
+.ts-line.is-now { background: var(--accent-soft); box-shadow: inset 4px 0 0 var(--accent); }
+.ts-line.is-break { background: var(--tint-break); box-shadow: inset 4px 0 0 var(--pause); }
+.ts-line.is-copied { background: var(--success-bg); box-shadow: inset 4px 0 0 var(--go); }
+/* Squeezed to nothing by a changed time beside it: goes on Save. */
+.ts-line.is-squeezed { opacity: .45; }
+.ts-line.is-squeezed .ts-when input { text-decoration: line-through; }
+.ts-when { grid-area: when; display: flex; align-items: center; gap: 6px; min-width: 0; }
+.ts-when input[type="time"] {
+  flex: 1 1 0; width: auto; min-width: 0; max-width: 8.5rem; min-height: 44px; padding: 0 var(--s2);
+  font-size: 15px; font-variant-numeric: tabular-nums;
+}
+.ts-when input[type="time"]::-webkit-calendar-picker-indicator { margin-left: 2px; opacity: .45; cursor: pointer; }
 .ts-to { color: var(--text-3); }
-.ts-now { grid-area: now; justify-self: start; margin-left: 0; background: var(--accent); color: var(--on-accent); }
-@container (min-width: 720px) {
-  .ts-line { grid-template-columns: 21rem minmax(0, 1fr) auto auto; grid-template-areas: "when text copy del"; gap: var(--s3); padding: var(--s1) var(--s2); }
-  .ts-line.is-now { grid-template-areas: "now now now now" "when text copy del"; row-gap: var(--s1); padding-top: var(--s2); }
-}
-.ts-copied-icon, .ts-failed-icon { display: none; }
-.ts-copy.is-copied { color: var(--success-text); border-color: currentColor; }
+.ts-len, .ts-now { flex: none; min-width: 3.2rem; margin-left: 2px; }
+.ts-len { color: var(--text-3); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ts-now { justify-content: center; background: var(--accent); color: var(--on-accent); }
+.ts-text { grid-area: text; min-height: 44px; }
+.ts-acts { grid-area: acts; display: flex; align-items: center; gap: 6px; }
+.ts-acts .btn-icon { width: 44px; height: 44px; min-height: 44px; }
+.ts-copy { min-height: 44px; padding: 0 var(--s3); gap: 6px; background: var(--surface-2); }
+.ts-delete, .ts-reset { background: transparent; border-color: transparent; color: var(--text-3); }
+.ts-delete:hover { background: var(--error-bg); color: var(--stop-text); }
+.ts-reset:hover { background: var(--surface-2); color: var(--text); }
+.ts-copied-word, .ts-copied-icon, .ts-failed-icon, .ts-reset { display: none; }
+.ts-line.is-copied .ts-copy { color: var(--success-text); border-color: currentColor; }
+.ts-line.is-copied .ts-copy-word, .ts-line.is-copied .ts-copy-icon { display: none; }
+.ts-line.is-copied .ts-copied-word, .ts-line.is-copied .ts-copied-icon { display: inline; }
+.ts-line.is-copied .ts-reset { display: inline-flex; }
 .ts-copy.is-failed { color: var(--error-text); border-color: currentColor; }
-.ts-copy.is-copied .ts-copy-icon, .ts-copy.is-failed .ts-copy-icon { display: none; }
-.ts-copy.is-copied .ts-copied-icon, .ts-copy.is-failed .ts-failed-icon { display: block; }
+.ts-copy.is-failed .ts-copy-icon, .ts-copy.is-failed .ts-copied-icon { display: none; }
+.ts-copy.is-failed .ts-failed-icon { display: inline; }
+.ts-end { grid-column: 1 / -1; justify-self: start; }  /* under its line, so the boxes stay level */
+@container (max-width: 479px) {
+  /* A phone: copy is an icon beside the words. */
+  .ts-copy-word, .ts-line.is-copied .ts-copied-word { display: none; }
+  .ts-copy { width: 44px; padding: 0; }
+}
+@container (min-width: 760px) {
+  .ts-line { grid-template-columns: 22.75rem minmax(0, 1fr) auto; grid-template-areas: "when text acts"; gap: var(--s3); }
+  .ts-when input[type="time"] { flex: none; width: 8.5rem; }
+  .ts-len, .ts-now { min-width: 3.6rem; }
+  .ts-acts { justify-content: flex-end; width: 13rem; }
+}
 .ts-copy-note { color: var(--error-text); font-size: 15px; font-weight: 600; }
+.ts-foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); }
+.ts-foot .btn { white-space: nowrap; }
+.ts-add { margin-right: auto; }
 /* A line a save was refused for: its boxes are outlined, and it says why. */
 .ts-error {
   grid-column: 1 / -1; display: flex; align-items: center; gap: 6px;
@@ -1004,11 +1042,12 @@ input[type="number"] { -moz-appearance: textfield; }
 }
 
 @media (max-width: 400px) {
-  /* A small phone: from and to still share their row, and Now moves under
-     them when there isn't room beside. */
-  .ts-when input[type="time"] { flex-basis: 5.75rem; font-size: 16px; padding: 0 var(--s2); }
-  /* A tap opens the phone's own time picker; the clock icon only takes room. */
+  /* A small phone: a tap opens the phone's own time picker, so the clock
+     icon only takes room. */
+  .ts-when input[type="time"] { font-size: 16px; padding: 0 6px; }
   .ts-when input[type="time"]::-webkit-calendar-picker-indicator { display: none; }
+  .ts-foot .btn { flex: 1 1 auto; }
+  .ts-add { flex-basis: 100%; }
 }
 
 @media (max-width: 360px) {

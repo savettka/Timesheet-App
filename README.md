@@ -44,10 +44,14 @@ This mirrors the logic in the original spreadsheet:
   logged in (a 12:47 login gives 12:47–2:00 PM, then 2–3 PM …) to the hour you're in now,
   which is marked. Breaks show as lines of their own, the hours carrying on as normal
   after them, and the last line ends at the logout -- once logged out, "End at logout" brings
-  the last lines to it. Lines can be deleted, the day can be
-  downloaded as a branded PNG with one button, and every line's times can be changed, more lines added, and each has a
-  copy button that copies it as "Emails for a client (13:00 to 14:00 PM)". Type and press
-  Enter to save; a day with no login starts at 1 PM, and earlier days work the same way.
+  the last lines to it. Each line shows how long it is, and the day's hours sit at the top.
+  Every line's times can be changed, and the line next to it follows (7–8 PM made 7–7:30 PM
+  turns 8–9 PM into 7:30–9 PM), so there are no gaps or overlaps. Each line has a copy button
+  that copies it as "Emails for a client (13:00 to 14:00 PM)" and turns it green -- for
+  posting it on another timesheet -- until it's reset or changed; the top counts how many
+  are copied. Lines can be added or deleted, and the day can be downloaded as a branded PNG
+  with one button. Type and press Enter to save; a day with no login starts at 1 PM, and
+  earlier days work the same way.
 - **Dashboard** — today's hours, this week's progress bar toward your target, and a
   suggested logout time once you're close to (or past) the weekly target.
 - **Settings** — change daily/weekly targets, workdays, display name, profile picture

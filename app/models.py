@@ -176,9 +176,20 @@ class WorkBlock(db.Model):
     end_time = db.Column(db.Time, nullable=False)
     text = db.Column(db.String(MAX_LENGTH), nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    # What was copied from the line ("13:00-14:00 Emails"), to post it on
+    # another timesheet. It shows as copied only while it still says that,
+    # so changing its times or words afterwards takes the mark off.
+    copied = db.Column(db.String(MAX_LENGTH + 20))
 
     # The only lookup is "this user's lines on this day".
     __table_args__ = (db.Index("ix_work_block_user_date", "user_id", "date"),)
+
+    def copy_mark(self):
+        return f"{self.start_time:%H:%M}-{self.end_time:%H:%M} {self.text}"
+
+    @property
+    def is_copied(self):
+        return bool(self.text) and self.copied == self.copy_mark()
 
 
 class LoginCode(db.Model):

@@ -355,59 +355,157 @@
     });
   }
 
+  function field(line, name) { return line.querySelector('[name="' + name + '"]'); }
+
   // A line's time as its labels say it, from its boxes right now: "13:00 to 14:00".
   function lineSpan(line) {
-    return (line.querySelector('[name="start"]').value || "?") + " to " +
-      (line.querySelector('[name="end"]').value || "?");
+    return (field(line, "start").value || "?") + " to " + (field(line, "end").value || "?");
+  }
+
+  // Minutes after midnight from "13:00"; an end of 00:00 is the midnight
+  // that ends the day.
+  function clockMinutes(value, name) {
+    if (!/^\d\d:\d\d/.test(value || "")) return null;
+    var m = parseInt(value.slice(0, 2), 10) * 60 + parseInt(value.slice(3, 5), 10);
+    return m === 0 && name === "end" ? 1440 : m;
+  }
+
+  // How long a line is: 1h, 30m, 1h 13m (as the server says it).
+  function lengthWords(minutes) {
+    if (!(minutes > 0)) return "";
+    var h = Math.floor(minutes / 60), m = minutes % 60;
+    return [h ? h + "h" : "", m ? m + "m" : ""].filter(Boolean).join(" ");
+  }
+
+  function lineWords(line) { return field(line, "text").value.trim().split(/\s+/).join(" "); }
+
+  // What a copy of a line says, as the server keeps it: "13:00-14:00 Emails".
+  function copyMark(line) {
+    return field(line, "start").value + "-" + field(line, "end").value + " " + lineWords(line);
+  }
+
+  // After a line's times or words change: its length, the names its boxes
+  // and buttons are read out by, and whether it still says what was copied
+  // -- change it after copying and it's no longer green.
+  function refreshLine(line) {
+    var span = lineSpan(line);
+    var len = line.querySelector(".ts-len");
+    if (len) {
+      var a = clockMinutes(field(line, "start").value, "start"), b = clockMinutes(field(line, "end").value, "end");
+      len.textContent = a === null || b === null ? "" : lengthWords(b - a);
+    }
+    field(line, "text").setAttribute("aria-label", "What you worked on, " + span);
+    var copied = !!line.dataset.copied && line.dataset.copied === copyMark(line);
+    line.classList.toggle("is-copied", copied);
+    var copy = line.querySelector(".ts-copy");
+    if (copy) copy.setAttribute("aria-label", (copied ? "Copied " : "Copy ") + span);
+    var reset = line.querySelector(".ts-reset");
+    if (reset) reset.setAttribute("aria-label", "Reset " + span + " to not copied");
+    var del = line.querySelector(".ts-delete");
+    del.setAttribute("aria-label", "Delete " + span);
+    if (del.hasAttribute("data-confirm")) del.setAttribute("data-confirm", "Delete the line from " + span + "?");
+  }
+
+  // "3 of 7 copied", from the lines with words in them (breaks aside).
+  function refreshCount() {
+    var chip = document.getElementById("ts-copied-count");
+    if (!chip) return;
+    var lines = [].filter.call(document.querySelectorAll(".ts-line"), function (line) {
+      return !line.classList.contains("is-break") && !line.classList.contains("is-squeezed") && lineWords(line);
+    });
+    var done = lines.filter(function (line) { return line.classList.contains("is-copied"); }).length;
+    chip.querySelector("b").textContent = done + " of " + lines.length;
+    chip.hidden = !lines.length;
+    chip.parentNode.hidden = !chip.parentNode.querySelector("li:not([hidden])");
   }
 
   // Each line's copy button puts it on the clipboard the way it was asked
   // for -- "Emails for a client (13:00 to 14:00 PM)" -- from what's in its
-  // boxes right now, saved or not. AM or PM follows the end time.
+  // boxes right now, saved or not. AM or PM follows the end time. The line
+  // then stays green, on any device, until it's reset or changed: a saved
+  // line is marked there and then; one with changes is saved with the page.
   function initTimesheetCopy() {
-    var list = document.querySelector(".ts-lines");
+    var form = document.querySelector(".ts-form");
+    var list = form && form.querySelector(".ts-lines");
     if (!list) return;
     var status = document.getElementById("ts-copy-status");
     var note = document.getElementById("ts-copy-note");
     function say(message) { if (status) status.textContent = message; }
     list.querySelectorAll(".ts-copy").forEach(function (b) { b.hidden = false; });
 
-    // Each line's text box and copy button are named for its time, and
-    // the names follow when a time is changed.
     list.addEventListener("input", function (e) {
-      if (e.target.type !== "time") return;
       var line = e.target.closest(".ts-line");
-      var span = lineSpan(line);
-      line.querySelector('[name="text"]').setAttribute("aria-label", "What you worked on, " + span);
-      var button = line.querySelector(".ts-copy");
-      if (!button.classList.contains("is-copied")) button.setAttribute("aria-label", "Copy " + span);
+      if (!line) return;
+      refreshLine(line);
+      refreshCount();
     });
 
+    // Sent with the page, as if its button had been pressed.
+    function submitWith(name, value) {
+      var input = document.createElement("input");
+      input.type = "hidden";
+      input.name = name;
+      input.value = value;
+      form.appendChild(input);
+      if (form.requestSubmit) form.requestSubmit(); else form.submit();
+      if (form.dataset.sent !== "true") input.remove();  // the save was called off
+    }
+
+    function mark(line, on) {
+      var name = on ? "copied" : "uncopied";
+      var index = String([].indexOf.call(list.children, line));
+      var id = field(line, "id").value;
+      var changed = !id || field(line, "start").value !== field(line, "was_start").value ||
+        field(line, "end").value !== field(line, "was_end").value || lineWords(line) !== field(line, "was_text").value;
+      if (on) line.dataset.copied = copyMark(line); else delete line.dataset.copied;
+      refreshLine(line);
+      refreshCount();
+      if (changed || !window.fetch || !window.FormData) return submitWith(name, index);
+      var body = new FormData();
+      body.append("id", id);
+      body.append("mark", on ? "1" : "0");
+      body.append("start", field(line, "start").value);
+      body.append("end", field(line, "end").value);
+      body.append("text", lineWords(line));
+      fetch(form.dataset.markUrl, { method: "POST", body: body, credentials: "same-origin" })
+        .then(function (r) {
+          if (!r.ok || (r.headers.get("Content-Type") || "").indexOf("json") < 0) throw new Error("not marked");
+          return r.json();
+        })
+        .then(function (done) {
+          // Changed on another device since this page opened: show it as it is.
+          if (on && !done.copied) window.location.reload();
+        })
+        .catch(function () { submitWith(name, index); });
+    }
+
     list.addEventListener("click", function (e) {
+      var reset = e.target.closest(".ts-reset");
+      if (reset) {
+        e.preventDefault();
+        mark(reset.closest(".ts-line"), false);
+        say("Reset to not copied.");
+        return;
+      }
       var button = e.target.closest(".ts-copy");
       if (!button) return;
       var line = button.closest(".ts-line");
-      var text = line.querySelector('[name="text"]').value.trim();
-      var from = line.querySelector('[name="start"]').value;
-      var to = line.querySelector('[name="end"]').value;
-      button.classList.remove("is-copied", "is-failed");
+      var text = lineWords(line);
+      var from = field(line, "start").value;
+      var to = field(line, "end").value;
+      button.classList.remove("is-failed");
       if (note) note.hidden = true;
       if (!text) {
         say("Nothing to copy yet: this line is empty.");
-        line.querySelector('[name="text"]').focus();
+        field(line, "text").focus();
         return;
       }
       var half = parseInt(to, 10) >= 12 ? " PM" : " AM";
       var copy = from && to ? text + " (" + from + " to " + to + half + ")" : text;
       button.focus();  // Safari doesn't focus a clicked button by itself
       copyText(copy).then(function () {
-        button.classList.add("is-copied");
-        button.setAttribute("aria-label", "Copied");
         say("Copied: " + copy);
-        setTimeout(function () {
-          button.classList.remove("is-copied");
-          button.setAttribute("aria-label", "Copy " + lineSpan(line));
-        }, 1600);
+        mark(line, true);
       }, function () {
         // Shown, not only spoken: otherwise the clipboard quietly keeps
         // whatever was in it before.
@@ -416,6 +514,109 @@
         say(message);
         if (note) { note.textContent = message; note.hidden = false; }
       });
+    });
+  }
+
+  // Times follow: change a line's end and the next line starts there;
+  // change a start and the line before ends there -- so the day never has a
+  // gap or an overlap, and the times posted elsewhere add up. A line pushed
+  // past entirely is squeezed to nothing and goes on Save (asking first if
+  // it has words). Each change is worked out afresh from the times as they
+  // were before that box was touched, so typing 9 on the way to 9:30
+  // leaves no trace of 9:00 behind.
+  function initTimesheetFollow() {
+    var form = document.querySelector(".ts-form");
+    var list = form && form.querySelector(".ts-lines");
+    if (!list) return;
+    var lines = [].slice.call(list.children);
+    var editing = null, base = [];
+
+    // An empty line no one has saved is only a suggestion: moving it with a
+    // neighbour moves its "was" times too, so the server doesn't ask for words.
+    function loose(line) {
+      return !field(line, "id").value && !lineWords(line) && !field(line, "was_text").value;
+    }
+    function remember() {
+      lines.forEach(function (line) {
+        field(line, "start").dataset.last = field(line, "start").value;
+        field(line, "end").dataset.last = field(line, "end").value;
+      });
+    }
+    function snapshot() {
+      base = lines.map(function (line) {
+        return {
+          start: field(line, "start").dataset.last, end: field(line, "end").dataset.last,
+          wasStart: field(line, "was_start").value, wasEnd: field(line, "was_end").value,
+          squeezed: line.classList.contains("is-squeezed"),
+        };
+      });
+    }
+    function put(line, name, value) {
+      field(line, name).value = value;
+      if (loose(line)) field(line, "was_" + name).value = value;
+    }
+
+    function follow(i, name, value) {
+      // Back to how things were, all but the box being typed in.
+      lines.forEach(function (line, j) {
+        var b = base[j];
+        if (j !== i || name !== "start") field(line, "start").value = b.start;
+        if (j !== i || name !== "end") field(line, "end").value = b.end;
+        field(line, "was_start").value = b.wasStart;
+        field(line, "was_end").value = b.wasEnd;
+        line.classList.toggle("is-squeezed", b.squeezed);
+      });
+      var own = lines[i];
+      var a = clockMinutes(field(own, "start").value, "start"), z = clockMinutes(field(own, "end").value, "end");
+      if (a !== null && z !== null && z > a) own.classList.remove("is-squeezed");
+
+      var dir = name === "end" ? 1 : -1;
+      var near = dir > 0 ? "start" : "end", far = dir > 0 ? "end" : "start";
+      var to = clockMinutes(value, name), was = clockMinutes(base[i][name], name);
+      for (var j = i + dir; to !== null && was !== null && j >= 0 && j < lines.length; j += dir) {
+        var line = lines[j];
+        var nearAt = clockMinutes(base[j][near], near), farAt = clockMinutes(base[j][far], far);
+        if (nearAt === null || farAt === null) break;
+        // Only a line that met this one, or that it now runs into.
+        if (nearAt !== was && !(dir > 0 ? nearAt < to : nearAt > to)) break;
+        put(line, near, value);
+        if (dir > 0 ? farAt > to : farAt < to) {
+          line.classList.remove("is-squeezed");
+          break;
+        }
+        put(line, far, value);
+        line.classList.add("is-squeezed");
+        was = farAt;
+      }
+      lines.forEach(refreshLine);
+      refreshCount();
+    }
+
+    remember();
+    list.addEventListener("input", function (e) {
+      var box = e.target;
+      if (box.type !== "time") return;
+      if (box !== editing) {
+        snapshot();
+        editing = box;
+      }
+      follow(lines.indexOf(box.closest(".ts-line")), box.name, box.value);
+      remember();
+    });
+
+    // On Save, squeezed lines go; asked first if any has words in it.
+    form.addEventListener("submit", function (e) {
+      var squeezed = lines.filter(function (line) { return line.classList.contains("is-squeezed"); });
+      var worded = squeezed.map(lineWords).filter(Boolean);
+      if (worded.length && !window.confirm(
+        (worded.length === 1 ? "Remove the line \u201c" + worded[0] + "\u201d? The line beside it now has its time."
+                             : "Remove " + worded.length + " lines (\u201c" + worded.join("\u201d, \u201c") +
+                               "\u201d)? The lines beside them now have their time."))) {
+        e.preventDefault();
+        e.stopPropagation();  // not counted as sent: Save can be pressed again
+        return;
+      }
+      lines.forEach(function (line) { field(line, "drop").value = line.classList.contains("is-squeezed") ? "1" : ""; });
     });
   }
 
@@ -605,7 +806,7 @@
       var rows = [];
       form.querySelectorAll(".ts-line").forEach(function (line) {
         var text = line.querySelector('[name="text"]').value.trim();
-        if (!text) return;
+        if (!text || line.classList.contains("is-squeezed")) return;
         rows.push({
           span: spanWords(line.querySelector('[name="start"]').value, line.querySelector('[name="end"]').value),
           text: text, isBreak: line.classList.contains("is-break"),
@@ -650,6 +851,7 @@
     initAvatarPicker();
     initDayType();
     initTimesheetCopy();
+    initTimesheetFollow();
     initTimesheetScroll();
     initTimesheetPng();
   });

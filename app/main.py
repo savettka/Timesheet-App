@@ -710,12 +710,17 @@ def timesheet(date_str=None):
         return SimpleNamespace(
             id=str(block.id) if block else "", start=start, end=end, text=text,
             was_start=start if shown else "", was_end=end if shown else "",
-            was_text=text if block is not None or is_break else "", is_now=False, is_break=is_break,
+            was_text=text if block is not None or is_break else "", is_now=False,
+            # A break moved or reworded is saved as a line, and still shown as a break.
+            is_break=is_break or text.casefold() == "break",
             placeholder="", error="", error_on="", can_end=False, end_confirm="",
+            copied=block.copied if block is not None and block.is_copied else "", length="",
         )
 
     def day_views(lines):
         views = [line_view(hhmm(start), hhmm(end), block) for start, end, block in lines]
+        for view, (start, end, _) in zip(views, lines):
+            view.length = logic.fmt_length(end - start)
         minute = now.hour * 60 + now.minute
         current = next((v for v, (start, end, _) in zip(views, lines)
                         if day == today and start <= minute < end), None)
@@ -730,7 +735,8 @@ def timesheet(date_str=None):
             # The last lines of a finished day can be brought to its logout:
             # one ending within the hour before it, or one running past it.
             for i, (view, (start, end, _)) in enumerate(zip(views, lines)):
-                if view.text and not view.is_break and start < logout_at and end != logout_at                         and end >= logout_at - 60:
+                if view.text and not view.is_break and start < logout_at and end != logout_at \
+                        and end >= logout_at - 60:
                     later = sum(1 for v in views[i + 1:] if v.text and not v.is_break)
                     view.can_end = True
                     if later:
@@ -739,12 +745,14 @@ def timesheet(date_str=None):
         return views
 
     def show(views):
-        # What the day's picture (Download PNG) says above its lines.
-        summary = ""
+        # The day at the top of the page, and above the lines in its picture
+        # (Download PNG): 1:00 PM – 6:00 PM · 4h 30m worked.
+        day_span = summary = worked = ""
         if entry is not None and entry.login_time is not None:
             until = logic.fmt_time(entry.logout_time) if entry.logout_time else "now"
             worked = logic.fmt_hours(logic.entry_total_hours(entry, now=now))
-            summary = f"{logic.fmt_time(entry.login_time)} – {until} · {worked} worked"
+            day_span = f"{logic.fmt_time(entry.login_time)} – {until}"
+            summary = f"{day_span} · {worked} worked"
         return render_template(
             "timesheet.html",
             day=day,
@@ -755,6 +763,8 @@ def timesheet(date_str=None):
             max_length=WorkBlock.MAX_LENGTH,
             who=current_user.display_name or current_user.username,
             summary=summary,
+            day_span=day_span,
+            day_worked=worked,
             stamp=f"{now:%a %d %b %Y}, {logic.fmt_time(now.time())}",
             logout_label=logic.fmt_time(entry.logout_time) if logout_at is not None else "",
         )
@@ -784,13 +794,26 @@ def timesheet(date_str=None):
                   "lines at the bottom: check their times, then press Save.", "error")
             return show(views)
 
+        def line_number(name):
+            # Which line a button was for: its place on the page.
+            value = form.get(name, "")
+            if value and (not value.isascii() or not value.isdigit() or int(value) >= len(fields[0])):
+                abort(400)
+            return value
+
+        # A line squeezed to nothing by a time changed beside it goes. A page
+        # from before this was added sends no "drop" at all.
+        dropped = form.getlist("drop") or [""] * len(fields[0])
+        if len(dropped) != len(fields[0]):
+            abort(400)
         by_id = {str(b.id): b for b in blocks}
-        changed, drafts, gone = [], [], 0
-        to_delete = form.get("delete", "")
-        to_logout = form.get("to_logout", "")
+        changed, drafts, gone, saved = [], [], 0, {}
+        to_delete = line_number("delete")
+        to_copy, to_uncopy = line_number("copied"), line_number("uncopied")
+        to_logout = line_number("to_logout")
         if to_logout:
             # "End at logout": that line's end becomes the logout, as if typed.
-            if logout_at is None or not to_logout.isascii() or not to_logout.isdigit()                     or int(to_logout) >= len(fields[0]):
+            if logout_at is None:
                 abort(400)
             fields[2][int(to_logout)] = hhmm(logout_at)
         ended = None
@@ -801,9 +824,16 @@ def timesheet(date_str=None):
             draft = SimpleNamespace(
                 id=block_id, start=start_raw, end=end_raw, text=text, was_start=was_start, was_end=was_end,
                 was_text=was_text, is_now=False, is_break=False, placeholder="", error="", error_on="",
-                can_end=False, end_confirm="",
+                can_end=False, end_confirm="", copied="", length="",
             )
             drafts.append(draft)
+            if dropped[index] == "1":
+                # The line beside it has its time now, so it goes for good.
+                block = by_id.get(block_id)
+                if block is not None:
+                    changed.append((block.start_time, block.end_time, "Removed"))
+                    db.session.delete(block)
+                continue
             if to_delete == str(index):
                 # A deleted line stays as a block with no words, so its time
                 # isn't offered as a line again.
@@ -854,9 +884,18 @@ def timesheet(date_str=None):
                 db.session.add(block)
                 blocks.append(block)
             block.start_time, block.end_time, block.text = start, end, text
+            saved[index] = block
             changed.append((start, end, "Saved"))
             if to_logout == str(index):
                 ended = block
+
+        if to_copy or to_uncopy:
+            # Copied (or its mark reset) on a line with changes not saved yet:
+            # the page is saved, and the mark goes on the line as saved.
+            index = int(to_copy or to_uncopy)
+            block = saved.get(index) or by_id.get(fields[0][index])
+            if block is not None and block.text and block not in db.session.deleted:
+                block.copied = block.copy_mark() if to_copy else None
 
         removed = 0
         if to_logout and not any(d.error for d in drafts):
@@ -865,7 +904,8 @@ def timesheet(date_str=None):
             keep = ended or by_id.get(fields[0][index])
             begin = clock(fields[1][index])
             for b in list(blocks):
-                if b is keep or not b.text or b in db.session.deleted or begin is None                         or logic.clock_minutes(b.start_time) < logic.clock_minutes(begin):
+                if b is keep or not b.text or b in db.session.deleted or begin is None \
+                        or logic.clock_minutes(b.start_time) < logic.clock_minutes(begin):
                     continue
                 if b in db.session.new:
                     db.session.expunge(b)
@@ -895,11 +935,12 @@ def timesheet(date_str=None):
             start, end, verb = changed[0]
             flash(f"{verb} {span(start, end)}.", "success")
         elif changed:
-            tally = [(verb, sum(1 for *_, v in changed if v == verb)) for verb in ("Saved", "Cleared", "Deleted")]
+            tally = [(verb, sum(1 for *_, v in changed if v == verb))
+                     for verb in ("Saved", "Cleared", "Deleted", "Removed")]
             words = [f"{verb if not i else verb.lower()} {count(n)}" for i, (verb, n) in
                      enumerate((verb, n) for verb, n in tally if n)]
             flash(", ".join(words) + ".", "success")
-        elif not form.get("add") and not gone:
+        elif not (form.get("add") or gone or to_copy or to_uncopy):
             flash("Already saved.", "success")
         if gone:
             flash(f"{count(gone).capitalize()} you changed had been removed on another device, so "
@@ -931,6 +972,29 @@ def timesheet(date_str=None):
                   "make room.", "warning")
             break
     return show(day_views(lines))
+
+
+@main_bp.route("/timesheet/mark", methods=["POST"])
+@login_required
+def timesheet_mark():
+    """Copy's mark on a saved line, put on or taken off without reloading the
+    page. It goes on only while the line still says what was copied."""
+    form = request.form
+    block_id = form.get("id", "")
+    block = None
+    if block_id.isascii() and block_id.isdigit() and len(block_id) < 19:
+        block = WorkBlock.query.filter_by(id=int(block_id), user_id=current_user.id).first()
+    if block is None or not block.text:
+        abort(404)
+    if form.get("mark") == "1":
+        said = f"{form.get('start', '')[:5]}-{form.get('end', '')[:5]} {' '.join(form.get('text', '').split())}"
+        if said != block.copy_mark():
+            return jsonify(copied=False)  # changed since, here or elsewhere: save first
+        block.copied = said
+    else:
+        block.copied = None
+    db.session.commit()
+    return jsonify(copied=block.is_copied)
 
 
 @main_bp.route("/entry/<date_str>", methods=["GET", "POST"])
