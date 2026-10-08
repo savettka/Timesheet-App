@@ -38,8 +38,8 @@ TIMESHEET_SHORT_PIECE = 30
 # The block of a line that is a recorded break, rather than None (time to
 # fill in) or a saved WorkBlock.
 TIMESHEET_BREAK = "break"
-# Time left uncovered between saved lines, shorter than this, isn't offered
-# as a line of its own.
+# Time left uncovered beside a saved line, shorter than this, isn't offered
+# as a line of its own. Time between punches always is.
 TIMESHEET_SMALL_GAP = 10
 
 
@@ -514,6 +514,12 @@ def timesheet_lines(entry, day, now, blocks=()):
             b = end
         breaks.append((a, b))
     breaks = sorted((max(a, start), min(b, end)) for a, b in breaks if min(b, end) > max(a, start))
+    # Back from a break near the end of an hour: as with a login, the line in
+    # progress already runs to the next o'clock (2:55 to 4:00 PM), as it will
+    # once 3 PM comes, not a 5-minute 2:55-3:00 PM.
+    back = max((b for _, b in breaks), default=end)
+    if back < end and end - back <= TIMESHEET_SHORT_PIECE and day == now.date() and entry.logout_time is None:
+        end = min(end + 60, 1440)
 
     # A block with no words is a deleted line: not shown, but its time is
     # taken, so it isn't offered again.
@@ -530,10 +536,13 @@ def timesheet_lines(entry, day, now, blocks=()):
     if cursor < end:
         gaps.append((cursor, end))
 
+    # Time between punches -- login, breaks, logout -- is time worked, however
+    # few minutes (back from a break at 10:48 PM, out at 10:52 PM). Only a
+    # sliver left beside a line whose times were typed isn't worth a line.
+    typed = {edge for a, b, block in taken if block.text.casefold() != "break" for edge in (a, b)}
+
     def worked(a, b):
-        # A sliver between saved lines isn't worth a line; a day with nothing
-        # saved and no breaks always gets its span, however short.
-        if b - a < TIMESHEET_SMALL_GAP and (blocks or breaks or b <= a):
+        if b <= a or (b - a < TIMESHEET_SMALL_GAP and (a in typed or b in typed)):
             return []
         return [(p, q, None) for p, q in hour_pieces(a, b)]
 
