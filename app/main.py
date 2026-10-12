@@ -364,6 +364,30 @@ def mark_label(entry, mark):
     return "you logged in" if mark == logic.shift_login_dt(entry) else "your last break"
 
 
+def fit_line_to_break(entry, break_start):
+    """The Timesheet line just before a break ends where the break begins:
+    one stopping up to half an hour short is stretched to it (7:00-8:00 PM
+    and a break at 8:04 gives 7:00-8:04 PM), and one running on into it is
+    cut there. Never over a deleted line, an earlier break or a Break line."""
+    at = logic.clock_minutes(break_start)
+    before = [b for b in WorkBlock.query.filter_by(user_id=entry.user_id, date=entry.date)
+              if logic.clock_minutes(b.start_time) < at]
+    if not before:
+        return
+    line = max(before, key=lambda b: (logic.clock_minutes(b.start_time), b.id))
+    end = logic.clock_minutes(line.end_time, ending=True)
+    if not line.text or line.text.casefold() == "break" or end == at:
+        return
+    if end < at:
+        reach = max(logic.clock_minutes(b.end_time, ending=True) for b in before)
+        away = any(s.break_start is not None and s.break_end is not None
+                   and logic.clock_minutes(s.break_start) < at
+                   and logic.clock_minutes(s.break_end, ending=True) > end for s in entry.breaks)
+        if reach >= at or away or at - end > logic.TIMESHEET_SHORT_PIECE:
+            return
+    line.end_time = break_start.replace(second=0, microsecond=0)
+
+
 @main_bp.route("/punch/in", methods=["POST"])
 @login_required
 def punch_in():
@@ -404,6 +428,7 @@ def punch_in():
             entry.breaks.append(
                 BreakSegment(break_start=entry.logout_time, break_end=when.time())
             )
+            fit_line_to_break(entry, entry.logout_time)
             message = (
                 f"Logged in again at {logic.fmt_time(when.time())}. The "
                 f"{logic.fmt_duration(gap)} since you logged out counts as a break."
@@ -461,6 +486,7 @@ def punch_break_start():
             flash(error, "error")
             return redirect(url_for("main.dashboard"))
     t = typed or now.time()
+    fit_line_to_break(entry, t)
     db.session.add(BreakSegment(entry_id=entry.id, break_start=t))
     db.session.commit()
     flash(f"Break started at {logic.fmt_time(t)}. Tap Back when you return.", "success")
