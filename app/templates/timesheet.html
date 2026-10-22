@@ -62,6 +62,7 @@
         </div>
         <input type="text" name="text" class="ts-text" value="{{ line.text }}" maxlength="{{ max_length }}"
                autocomplete="off" aria-label="What you worked on, {{ span }}"{{ err_text|safe }}
+               {%- if not line.is_break and recent %} list="ts-recent"{% endif %}
                {%- if line.placeholder %} placeholder="{{ line.placeholder }}"{% endif %}>
         <div class="ts-acts">
           {% if not line.is_break %}
@@ -89,6 +90,8 @@
       </li>
       {% endfor %}
     </ol>
+    {# Recent words, offered while typing a line. #}
+    {% if recent %}<datalist id="ts-recent">{% for text in recent %}<option value="{{ text }}">{% endfor %}</datalist>{% endif %}
     <p class="visually-hidden" aria-live="polite" id="ts-copy-status"></p>
     <p class="ts-copy-note" id="ts-copy-note" hidden></p>
 

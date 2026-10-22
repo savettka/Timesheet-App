@@ -3,6 +3,7 @@ import math
 import os
 import secrets
 import uuid
+from collections import defaultdict
 from datetime import date, datetime, timedelta
 from io import BytesIO
 from types import SimpleNamespace
@@ -20,6 +21,7 @@ from flask import (
     url_for,
 )
 from flask_login import current_user, login_required
+from sqlalchemy import func
 
 from app import db
 from app import logic
@@ -276,6 +278,38 @@ def index():
     return redirect(url_for("main.dashboard"))
 
 
+def days_to_fill(user_id, now, days=7):
+    """The last week's days with Timesheet lines still to fill in -- each
+    finished line of a worked day with no words yet -- newest first."""
+    today = now.date()
+    first = today - timedelta(days=days - 1)
+    entries = TimeEntry.query.filter(TimeEntry.user_id == user_id, TimeEntry.date >= first,
+                                     TimeEntry.date <= today, TimeEntry.login_time.isnot(None)).all()
+    blocks = defaultdict(list)
+    for b in WorkBlock.query.filter(WorkBlock.user_id == user_id, WorkBlock.date >= first, WorkBlock.date <= today):
+        blocks[b.date].append(b)
+    minute = now.hour * 60 + now.minute
+    out = []
+    for entry in sorted(entries, key=lambda e: e.date, reverse=True):
+        lines = logic.timesheet_lines(entry, entry.date, now, blocks[entry.date])
+        empty = sum(1 for _, end, block in lines if block is None and (entry.date < today or end <= minute))
+        if empty:
+            out.append((entry.date, empty))
+    return out
+
+
+def recent_texts(user_id, day, limit=15):
+    """What was written on recent Timesheet lines, latest first: offered as
+    suggestions while typing a line, so a task done again is a tap away."""
+    rows = (db.session.query(WorkBlock.text)
+            .filter(WorkBlock.user_id == user_id, WorkBlock.text != "",
+                    WorkBlock.date <= day, WorkBlock.date >= day - timedelta(days=60))
+            .group_by(WorkBlock.text)
+            .order_by(func.max(WorkBlock.date).desc(), func.count(WorkBlock.id).desc())
+            .limit(limit + 1).all())
+    return [text for text, in rows if text.casefold() != "break"][:limit]
+
+
 @main_bp.route("/dashboard")
 @login_required
 def dashboard():
@@ -287,6 +321,7 @@ def dashboard():
     ctx["month"] = logic.month_summary(
         current_user, month_entries, today.year, today.month, today, now=ctx["now"]
     )
+    ctx["to_fill"] = days_to_fill(current_user.id, ctx["now"])
     return render_template("dashboard.html", **ctx)
 
 
@@ -793,6 +828,7 @@ def timesheet(date_str=None):
             day_worked=worked,
             stamp=f"{now:%a %d %b %Y}, {logic.fmt_time(now.time())}",
             logout_label=logic.fmt_time(entry.logout_time) if logout_at is not None else "",
+            recent=recent_texts(current_user.id, day),
         )
 
     if request.method == "POST":

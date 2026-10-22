@@ -7,6 +7,17 @@
 {%- endblock %}
 
 {% block content %}
+{% if to_fill %}
+<section class="card fill-card" aria-labelledby="fill-heading">
+  <h2 id="fill-heading" class="card-title">{{ icon('clipboard') }}Timesheet to fill in</h2>
+  <ul class="fill-days">
+    {% for d, n in to_fill %}
+    <li><a class="fill-day" href="{{ url_for('main.timesheet') if d == today else url_for('main.timesheet', date_str=d.isoformat()) }}">
+      <b>{{ 'Today' if d == today else d.strftime('%a %d %b') }}</b>{{ n }} line{{ 's' if n != 1 }}</a></li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
 <div class="dash-grid">
 
   {# ------------------------------------------------------------ status #}

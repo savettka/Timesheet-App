@@ -648,7 +648,7 @@
   var PNG = {
     width: 1080, pad: 56, scale: 2,
     band: "#eef0ff", brandText: "#3f3697", brandMuted: "#57519f", ink: "#151823", ink2: "#3d4354",
-    ink3: "#555c6f", hair: "#e6e8ee", breakFill: "#fdefd2", breakText: "#7a4a00", font: "Inter, system-ui, sans-serif",
+    ink3: "#555c6f", hair: "#e6e8ee", breakFill: "#fdefd2", breakText: "#7a4a00", font: "Figtree, system-ui, sans-serif",
   };
 
   function clock12(hhmm) {
@@ -819,7 +819,7 @@
         return;
       }
       button.setAttribute("aria-disabled", "true");
-      var fonts = document.fonts && document.fonts.load ? document.fonts.load("600 21px Inter") : Promise.resolve();
+      var fonts = document.fonts && document.fonts.load ? document.fonts.load("600 21px Figtree") : Promise.resolve();
       Promise.all([fonts.catch(function () {}), loadLogo()]).then(function (ready) {
         var d = form.dataset;
         var canvas = drawTimesheet({ day: d.pngDay, who: d.pngWho, summary: d.pngSummary, stamp: d.pngStamp },

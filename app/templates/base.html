@@ -35,7 +35,7 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
@@ -69,13 +69,22 @@
   {% endmacro %}
 
   {% if current_user.is_authenticated %}
-  {% set nav_items = [
-      ('main.dashboard', 'Home', 'home', ['main.dashboard']),
-      ('main.timesheet', 'Timesheet', 'clipboard', ['main.timesheet']),
-      ('main.history', 'History', 'list', ['main.history', 'main.edit_entry']),
-      ('main.calendar', 'Calendar', 'calendar', ['main.calendar']),
-      ('main.settings', 'Settings', 'sliders', ['main.settings']),
+  {# The menu in three groups, as time trackers lay it out: what you track,
+     what you look back on, and your own settings. #}
+  {% set nav_sections = [
+      ('Track', [
+          ('main.dashboard', 'Home', 'home', ['main.dashboard']),
+          ('main.timesheet', 'Timesheet', 'clipboard', ['main.timesheet']),
+          ('main.calendar', 'Calendar', 'calendar', ['main.calendar']),
+      ]),
+      ('Analyse', [
+          ('main.history', 'History', 'list', ['main.history', 'main.edit_entry']),
+      ]),
+      ('Manage', [
+          ('main.settings', 'Settings', 'sliders', ['main.settings']),
+      ]),
   ] %}
+  {% set nav_items = nav_sections|map(attribute=1)|sum(start=[]) %}
   <div class="app-shell">
     <aside class="sidebar">
       <a class="brand" href="{{ url_for('main.dashboard') }}">
@@ -83,11 +92,14 @@
         <span class="brand-name">STM</span>
       </a>
       <nav class="side-nav" aria-label="Main">
-        {% for endpoint, label, icon_name, active_on in nav_items %}
+        {% for section, items in nav_sections %}
+          <p class="nav-section">{{ section }}</p>
+          {% for endpoint, label, icon_name, active_on in items %}
           <a href="{{ url_for(endpoint) }}" class="nav-link"
              {% if request.endpoint in active_on %}aria-current="page"{% endif %}>
             {{ icon(icon_name) }}<span>{{ label }}</span>
           </a>
+          {% endfor %}
         {% endfor %}
       </nav>
       <div class="sidebar-footer">

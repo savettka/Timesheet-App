@@ -14,24 +14,27 @@
    ========================================================================== */
 
 :root {
-  --bg: #f4f5f9;
+  --bg: #f1f3f6;
   --surface: #ffffff;
-  --surface-2: #f1f3f8;
-  --surface-3: #e5e8f0;
-  --line: #dde1ea;
+  --surface-2: #f4f6f9;
+  --surface-3: #e8ecf2;
+  --line: #e2e6ed;
   --line-strong: #7b8396;
+  --card-border: #e9ecf1;
+  --pill: #14161b;
+  --on-pill: #ffffff;
 
   --text: #151823;
   --text-2: #3d4354;
   --text-3: #555c6f;
 
-  --accent: #4f46e5;
-  --accent-hover: #4338ca;
-  --accent-text: #4338ca;
-  --accent-soft: #eceeff;
+  --accent: #2f63d8;
+  --accent-hover: #2552bd;
+  --accent-text: #2350bd;
+  --accent-soft: #eaf0fd;
   --on-accent: #ffffff;
-  --focus: #4f46e5;
-  --focus-ring: rgba(79, 70, 229, 0.3);
+  --focus: #2f63d8;
+  --focus-ring: rgba(47, 99, 216, 0.3);
 
   --go: #15803d;
   --go-hover: #166534;
@@ -53,24 +56,24 @@
   --error-text: #9f1c1c;
   --warn-bg: #fff3dc;
   --warn-text: #7a4300;
-  --info-bg: #eceeff;
-  --info-text: #29247e;
+  --info-bg: #eaf0fd;
+  --info-text: #1d3f8f;
 
   --tint-break: #fff7e6;
   --tint-stale: #fff1f0;
 
-  --shadow: 0 1px 2px rgba(16, 24, 40, 0.05), 0 2px 6px rgba(16, 24, 40, 0.06);
+  --shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 8px 24px -14px rgba(16, 24, 40, 0.22);
   --shadow-lg: 0 10px 30px -10px rgba(16, 24, 40, 0.25);
 
   --r-sm: 8px;
   --r-md: 12px;
-  --r-lg: 18px;
+  --r-lg: 16px;
 
   --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px;
   --s5: 24px; --s6: 32px; --s7: 48px;
 
-  --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --sidebar-w: 248px;
+  --font: "Figtree", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --sidebar-w: 232px;
   --tab-h: 68px;
   color-scheme: light;
 }
@@ -83,15 +86,18 @@
     --surface-3: #2a2f3b;
     --line: #2d323f;
     --line-strong: #7f879a;
+    --card-border: #262b37;
+    --pill: #f2f4f8;
+    --on-pill: #14161b;
 
     --text: #f2f4f8;
     --text-2: #c7cbd6;
     --text-3: #a4aab8;
 
-    --accent-text: #aab2ff;
-    --accent-soft: #252850;
-    --focus: #aab2ff;
-    --focus-ring: rgba(170, 178, 255, 0.35);
+    --accent-text: #9db8ff;
+    --accent-soft: #1b2648;
+    --focus: #9db8ff;
+    --focus-ring: rgba(157, 184, 255, 0.35);
     --stop-text: #ff8a8a;
 
     --ahead: #5ee08e;
@@ -103,8 +109,8 @@
     --error-text: #ffb3b3;
     --warn-bg: #3a2a0e;
     --warn-text: #fcd38a;
-    --info-bg: #212448;
-    --info-text: #cfd3ff;
+    --info-bg: #1b2648;
+    --info-text: #cdd9ff;
 
     --tint-break: #251e10;
     --tint-stale: #2a1718;
@@ -122,15 +128,18 @@
   --surface-3: #2a2f3b;
   --line: #2d323f;
   --line-strong: #7f879a;
+  --card-border: #262b37;
+  --pill: #f2f4f8;
+  --on-pill: #14161b;
 
   --text: #f2f4f8;
   --text-2: #c7cbd6;
   --text-3: #a4aab8;
 
-  --accent-text: #aab2ff;
-  --accent-soft: #252850;
-  --focus: #aab2ff;
-  --focus-ring: rgba(170, 178, 255, 0.35);
+  --accent-text: #9db8ff;
+  --accent-soft: #1b2648;
+  --focus: #9db8ff;
+  --focus-ring: rgba(157, 184, 255, 0.35);
   --stop-text: #ff8a8a;
 
   --ahead: #5ee08e;
@@ -142,8 +151,8 @@
   --error-text: #ffb3b3;
   --warn-bg: #3a2a0e;
   --warn-text: #fcd38a;
-  --info-bg: #212448;
-  --info-text: #cfd3ff;
+  --info-bg: #1b2648;
+  --info-text: #cdd9ff;
 
   --tint-break: #251e10;
   --tint-stale: #2a1718;
@@ -229,12 +238,16 @@ table { border-collapse: collapse; width: 100%; }
 .sidebar {
   width: var(--sidebar-w);
   flex-shrink: 0;
-  position: sticky; top: 0;
-  height: 100vh;
+  position: sticky; top: var(--s3);
+  height: calc(100vh - 2 * var(--s3));
+  margin: var(--s3) 0 var(--s3) var(--s3);
   display: flex; flex-direction: column;
-  padding: var(--s5) var(--s3);
+  padding: var(--s5) var(--s3) var(--s3);
   background: var(--surface);
-  border-right: 1px solid var(--line);
+  border: 1px solid var(--card-border);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+  overflow-y: auto;
 }
 
 .brand {
@@ -246,24 +259,26 @@ table { border-collapse: collapse; width: 100%; }
 .logo-mark { width: 28px; height: 28px; color: var(--text); display: block; flex-shrink: 0; }
 .logo-mark.logo-lg { width: 56px; height: 56px; margin: 0 auto var(--s4); }
 
-.side-nav { display: flex; flex-direction: column; gap: var(--s1); flex: 1; }
+.side-nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.nav-section {
+  padding: var(--s4) var(--s3) var(--s1);
+  font-size: 13px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+  color: var(--text-3);
+}
+.nav-section:first-child { padding-top: 0; }
 .nav-link {
   position: relative;
   display: flex; align-items: center; gap: var(--s3);
-  min-height: 48px;
+  min-height: 44px;
   padding: 0 var(--s3);
-  border-radius: var(--r-md);
+  border-radius: 10px;
   color: var(--text-2);
-  font-size: 16px; font-weight: 500;
+  font-size: 15px; font-weight: 500;
   text-decoration: none;
   transition: background-color .15s ease, color .15s ease;
 }
 .nav-link:hover { background: var(--surface-2); color: var(--text); }
-.nav-link[aria-current="page"] { background: var(--accent-soft); color: var(--accent-text); font-weight: 600; }
-.nav-link[aria-current="page"]::before {
-  content: ""; position: absolute; left: -12px; top: 10px; bottom: 10px;
-  width: 4px; border-radius: 0 4px 4px 0; background: var(--accent);
-}
+.nav-link[aria-current="page"] { background: var(--pill); color: var(--on-pill); font-weight: 600; }
 
 .sidebar-footer {
   display: flex; flex-direction: column; gap: var(--s1);
@@ -310,7 +325,7 @@ table { border-collapse: collapse; width: 100%; }
   border-bottom: 1px solid var(--line);
 }
 .topbar-brand { display: none; }
-.page-title { flex: 1; min-width: 0; font-size: 24px; font-weight: 700; }
+.page-title { flex: 1; min-width: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
 .topbar .theme-toggle-icon { display: none; }
 .topbar-user {
   display: flex; align-items: center; gap: var(--s2);
@@ -345,7 +360,7 @@ table { border-collapse: collapse; width: 100%; }
 
 .card {
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 1px solid var(--card-border);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow);
   padding: var(--s5);
@@ -356,7 +371,7 @@ table { border-collapse: collapse; width: 100%; }
   flex-wrap: wrap; gap: var(--s2) var(--s4);
   margin-bottom: var(--s4);
 }
-.card-title { font-size: 19px; font-weight: 650; }
+.card-title { font-size: 19px; font-weight: 700; letter-spacing: -0.01em; }
 .card-head .card-title { margin: 0; }
 .card > .card-title { margin-bottom: var(--s3); }
 .card-sub { font-size: 15px; color: var(--text-3); }
@@ -600,6 +615,21 @@ table { border-collapse: collapse; width: 100%; }
 .day-chip.is-other-month .day-chip-hours { color: var(--text-3); }
 
 .saturday-card .banner { margin: 0; }
+
+/* Home: days with Timesheet lines still to fill in, newest first. */
+.fill-card { margin-bottom: var(--s4); display: flex; align-items: center; flex-wrap: wrap; gap: var(--s3) var(--s4); }
+.fill-card .card-title { display: flex; align-items: center; gap: var(--s2); }
+.fill-card .card-title .icon { color: var(--warn-text); }
+.fill-days { list-style: none; display: flex; flex-wrap: wrap; gap: var(--s2); }
+.fill-day {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 40px; padding: 0 14px;
+  border-radius: 999px;
+  background: var(--warn-bg); color: var(--warn-text);
+  font-size: 15px; text-decoration: none;
+}
+.fill-day b { font-weight: 700; }
+.fill-day:hover { box-shadow: inset 0 0 0 1.5px currentColor; }
 
 /* ==========================================================================
    History
@@ -995,11 +1025,10 @@ input[type="number"] { -moz-appearance: textfield; }
     text-decoration: none;
   }
   .tab-link .icon { width: 26px; height: 26px; }
-  .tab-link[aria-current="page"] { color: var(--accent-text); }
-  .tab-link[aria-current="page"]::before {
-    content: ""; position: absolute; top: 0; left: 28%; right: 28%;
-    height: 3px; border-radius: 0 0 3px 3px; background: var(--accent);
-  }
+  .tab-link[aria-current="page"] { color: var(--text); }
+  /* The page you're on: its icon in the same dark pill as the menu's. */
+  .tab-link .icon { padding: 3px 12px; box-sizing: content-box; border-radius: 999px; }
+  .tab-link[aria-current="page"] .icon { background: var(--pill); color: var(--on-pill); }
   .tab-link:focus-visible { outline-offset: -4px; }
 
   .card { padding: var(--s4) 18px; border-radius: 16px; }
