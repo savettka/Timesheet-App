@@ -841,6 +841,28 @@
     });
   }
 
+  // ------------------------------------------------------------ copy week
+  // The week's lines, day by day, onto the clipboard: to paste into the
+  // other timesheet in one go.
+  function initWeekCopy() {
+    var button = document.querySelector(".tw-copy");
+    if (!button) return;
+    var status = document.getElementById("tw-status");
+    var word = button.querySelector("span");
+    button.hidden = false;
+    button.addEventListener("click", function () {
+      copyText(button.dataset.copy).then(function () {
+        button.classList.add("is-copied");
+        word.textContent = "Copied";
+        if (status) status.textContent = "Copied the week.";
+        setTimeout(function () { button.classList.remove("is-copied"); word.textContent = "Copy week"; }, 1800);
+      }, function () {
+        if (status) status.textContent = "Couldn't copy here.";
+        word.textContent = "Couldn't copy";
+      });
+    });
+  }
+
   // ------------------------------------------------------------ calendar grid
   // A block opens in a box to change its words or times (an empty one, or
   // a click on the grid, to write a new line); a written line's bottom edge
@@ -998,6 +1020,7 @@
     initPageWait();
     initTimerClock();
     initCalendarGrid();
+    initWeekCopy();
     initLiveTimer();
     initStatusPoll();
     initBreakRows();

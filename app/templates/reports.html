@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% block title %}Reports{% endblock %}
+{% block page_title %}Reports{% endblock %}
+
+{% block content %}
+{% set balance_minutes = ((worked - due) * 60)|round|int %}
+<nav class="seg" aria-label="Report period">
+  {% for key, label in ranges.items() %}
+  <a href="{{ url_for('main.reports', range=key) }}"{{ ' aria-current="page"'|safe if key == name }}>{{ label }}</a>
+  {% endfor %}
+</nav>
+<p class="rp-period">{{ first.strftime('%a %d %b') }} – {{ last.strftime('%a %d %b %Y') }}</p>
+
+<dl class="rp-stats">
+  <div class="rp-stat"><dt>Worked</dt><dd>{{ fmt_hours(worked) }}</dd></div>
+  <div class="rp-stat"><dt>Due so far</dt><dd>{{ fmt_hours(due) }}</dd></div>
+  <div class="rp-stat {{ 'is-ahead' if balance_minutes > 0 else ('is-behind' if balance_minutes < 0 else '') }}">
+    <dt>{{ 'Overtime' if balance_minutes >= 0 else 'Short' }}</dt><dd>{{ fmt_balance(worked - due) }}</dd></div>
+  <div class="rp-stat"><dt>Breaks</dt><dd>{{ fmt_hours(breaks) }}</dd></div>
+  <div class="rp-stat"><dt>Days worked</dt><dd>{{ days_worked }}</dd></div>
+  <div class="rp-stat"><dt>Usual hours</dt><dd class="rp-small">{{ (avg_start ~ ' – ' ~ avg_end) if avg_start and avg_end else (avg_start or '–') }}</dd></div>
+</dl>
+
+<div class="rp-grid">
+  <section class="card" aria-labelledby="rp-days">
+    <h2 id="rp-days" class="card-title">Hours by day</h2>
+    <ol class="rp-bars" style="--days: {{ days|length }}">
+      {% for d in days %}
+      {% set label = d.date.strftime('%a %d %b') ~ ': ' ~ (fmt_hours(d.worked) ~ ' worked' if d.worked else 'nothing worked') ~ (', target ' ~ fmt_hours(d.target) if d.target else '') %}
+      <li class="rp-bar{{ ' is-today' if d.is_today }}{{ ' is-future' if d.future }}" aria-label="{{ label }}" title="{{ label }}">
+        <span class="rp-bar-col">
+          {% if d.target %}<span class="rp-target" style="--h: {{ (d.target / scale * 100)|round(1) }}%"></span>{% endif %}
+          <span class="rp-fill{{ ' is-met' if d.target and d.worked >= d.target }}" style="--h: {{ (d.worked / scale * 100)|round(1) }}%"></span>
+        </span>
+        <span class="rp-bar-num" aria-hidden="true">{{ fmt_hours_compact(d.worked) if d.worked else '' }}</span>
+        <span class="rp-bar-day" aria-hidden="true">{{ d.date.strftime('%a' if days|length <= 7 else '%d') }}</span>
+      </li>
+      {% endfor %}
+    </ol>
+  </section>
+
+  <section class="card" aria-labelledby="rp-tasks">
+    <div class="card-head">
+      <h2 id="rp-tasks" class="card-title">Where the time went</h2>
+      {% if written %}<a class="link" download href="{{ url_for('main.reports_csv', range=name) }}">{{ icon('download', 'icon icon-inline') }} CSV</a>{% endif %}
+    </div>
+    {% if tasks %}
+    <ul class="rp-tasks">
+      {% for text, minutes in tasks %}
+      <li>
+        <span class="rp-task-text">{{ text }}</span><span class="rp-task-time">{{ fmt_length(minutes) }}</span>
+        <span class="rp-task-bar" aria-hidden="true"><span style="width: {{ (minutes / task_total * 100)|round(1) }}%"></span></span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="hint">No Timesheet lines with words in this period yet.</p>
+    {% endif %}
+  </section>
+</div>
+
+<section class="card days-card rp-attendance" aria-labelledby="rp-att">
+  <h2 id="rp-att" class="card-title">Attendance</h2>
+  <table class="days">
+    <thead><tr><th scope="col">Day</th><th scope="col">In</th><th scope="col">Out</th><th scope="col">Breaks</th>
+      <th scope="col" class="c-worked">Worked</th><th scope="col" class="c-bal">+/−</th></tr></thead>
+    <tbody>
+      {% for d in days if not d.future and (d.entry or d.due) %}
+      {% set m = (d.balance * 60)|round|int %}
+      <tr class="{{ 'is-today' if d.is_today }}">
+        <td class="c-day"><a class="day-link" href="{{ url_for('main.timesheet', date_str=d.date.isoformat()) }}">{{ d.date.strftime('%a %d %b') }}</a></td>
+        <td class="c-in">{{ fmt_time(d.entry.login_time) if d.entry and d.entry.login_time else '–' }}</td>
+        <td class="c-out">{{ fmt_time(d.entry.logout_time) if d.entry and d.entry.logout_time else '–' }}</td>
+        <td class="c-brk">{{ fmt_hours(d.breaks) if d.breaks else '–' }}</td>
+        <td class="c-worked">{{ fmt_hours(d.worked) if d.worked else '–' }}</td>
+        <td class="c-bal {{ 'is-ahead' if m > 0 else ('is-behind' if m < 0 else '') }}">{{ fmt_balance(d.balance) }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="is-empty">Nothing logged in this period yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

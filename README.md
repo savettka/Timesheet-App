@@ -52,8 +52,21 @@ This mirrors the logic in the original spreadsheet:
   are copied. Lines can be added or deleted, and the day can be downloaded as a branded PNG
   with one button. Type and press Enter to save; a day with no login starts at 1 PM, and
   earlier days work the same way.
-- **Dashboard** — today's hours, this week's progress bar toward your target, and a
-  suggested logout time once you're close to (or past) the weekly target.
+- **Timer** — type what you're working on and press Start (Home or today's Timesheet).
+  Stop, Break or Logout writes the Timesheet line with the exact times; starting another
+  task writes the running one first. The latest tasks are a tap from starting again.
+- **Week timesheet** — what you worked on down the side, the days across, each day's
+  hours against the weekly target, "Not written yet" for hours with no words, **Copy
+  week** (every line, day by day, ready to paste) and **Mark week posted**.
+- **Calendar day and week** — the Timesheet's lines as blocks on a time grid: click to
+  write or change a line, drag a block's bottom edge to change its end (the next line
+  follows). The month grid is the third tab.
+- **Reports** — this or last week or month: worked, due, overtime, breaks, days worked,
+  usual hours, a bar per day against its target, where the time went, attendance, and
+  the lines as a CSV.
+- **Dashboard** — today's hours, this week's progress bar toward your target, a
+  suggested logout time once you're close to (or past) the weekly target, and the last
+  week's days with Timesheet lines still to fill in.
 - **Settings** — change daily/weekly targets, workdays, display name, profile picture
   and password.
 - **Team members (admin only)** — the first account created owns the install. Only it

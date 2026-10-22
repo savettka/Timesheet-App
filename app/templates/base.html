@@ -74,10 +74,11 @@
   {% set nav_sections = [
       ('Track', [
           ('main.dashboard', 'Home', 'home', ['main.dashboard']),
-          ('main.timesheet', 'Timesheet', 'clipboard', ['main.timesheet']),
+          ('main.timesheet', 'Timesheet', 'clipboard', ['main.timesheet', 'main.timesheet_week']),
           ('main.calendar', 'Calendar', 'calendar', ['main.calendar', 'main.calendar_week', 'main.calendar_day']),
       ]),
       ('Analyse', [
+          ('main.reports', 'Reports', 'chart', ['main.reports']),
           ('main.history', 'History', 'list', ['main.history', 'main.edit_entry']),
       ]),
       ('Manage', [
@@ -85,6 +86,7 @@
       ]),
   ] %}
   {% set nav_items = nav_sections|map(attribute=1)|sum(start=[]) %}
+  {% set tab_items = nav_items|rejectattr(0, 'equalto', 'main.settings')|list %}
   <div class="app-shell">
     <aside class="sidebar">
       <a class="brand" href="{{ url_for('main.dashboard') }}">
@@ -132,7 +134,7 @@
     {# Phones get the pages as a bar under the thumb instead of a menu that
        has to be opened first. #}
     <nav class="tab-bar" aria-label="Main">
-      {% for endpoint, label, icon_name, active_on in nav_items %}
+      {% for endpoint, label, icon_name, active_on in tab_items %}
         <a href="{{ url_for(endpoint) }}" class="tab-link"
            {% if request.endpoint in active_on %}aria-current="page"{% endif %}>
           {{ icon(icon_name) }}<span>{{ label }}</span>

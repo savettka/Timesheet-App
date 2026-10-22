@@ -7,6 +7,10 @@
 {% block content %}
 {% if timer or can_time %}<div class="ts-card ts-timer">{{ timer_card(timer, can_time, recent, 'timesheet') }}</div>{% endif %}
 <section class="card form-card ts-card" aria-labelledby="day-title">
+  <nav class="seg" aria-label="Timesheet view">
+    <a href="{{ url_for('main.timesheet', date_str=day.isoformat()) }}" aria-current="page">Day</a>
+    <a href="{{ url_for('main.timesheet_week', date_str=day.isoformat()) }}">Week</a>
+  </nav>
   <div class="day-nav">
     <a class="btn btn-icon" href="{{ url_for('main.timesheet', date_str=prev_date.isoformat()) }}"
        aria-label="Previous day, {{ prev_date.strftime('%A %d %B') }}">{{ icon('chevron-left') }}</a>

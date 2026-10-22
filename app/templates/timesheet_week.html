@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% block title %}Timesheet{% endblock %}
+{% block page_title %}Timesheet{% endblock %}
+
+{% block content %}
+<section class="card tw-card" aria-labelledby="tw-title">
+  <nav class="seg" aria-label="Timesheet view">
+    <a href="{{ url_for('main.timesheet', date_str=days[0].isoformat()) if not is_current else url_for('main.timesheet') }}">Day</a>
+    <a href="{{ url_for('main.timesheet_week', date_str=days[0].isoformat()) }}" aria-current="page">Week</a>
+  </nav>
+  <div class="month-nav">
+    <a class="btn btn-icon" href="{{ prev_url }}" aria-label="Previous week">{{ icon('chevron-left') }}</a>
+    <h2 id="tw-title" class="month-title">{{ days[0].strftime('%d %b') }} – {{ days[-1].strftime('%d %b %Y') }}</h2>
+    <a class="btn btn-icon" href="{{ next_url }}" aria-label="Next week">{{ icon('chevron-right') }}</a>
+  </div>
+  {% if not is_current %}<p class="month-jump"><a class="link" href="{{ url_for('main.timesheet_week') }}">Jump to this week</a></p>{% endif %}
+
+  <ul class="ts-sum tw-sum">
+    <li class="ts-chip">{{ icon('clock') }}<b>{{ fmt_minutes(week_worked) or '0:00' }}</b> of {{ fmt_minutes((week_target * 60)|round|int) or '0:00' }}</li>
+    {% if total_lines %}<li class="ts-chip ts-chip-copied">{{ icon('check') }}<b>{{ copied }} of {{ total_lines }}</b> copied</li>{% endif %}
+  </ul>
+
+  <div class="tw-scroll">
+    <table class="tw">
+      <thead>
+        <tr>
+          <th scope="col" class="tw-task">What you worked on</th>
+          {% for d in days %}
+          <th scope="col" class="{{ 'is-today' if d == today }}">
+            <a href="{{ url_for('main.timesheet', date_str=d.isoformat()) }}"><span>{{ d.strftime('%a') }}</span> {{ d.day }}</a>
+          </th>
+          {% endfor %}
+          <th scope="col">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for text, minutes in rows %}
+        <tr>
+          <th scope="row" class="tw-task">{{ text }}</th>
+          {% for m in minutes %}<td class="{{ 'is-today' if days[loop.index0] == today }}">{{ fmt_minutes(m) or '–' }}</td>{% endfor %}
+          <td class="tw-total">{{ fmt_minutes(minutes|sum) }}</td>
+        </tr>
+        {% else %}
+        <tr><td class="tw-none" colspan="9">No lines with words this week yet.</td></tr>
+        {% endfor %}
+        {% if unwritten|sum %}
+        <tr class="tw-unwritten">
+          <th scope="row" class="tw-task">Not written yet</th>
+          {% for m in unwritten %}<td class="{{ 'is-today' if days[loop.index0] == today }}">{{ fmt_minutes(m) or '–' }}</td>{% endfor %}
+          <td class="tw-total">{{ fmt_minutes(unwritten|sum) }}</td>
+        </tr>
+        {% endif %}
+      </tbody>
+      <tfoot>
+        <tr>
+          <th scope="row" class="tw-task">Worked</th>
+          {% for m in worked %}<td class="{{ 'is-today' if days[loop.index0] == today }}">{{ fmt_minutes(m) or '–' }}</td>{% endfor %}
+          <td class="tw-total">{{ fmt_minutes(week_worked) or '0:00' }}</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+
+  <div class="ts-foot">
+    {% if copy_text %}
+    <button type="button" class="btn btn-secondary tw-copy" data-copy="{{ copy_text }}" hidden>{{ icon('copy') }}<span>Copy week</span></button>
+    {% endif %}
+    <span class="tw-gap"></span>
+    {% if total_lines %}
+    <form method="post" action="{{ url_for('main.timesheet_week_posted', date_str=days[0].isoformat()) }}" class="js-once">
+      {% if copied == total_lines %}
+      <input type="hidden" name="mark" value="0">
+      <button type="submit" class="btn btn-ghost">{{ icon('undo') }}Mark not posted</button>
+      {% else %}
+      <input type="hidden" name="mark" value="1">
+      <button type="submit" class="btn btn-primary">{{ icon('check') }}Mark week posted</button>
+      {% endif %}
+    </form>
+    {% endif %}
+  </div>
+  <p class="visually-hidden" aria-live="polite" id="tw-status"></p>
+</section>
+{% endblock %}

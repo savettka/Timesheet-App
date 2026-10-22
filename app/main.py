@@ -1,4 +1,6 @@
 import calendar
+import csv
+import io
 import math
 import os
 import secrets
@@ -716,6 +718,184 @@ def punch_out():
         "success",
     )
     return redirect(url_for("main.dashboard"))
+
+
+# ------------------------------------------------------- week and reports
+
+def written_lines(user_id, first, last, now):
+    """Every Timesheet line with words from first to last (breaks aside), as
+    (date, start, end, block) in time order, and each day's TimeEntry."""
+    entries = get_entries_for_range(user_id, first, last)
+    saved = defaultdict(list)
+    for b in WorkBlock.query.filter(WorkBlock.user_id == user_id, WorkBlock.date >= first, WorkBlock.date <= last):
+        saved[b.date].append(b)
+    out = []
+    d = first
+    while d <= last:
+        for a, b, block in logic.timesheet_lines(entries.get(d), d, now, saved[d]):
+            if block is not None and block != logic.TIMESHEET_BREAK and block.text and block.text.casefold() != "break":
+                out.append((d, a, b, block))
+        d += timedelta(days=1)
+    return out, entries
+
+
+def copy_words(text, a, b):
+    """A line as the copy button puts it: "Emails (13:00 to 14:00 PM)"."""
+    to = logic.minutes_clock(b)
+    return f"{text} ({logic.minutes_clock(a):%H:%M} to {to:%H:%M} {'PM' if to.hour >= 12 else 'AM'})"
+
+
+@main_bp.route("/timesheet/week", endpoint="timesheet_week")
+@main_bp.route("/timesheet/week/<date_str>", endpoint="timesheet_week")
+@login_required
+def timesheet_week(date_str=None):
+    """The week as a timesheet: what you worked on down the side, the days
+    across, the hours where they meet -- with each day's total against its
+    target, a copy of the whole week to paste elsewhere, and a way to mark
+    it all as posted."""
+    now = datetime.now()
+    day = now.date()
+    if date_str is not None:
+        try:
+            day = datetime.strptime(date_str, "%Y-%m-%d").date()
+        except ValueError:
+            return redirect(url_for("main.timesheet_week"))
+    days = logic.week_dates(day)
+    lines, entries = written_lines(current_user.id, days[0], days[-1], now)
+    rows = defaultdict(lambda: [0] * 7)
+    for d, a, b, block in lines:
+        rows[block.text][(d - days[0]).days] += b - a
+    rows = sorted(rows.items(), key=lambda row: (-sum(row[1]), row[0].casefold()))
+    worked = [round(logic.entry_total_hours(entries[d], now=now) * 60) if d in entries and entries[d].login_time
+              else 0 for d in days]
+    written = [sum(minutes[i] for _, minutes in rows) for i in range(7)]
+    # The weekly target, as on Home: moved only by leave or a day's own target.
+    week_target = current_user.weekly_target_hours + sum(
+        logic.target_hours_for(current_user, d, entries.get(d)) - logic.entry_target_hours(current_user, d) for d in days)
+    copy = []
+    for d in days:
+        today_lines = [copy_words(block.text, a, b) for when, a, b, block in lines if when == d]
+        if today_lines:
+            copy += ([""] if copy else []) + [d.strftime("%a %d %b")] + today_lines
+    return render_template(
+        "timesheet_week.html",
+        days=days, rows=rows, worked=worked, written=written,
+        unwritten=[max(0, w - x) for w, x in zip(worked, written)],
+        week_worked=sum(worked), week_target=max(0.0, week_target),
+        copied=sum(1 for *_, block in lines if block.is_copied), total_lines=len(lines),
+        copy_text="\n".join(copy), today=now.date(),
+        prev_url=url_for("main.timesheet_week", date_str=(days[0] - timedelta(days=7)).isoformat()),
+        next_url=url_for("main.timesheet_week", date_str=(days[0] + timedelta(days=7)).isoformat()),
+        is_current=days[0] <= now.date() <= days[-1],
+        fmt_minutes=lambda m: f"{m // 60}:{m % 60:02d}" if m else "",
+    )
+
+
+@main_bp.route("/timesheet/week/<date_str>/posted", methods=["POST"])
+@login_required
+def timesheet_week_posted(date_str):
+    """Every written line of the week marked as copied (posted on the other
+    timesheet) -- or, with mark=0, back to not copied."""
+    try:
+        day = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        abort(400)
+    days = logic.week_dates(day)
+    lines, _ = written_lines(current_user.id, days[0], days[-1], datetime.now())
+    on = request.form.get("mark") != "0"
+    for *_, block in lines:
+        block.copied = block.copy_mark() if on else None
+    db.session.commit()
+    n = len(lines)
+    if not n:
+        flash("No lines with words this week yet.", "warning")
+    elif on:
+        flash(f"Marked {n} line{'s' if n != 1 else ''} as posted.", "success")
+    else:
+        flash(f"{n} line{'s' if n != 1 else ''} back to not copied.", "success")
+    return redirect(url_for("main.timesheet_week", date_str=days[0].isoformat()))
+
+
+REPORT_RANGES = {"week": "This week", "last-week": "Last week", "month": "This month", "last-month": "Last month"}
+
+
+def report_range(name, today):
+    if name == "last-week":
+        first = today - timedelta(days=today.weekday() + 7)
+        return first, first + timedelta(days=6)
+    if name == "month":
+        return today.replace(day=1), today.replace(day=calendar.monthrange(today.year, today.month)[1])
+    if name == "last-month":
+        last = today.replace(day=1) - timedelta(days=1)
+        return last.replace(day=1), last
+    first = today - timedelta(days=today.weekday())
+    return first, first + timedelta(days=6)
+
+
+@main_bp.route("/reports")
+@login_required
+def reports():
+    """Hours by day against target, breaks, overtime, the tasks the time went
+    on, and when each day began and ended -- for a week or a month."""
+    now = datetime.now()
+    today = now.date()
+    name = request.args.get("range", "week")
+    if name not in REPORT_RANGES:
+        name = "week"
+    first, last = report_range(name, today)
+    lines, entries = written_lines(current_user.id, first, min(last, today), now)
+    days = []
+    d = first
+    while d <= last:
+        entry = entries.get(d)
+        target = logic.target_hours_for(current_user, d, entry) if (entry is not None or d <= today) else 0.0
+        worked = logic.entry_total_hours(entry, now=now) if entry is not None and entry.login_time else 0.0
+        due = logic.accrued_target_hours(target, entry, d, today, now=now)
+        days.append(SimpleNamespace(
+            date=d, entry=entry, worked=worked, target=target, due=due, balance=worked - due,
+            breaks=logic.entry_break_hours(entry, now=now) if entry is not None and entry.login_time else 0.0,
+            future=d > today, is_today=d == today,
+        ))
+        d += timedelta(days=1)
+    worked_days = [x for x in days if x.worked > 0]
+    starts = [logic.clock_minutes(x.entry.login_time) for x in worked_days]
+    ends = [logic.clock_minutes(x.entry.logout_time, ending=True) for x in worked_days if x.entry.logout_time]
+    tasks = defaultdict(int)
+    for _, a, b, block in lines:
+        tasks[block.text] += b - a
+    tasks = sorted(tasks.items(), key=lambda t: -t[1])
+    top = max((x.worked for x in days), default=0)
+    scale = max(top, max((x.target for x in days), default=0), 1)
+    return render_template(
+        "reports.html",
+        name=name, ranges=REPORT_RANGES, first=first, last=last, days=days, scale=scale,
+        worked=sum(x.worked for x in days), due=sum(x.due for x in days),
+        breaks=sum(x.breaks for x in days), days_worked=len(worked_days),
+        avg_start=logic.fmt_clock(logic.minutes_clock(sum(starts) // len(starts))) if starts else "",
+        avg_end=logic.fmt_clock(logic.minutes_clock(sum(ends) // len(ends) % 1440)) if ends else "",
+        tasks=tasks[:10], task_total=sum(m for _, m in tasks) or 1, written=len(lines),
+        fmt_hours=logic.fmt_hours, fmt_balance=logic.fmt_balance, fmt_time=logic.fmt_time,
+        fmt_length=logic.fmt_length, fmt_hours_compact=logic.fmt_hours_compact,
+    )
+
+
+@main_bp.route("/reports/lines.csv")
+@login_required
+def reports_csv():
+    """The range's written lines, one a row, for a spreadsheet."""
+    now = datetime.now()
+    name = request.args.get("range", "week")
+    first, last = report_range(name if name in REPORT_RANGES else "week", now.date())
+    lines, _ = written_lines(current_user.id, first, min(last, now.date()), now)
+    out = io.StringIO()
+    sheet = csv.writer(out)
+    sheet.writerow(["Date", "From", "To", "Hours", "What you worked on", "Copied"])
+    for d, a, b, block in lines:
+        sheet.writerow([d.isoformat(), logic.minutes_clock(a).strftime("%H:%M"), logic.minutes_clock(b).strftime("%H:%M"),
+                        f"{(b - a) / 60:.2f}", block.text, "Yes" if block.is_copied else ""])
+    response = current_app.response_class(out.getvalue(), mimetype="text/csv")
+    response.headers["Content-Disposition"] = f'attachment; filename="STM lines {first.isoformat()} to {last.isoformat()}.csv"'
+    return response
 
 
 # ------------------------------------------------------- calendar grid

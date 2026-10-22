@@ -774,6 +774,60 @@ table { border-collapse: collapse; width: 100%; }
   .cal-bal { font-size: 12px; }
 }
 
+/* The week's timesheet: tasks down the side, days across, totals at the
+   foot; today's column tinted. Scrolls sideways on its own on a phone. */
+.tw-card { max-width: 1100px; }
+.tw-sum { justify-content: center; margin: 0 0 var(--s4); }
+.tw-scroll { overflow-x: auto; margin: 0 calc(var(--s2) * -1); padding: 0 var(--s2); }
+.tw { min-width: 640px; font-variant-numeric: tabular-nums; }
+.tw th, .tw td { padding: 10px 8px; text-align: center; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.tw thead th { font-size: 14px; font-weight: 600; color: var(--text-2); }
+.tw thead a { color: inherit; text-decoration: none; }
+.tw thead a span { color: var(--text-3); font-weight: 500; }
+.tw thead a:hover { color: var(--accent-text); }
+.tw .tw-task { text-align: left; font-weight: 600; white-space: normal; min-width: 180px; max-width: 320px; }
+.tw tbody td { color: var(--text); }
+.tw .is-today { background: color-mix(in srgb, var(--accent-soft) 60%, transparent); }
+.tw .tw-total { font-weight: 700; }
+.tw-unwritten th, .tw-unwritten td { color: var(--warn-text); background: color-mix(in srgb, var(--warn-bg) 60%, transparent); }
+.tw tfoot th, .tw tfoot td { font-weight: 700; border-bottom: 0; border-top: 2px solid var(--line); }
+.tw-none { color: var(--text-3); padding: var(--s5) !important; }
+.tw-card .ts-foot { margin-top: var(--s4); }
+.tw-gap { flex: 1; }
+.tw-card .ts-foot form { margin: 0; }
+.tw-copy.is-copied { color: var(--success-text); border-color: currentColor; }
+
+/* Reports */
+.rp-period { text-align: center; color: var(--text-2); margin: calc(var(--s2) * -1) 0 var(--s4); }
+.rp-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s3); margin: 0 0 var(--s4); }
+@media (min-width: 720px) { .rp-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.rp-stat { background: var(--surface); border: 1px solid var(--card-border); border-radius: var(--r-lg); box-shadow: var(--shadow); padding: var(--s3) var(--s4); }
+.rp-stat dt { font-size: 14px; color: var(--text-2); font-weight: 500; }
+.rp-stat dd { margin: 2px 0 0; font-size: 24px; font-weight: 700; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.rp-stat dd.rp-small { font-size: 17px; line-height: 1.6; }
+.rp-stat.is-ahead dd { color: var(--ahead); }
+.rp-stat.is-behind dd { color: var(--behind); }
+.rp-grid { display: grid; gap: var(--s4); grid-template-columns: minmax(0, 1fr); margin-bottom: var(--s4); }
+@media (min-width: 1040px) { .rp-grid { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); } }
+.rp-bars { list-style: none; display: grid; grid-template-columns: repeat(var(--days), minmax(0, 1fr)); gap: 4px; align-items: end; height: 220px; margin-top: var(--s4); }
+.rp-bar { display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; min-width: 0; }
+.rp-bar-col { position: relative; flex: 1; width: min(100%, 40px); }
+.rp-fill { position: absolute; left: 0; right: 0; bottom: 0; height: var(--h); border-radius: 6px 6px 2px 2px; background: color-mix(in srgb, var(--accent) 75%, var(--surface)); }
+.rp-fill.is-met { background: color-mix(in srgb, var(--go) 75%, var(--surface)); }
+.rp-target { position: absolute; left: -3px; right: -3px; bottom: var(--h); border-top: 2px dashed var(--text-3); z-index: 1; }
+.rp-bar.is-today .rp-bar-day { color: var(--accent-text); font-weight: 700; }
+.rp-bar.is-future .rp-bar-col { opacity: .4; }
+.rp-bar-num, .rp-bar-day { font-size: 13px; color: var(--text-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.rp-bar-num { min-height: 1.2em; font-weight: 600; color: var(--text); }
+@media (max-width: 720px) { .rp-bars { gap: 2px; } .rp-bar-num { display: none; } }
+.rp-tasks { list-style: none; display: flex; flex-direction: column; gap: var(--s3); }
+.rp-tasks li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px var(--s3); }
+.rp-task-text { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rp-task-time { font-weight: 700; font-variant-numeric: tabular-nums; }
+.rp-task-bar { grid-column: 1 / -1; height: 6px; border-radius: 6px; background: var(--surface-3); overflow: hidden; }
+.rp-task-bar span { display: block; height: 100%; border-radius: 6px; background: var(--accent); }
+.rp-attendance .card-title { padding: var(--s4) var(--s4) 0; }
+
 /* Day / Week / Month: one row of tabs, the one you're on a dark pill. */
 .seg { display: flex; gap: 4px; width: fit-content; margin: 0 auto var(--s4); padding: 4px; border-radius: 999px; background: var(--surface-2); }
 .seg a {
