@@ -841,6 +841,89 @@
     });
   }
 
+  // ------------------------------------------------------------ calendar grid
+  // A block opens in a box to change its words or times (an empty one, or
+  // a click on the grid, to write a new line); a written line's bottom edge
+  // can be dragged, in 5-minute steps, and is saved on letting go.
+  function initCalendarGrid() {
+    var grid = document.querySelector(".cg");
+    var dialog = document.getElementById("cg-dialog");
+    if (!grid || !dialog || !dialog.showModal) return;
+    var form = document.getElementById("cg-form");
+    var resize = document.getElementById("cg-resize");
+    var from = parseInt(grid.dataset.from, 10), to = parseInt(grid.dataset.to, 10);
+    var ppm = function () { return grid.querySelector(".cg-body").getBoundingClientRect().height / (to - from); };
+    function hhmm(m) { m = ((m % 1440) + 1440) % 1440; return String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0"); }
+    function minutes(v, isEnd) { var m = parseInt(v.slice(0, 2), 10) * 60 + parseInt(v.slice(3, 5), 10); return m === 0 && isEnd ? 1440 : m; }
+    function set(f, name, value) { f.querySelector('[name="' + name + '"]').value = value; }
+
+    function open(date, block, start, end) {
+      set(form, "date", date);
+      set(form, "id", block ? block.dataset.id : "");
+      set(form, "start", start);
+      set(form, "end", end);
+      set(form, "text", block ? block.dataset.text : "");
+      var written = block && block.dataset.id;
+      document.getElementById("cg-dialog-title").textContent = written ? "Change this line" : "Write a line";
+      document.getElementById("cg-open").href = "/timesheet/" + date;
+      dialog.showModal();
+      document.getElementById("cg-text").focus();
+    }
+    document.getElementById("cg-cancel").addEventListener("click", function () { dialog.close(); });
+    // On its way: the box steps aside so the loading circle shows.
+    form.addEventListener("submit", function (e) {
+      setTimeout(function () { if (!e.defaultPrevented) dialog.close(); }, 0);
+    });
+
+    var dragged = false;
+    grid.addEventListener("click", function (e) {
+      if (dragged) { e.preventDefault(); dragged = false; return; }
+      var col = e.target.closest(".cg-col");
+      if (!col) return;
+      var block = e.target.closest(".cg-block");
+      e.preventDefault();
+      if (block) return open(col.dataset.date, block, block.dataset.start, block.dataset.end);
+      // An empty part of the day: an hour from the o'clock clicked.
+      var y = e.clientY - col.getBoundingClientRect().top;
+      var at = Math.max(from, Math.min(to - 60, Math.floor((from + y / ppm()) / 60) * 60));
+      open(col.dataset.date, null, hhmm(at), hhmm(at + 60));
+    });
+
+    grid.addEventListener("pointerdown", function (e) {
+      var grip = e.target.closest(".cg-grip");
+      if (!grip) return;
+      e.preventDefault();
+      var block = grip.closest(".cg-block"), col = block.closest(".cg-col");
+      var start = minutes(block.dataset.start), end = minutes(block.dataset.end, true), was = end;
+      var y0 = e.clientY, scale = ppm(), label = block.querySelector(".cg-time");
+      block.classList.add("is-dragging");
+      grip.setPointerCapture(e.pointerId);
+      function move(ev) {
+        end = Math.max(start + 5, Math.min(1440, Math.round((was + (ev.clientY - y0) / scale) / 5) * 5));
+        block.style.setProperty("--l", end - start);
+        if (label) label.textContent = hhmm(start) + " – " + hhmm(end);
+      }
+      function up() {
+        grip.removeEventListener("pointermove", move);
+        grip.removeEventListener("pointerup", up);
+        grip.removeEventListener("pointercancel", up);
+        block.classList.remove("is-dragging");
+        dragged = true;
+        setTimeout(function () { dragged = false; }, 0);
+        if (end === was) return;
+        set(resize, "date", col.dataset.date);
+        set(resize, "id", block.dataset.id);
+        set(resize, "start", block.dataset.start);
+        set(resize, "end", hhmm(end));
+        set(resize, "text", block.dataset.text);
+        if (resize.requestSubmit) resize.requestSubmit(); else resize.submit();
+      }
+      grip.addEventListener("pointermove", move);
+      grip.addEventListener("pointerup", up);
+      grip.addEventListener("pointercancel", up);
+    });
+  }
+
   // ------------------------------------------------------------ timer
   // The running timer's clock, counting on from the seconds the page was
   // given, so it stays right however long the page is left open.
@@ -914,6 +997,7 @@
     initForms();
     initPageWait();
     initTimerClock();
+    initCalendarGrid();
     initLiveTimer();
     initStatusPoll();
     initBreakRows();

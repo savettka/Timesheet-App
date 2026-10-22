@@ -774,6 +774,86 @@ table { border-collapse: collapse; width: 100%; }
   .cal-bal { font-size: 12px; }
 }
 
+/* Day / Week / Month: one row of tabs, the one you're on a dark pill. */
+.seg { display: flex; gap: 4px; width: fit-content; margin: 0 auto var(--s4); padding: 4px; border-radius: 999px; background: var(--surface-2); }
+.seg a {
+  display: inline-flex; align-items: center; min-height: 36px; padding: 0 18px;
+  border-radius: 999px; color: var(--text-2); font-size: 15px; font-weight: 600; text-decoration: none;
+}
+.seg a:hover { color: var(--text); }
+.seg a[aria-current="page"] { background: var(--pill); color: var(--on-pill); }
+
+/* The time grid: an hour is 64px; each block sits at its start and is as
+   tall as it is long. Coloured as on the Timesheet: written lines blue,
+   breaks amber, copied green, empty hours a dashed outline. */
+.cg { --ppm: 1.0667px; --times: 52px; }
+.cg-head, .cg-body { display: grid; grid-template-columns: var(--times) repeat(var(--cols), minmax(0, 1fr)); gap: 0 6px; }
+.cg-head { position: sticky; top: 72px; z-index: 5; padding-bottom: var(--s2); background: var(--surface); border-bottom: 1px solid var(--line); }
+.cg-day {
+  display: flex; flex-direction: column; align-items: center; gap: 0;
+  padding: 6px 0; border-radius: var(--r-md); text-decoration: none; color: var(--text);
+}
+.cg-day:hover { background: var(--surface-2); }
+.cg-day-name { font-size: 13px; font-weight: 600; color: var(--text-3); }
+.cg-day-num { font-size: 19px; font-weight: 700; line-height: 1.2; }
+.cg-day-hours { font-size: 13px; font-weight: 600; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.cg-day.is-today .cg-day-num {
+  display: inline-grid; place-items: center; min-width: 30px; height: 30px; border-radius: 999px;
+  background: var(--accent); color: var(--on-accent);
+}
+.cg-body { position: relative; height: calc(var(--span) * var(--ppm)); margin-top: var(--s2); }
+.cg-times { position: relative; }
+.cg-times span {
+  position: absolute; right: 8px; top: calc(var(--at) * var(--ppm) - 9px);
+  font-size: 13px; color: var(--text-3); white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+.cg-col {
+  position: relative; border-radius: var(--r-sm);
+  background: repeating-linear-gradient(to bottom, var(--line) 0 1px, transparent 1px calc(60 * var(--ppm)));
+  cursor: copy;
+}
+.cg-col.is-today { background-color: color-mix(in srgb, var(--accent-soft) 45%, transparent); }
+.cg-block {
+  position: absolute; left: 2px; right: 2px;
+  top: calc(var(--s) * var(--ppm) + 1px); height: calc(var(--l) * var(--ppm) - 2px);
+  min-height: 18px; overflow: hidden;
+  display: flex; flex-direction: column; gap: 0; padding: 3px 8px;
+  border-radius: 8px; text-decoration: none;
+  background: var(--accent-soft); color: var(--accent-text);
+  box-shadow: inset 3px 0 0 var(--accent);
+  cursor: pointer;
+}
+.cg-block:hover { filter: brightness(.97); }
+.cg-text { font-size: 13px; font-weight: 600; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cg-time { font-size: 13px; line-height: 1.3; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.cg-block.kind-break { background: var(--tint-break); color: var(--warn-text); box-shadow: inset 3px 0 0 var(--pause); }
+.cg-block.kind-empty {
+  background: transparent; color: var(--text-3);
+  box-shadow: none; outline: 1.5px dashed var(--line-strong); outline-offset: -2px;
+}
+.cg-block.is-copied { background: var(--success-bg); color: var(--success-text); box-shadow: inset 3px 0 0 var(--go); }
+.cg-block.is-now { outline: 2px solid var(--accent); outline-offset: -2px; }
+.cg-grip { position: absolute; left: 0; right: 0; bottom: 0; height: 9px; cursor: ns-resize; touch-action: none; }
+.cg-grip::after { content: ""; position: absolute; left: 50%; bottom: 3px; width: 22px; height: 3px; margin-left: -11px; border-radius: 3px; background: currentColor; opacity: .35; }
+.cg-block.is-dragging { z-index: 3; box-shadow: inset 3px 0 0 var(--accent), var(--shadow-lg); }
+.cg-now { position: absolute; left: -3px; right: 0; top: calc(var(--s) * var(--ppm)); height: 2px; background: var(--stop); z-index: 2; pointer-events: none; }
+.cg-now::before { content: ""; position: absolute; left: -3px; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: var(--stop); }
+.cg-view-week .cg-time { display: none; }
+@media (max-width: 720px) {
+  .cg { --times: 40px; }
+  .cg-head { top: 64px; }
+  .cg-view-week .cg-block { padding: 2px 3px; }
+  .cg-view-week .cg-text { display: none; }  /* a week on a phone: colours only; a tap opens the line */
+  .cg-times span { font-size: 13px; right: 4px; }
+}
+
+.cg-dialog {
+  width: min(460px, calc(100vw - 32px)); padding: var(--s5);
+  border: 1px solid var(--card-border); border-radius: var(--r-lg);
+  background: var(--surface); color: var(--text); box-shadow: var(--shadow-lg);
+}
+.cg-dialog::backdrop { background: color-mix(in srgb, var(--bg) 40%, rgba(0, 0, 0, .35)); }
+
 /* ==========================================================================
    Forms
    ========================================================================== */

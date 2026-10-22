@@ -718,6 +718,179 @@ def punch_out():
     return redirect(url_for("main.dashboard"))
 
 
+# ------------------------------------------------------- calendar grid
+
+def clean_text(text):
+    return " ".join((text or "").split())[:WorkBlock.MAX_LENGTH].rstrip()
+
+
+def move_line(block, a, b, blocks):
+    """Give a saved line new times, a to b in minutes, with the lines beside
+    it following: one that met an edge moves with it, one it now runs into
+    starts (or ends) where it does. Returns why it can't, or None."""
+    old_a = logic.clock_minutes(block.start_time)
+    old_b = logic.clock_minutes(block.end_time, ending=True)
+    for other in blocks:
+        if other is block:
+            continue
+        s, e = logic.clock_minutes(other.start_time), logic.clock_minutes(other.end_time, ending=True)
+        if s == old_b or (b > old_b and old_b <= s < b):
+            if b >= e:
+                return "That would run over the whole of the next line. Change it on the Timesheet."
+            other.start_time = logic.minutes_clock(b)
+        elif e == old_a or (a < old_a and a < e <= old_a):
+            if a <= s:
+                return "That would run over the whole of the line before. Change it on the Timesheet."
+            other.end_time = logic.minutes_clock(a)
+    block.start_time, block.end_time = logic.minutes_clock(a), logic.minutes_clock(b)
+    return None
+
+
+def calendar_columns(user_id, days, now):
+    """Each day's Timesheet lines as blocks for the time grid, and the hours
+    the grid runs over (whole hours, at least 1 PM to 10 PM)."""
+    today = now.date()
+    entries = {e.date: e for e in TimeEntry.query.filter(
+        TimeEntry.user_id == user_id, TimeEntry.date >= days[0], TimeEntry.date <= days[-1])}
+    saved = defaultdict(list)
+    for b in WorkBlock.query.filter(WorkBlock.user_id == user_id, WorkBlock.date >= days[0],
+                                    WorkBlock.date <= days[-1]):
+        saved[b.date].append(b)
+    minute = now.hour * 60 + now.minute
+    columns, low, high = [], logic.TIMESHEET_DAY[0], logic.TIMESHEET_DAY[1]
+    for d in days:
+        entry = entries.get(d)
+        if d > today:
+            lines = []
+        elif entry is None or entry.login_time is None:
+            # Not worked: only lines written in by hand, no empty hours.
+            lines = [line for line in logic.timesheet_lines(entry, d, now, saved[d]) if line[2] is not None
+                     and line[2] != logic.TIMESHEET_BREAK]
+        else:
+            lines = logic.timesheet_lines(entry, d, now, saved[d])
+        blocks = []
+        for a, b, block in lines:
+            text = "Break" if block == logic.TIMESHEET_BREAK else (block.text if block is not None else "")
+            kind = "break" if text.casefold() == "break" else ("saved" if text else "empty")
+            blocks.append(SimpleNamespace(
+                start=a, end=b, text=text, kind=kind,
+                id=str(block.id) if block is not None and block != logic.TIMESHEET_BREAK else "",
+                start_hhmm=logic.minutes_clock(a).strftime("%H:%M"), end_hhmm=logic.minutes_clock(b).strftime("%H:%M"),
+                span=logic.fmt_span(a, b), length=logic.fmt_length(b - a),
+                copied=block is not None and block != logic.TIMESHEET_BREAK and block.is_copied,
+                now=d == today and a <= minute < b,
+            ))
+            low, high = min(low, a), max(high, b)
+        worked = logic.entry_total_hours(entry, now=now) if entry is not None and entry.login_time else 0
+        columns.append(SimpleNamespace(date=d, blocks=blocks, is_today=d == today, worked=worked,
+                                       now_at=minute if d == today else None))
+    low, high = low // 60 * 60, min(1440, -(-high // 60) * 60)
+    return columns, low, high
+
+
+def calendar_grid(view, date_str):
+    now = datetime.now()
+    today = now.date()
+    day = today
+    if date_str is not None:
+        try:
+            day = datetime.strptime(date_str, "%Y-%m-%d").date()
+        except ValueError:
+            return redirect(url_for(f"main.calendar_{view}"))
+    if view == "week":
+        first = day - timedelta(days=day.weekday())
+        days = [first + timedelta(days=i) for i in range(7)]
+        step = timedelta(days=7)
+        title = f"{days[0]:%d %b} – {days[-1]:%d %b %Y}"
+        is_current = first <= today <= days[-1]
+    else:
+        days, step, title, is_current = [day], timedelta(days=1), f"{day:%A %d %B}", day == today
+    columns, low, high = calendar_columns(current_user.id, days, now)
+    endpoint = f"main.calendar_{view}"
+    return render_template(
+        "calendar_grid.html",
+        view=view, columns=columns, grid_from=low, grid_to=high, title=title, is_current=is_current,
+        hours=[(m, logic.fmt_clock(logic.minutes_clock(m)).replace(":00", "")) for m in range(low, high + 1, 60)],
+        prev_url=url_for(endpoint, date_str=(days[0] - step).isoformat()),
+        next_url=url_for(endpoint, date_str=(days[0] + step).isoformat()),
+        today_url=url_for(endpoint),
+        here=url_for(endpoint, date_str=days[0].isoformat()),
+        day_url=url_for("main.calendar_day", date_str=day.isoformat()),
+        week_url=url_for("main.calendar_week", date_str=day.isoformat()),
+        month_url=url_for("main.calendar", year=day.year, month=day.month),
+        today=today, fmt_hours_compact=logic.fmt_hours_compact,
+        recent=recent_texts(current_user.id, today),
+    )
+
+
+@main_bp.route("/calendar/week", endpoint="calendar_week")
+@main_bp.route("/calendar/week/<date_str>", endpoint="calendar_week")
+@login_required
+def calendar_week(date_str=None):
+    return calendar_grid("week", date_str)
+
+
+@main_bp.route("/calendar/day", endpoint="calendar_day")
+@main_bp.route("/calendar/day/<date_str>", endpoint="calendar_day")
+@login_required
+def calendar_day(date_str=None):
+    return calendar_grid("day", date_str)
+
+
+@main_bp.route("/calendar/line", methods=["POST"])
+@login_required
+def calendar_line():
+    """A line added or changed from the Calendar: from the box a block opens,
+    or by dragging its edge. Back to the same view afterwards."""
+    form = request.form
+    back = form.get("back", "")
+    if not back.startswith("/calendar/") or "//" in back:
+        back = url_for("main.calendar_week")
+    try:
+        day = datetime.strptime(form.get("date", ""), "%Y-%m-%d").date()
+    except ValueError:
+        abort(400)
+    if day > datetime.now().date():
+        flash("That day hasn't come yet.", "error")
+        return redirect(back)
+    start, end = parse_time_field(form.get("start")), parse_time_field(form.get("end"))
+    text = clean_text(form.get("text"))
+    if start is None or end is None:
+        flash("Give the line a start and an end time.", "error")
+        return redirect(back)
+    a, b = logic.clock_minutes(start), logic.clock_minutes(end, ending=True)
+    if b <= a:
+        flash("The end has to be after the start.", "error")
+        return redirect(back)
+    blocks = WorkBlock.query.filter_by(user_id=current_user.id, date=day).all()
+    block_id = form.get("id", "")
+    if block_id:
+        block = next((x for x in blocks if str(x.id) == block_id), None)
+        if block is None:
+            abort(404)
+        if not text:
+            # Kept with no words, so its time isn't offered again -- as Delete
+            # on the Timesheet does.
+            block.text = ""
+            db.session.commit()
+            flash(f"Deleted {logic.fmt_span(a, b)}.", "success")
+            return redirect(back)
+        error = move_line(block, a, b, blocks)
+        if error:
+            db.session.rollback()
+            flash(error, "error")
+            return redirect(back)
+        block.text = text
+    else:
+        if not text:
+            flash("Write what you worked on, to keep this line.", "error")
+            return redirect(back)
+        place_timed_line(current_user.id, day, a, b, text)
+    db.session.commit()
+    flash(f"Saved {logic.fmt_span(a, b)}.", "success")
+    return redirect(back)
+
+
 # ------------------------------------------------------- history, calendar
 
 def _month_page(year, month):

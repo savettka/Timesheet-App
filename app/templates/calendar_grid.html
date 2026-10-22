@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% block title %}Calendar{% endblock %}
+{% block page_title %}Calendar{% endblock %}
+
+{% block content %}
+<section class="card cg-card" aria-labelledby="cg-title">
+  <nav class="seg" aria-label="Calendar view">
+    <a href="{{ day_url }}"{{ ' aria-current="page"'|safe if view == 'day' }}>Day</a>
+    <a href="{{ week_url }}"{{ ' aria-current="page"'|safe if view == 'week' }}>Week</a>
+    <a href="{{ month_url }}">Month</a>
+  </nav>
+  <div class="month-nav">
+    <a class="btn btn-icon" href="{{ prev_url }}" aria-label="Previous {{ view }}">{{ icon('chevron-left') }}</a>
+    <h2 id="cg-title" class="month-title">{{ title }}</h2>
+    <a class="btn btn-icon" href="{{ next_url }}" aria-label="Next {{ view }}">{{ icon('chevron-right') }}</a>
+  </div>
+  {% if not is_current %}<p class="month-jump"><a class="link" href="{{ today_url }}">Jump to today</a></p>{% endif %}
+
+  {# Each day a column of its Timesheet lines on one time grid. A block is a
+     link to that day's Timesheet; app.js opens it in a box here instead, and
+     lets a written line's bottom edge be dragged. #}
+  <div class="cg cg-view-{{ view }}" style="--from: {{ grid_from }}; --span: {{ grid_to - grid_from }}; --cols: {{ columns|length }}"
+       data-from="{{ grid_from }}" data-to="{{ grid_to }}">
+    <div class="cg-head">
+      <span class="cg-gutter" aria-hidden="true"></span>
+      {% for col in columns %}
+      <a class="cg-day{{ ' is-today' if col.is_today }}" href="{{ url_for('main.timesheet', date_str=col.date.isoformat()) }}"
+         {%- if col.is_today %} aria-current="date"{% endif %}>
+        <span class="cg-day-name">{{ col.date.strftime('%a') }}</span>
+        <span class="cg-day-num">{{ col.date.day }}</span>
+        <span class="cg-day-hours">{{ fmt_hours_compact(col.worked) if col.worked else '–' }}</span>
+      </a>
+      {% endfor %}
+    </div>
+    <div class="cg-body">
+      <div class="cg-times" aria-hidden="true">
+        {% for at, label in hours %}<span style="--at: {{ at - grid_from }}">{{ label }}</span>{% endfor %}
+      </div>
+      {% for col in columns %}
+      <div class="cg-col{{ ' is-today' if col.is_today }}" data-date="{{ col.date.isoformat() }}"
+           aria-label="{{ col.date.strftime('%A %d %B') }}" role="group">
+        {% for b in col.blocks %}
+        <a class="cg-block kind-{{ b.kind }}{{ ' is-copied' if b.copied }}{{ ' is-now' if b.now }}"
+           href="{{ url_for('main.timesheet', date_str=col.date.isoformat()) }}"
+           style="--s: {{ b.start - grid_from }}; --l: {{ b.end - b.start }}"
+           data-id="{{ b.id }}" data-start="{{ b.start_hhmm }}" data-end="{{ b.end_hhmm }}" data-text="{{ b.text }}"
+           aria-label="{{ b.span }}, {{ b.text or 'nothing written yet' }}">
+          <span class="cg-text">{{ b.text or 'Empty' }}</span>
+          <span class="cg-time">{{ b.span }} · {{ b.length }}</span>
+          {% if b.id and b.kind != 'break' %}<span class="cg-grip" aria-hidden="true"></span>{% endif %}
+        </a>
+        {% endfor %}
+        {% if col.now_at is not none and grid_from <= col.now_at < grid_to %}
+        <span class="cg-now" style="--s: {{ col.now_at - grid_from }}" aria-hidden="true"></span>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<dialog class="cg-dialog" id="cg-dialog" aria-labelledby="cg-dialog-title">
+  <form method="post" action="{{ url_for('main.calendar_line') }}" class="form js-once" id="cg-form">
+    <h2 class="card-title" id="cg-dialog-title">Line</h2>
+    <input type="hidden" name="date">
+    <input type="hidden" name="id">
+    <input type="hidden" name="back" value="{{ here }}">
+    <div class="field-row">
+      <div class="field"><label for="cg-start">From</label><input type="time" id="cg-start" name="start" required></div>
+      <div class="field"><label for="cg-end">To</label><input type="time" id="cg-end" name="end" required></div>
+    </div>
+    <div class="field">
+      <label for="cg-text">What you worked on</label>
+      <input type="text" id="cg-text" name="text" maxlength="300" autocomplete="off"
+             {%- if recent %} list="cg-recent"{% endif %}>
+    </div>
+    {% if recent %}<datalist id="cg-recent">{% for text in recent %}<option value="{{ text }}">{% endfor %}</datalist>{% endif %}
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">{{ icon('check') }}Save</button>
+      <a class="btn btn-secondary" id="cg-open" href="#">Open the day</a>
+      <button type="button" class="btn btn-ghost" id="cg-cancel">Cancel</button>
+    </div>
+  </form>
+</dialog>
+{# What a drag sends: the block's new end, its start and words as they were. #}
+<form method="post" action="{{ url_for('main.calendar_line') }}" id="cg-resize" class="js-once" hidden>
+  <input type="hidden" name="date"><input type="hidden" name="id"><input type="hidden" name="start">
+  <input type="hidden" name="end"><input type="hidden" name="text"><input type="hidden" name="back" value="{{ here }}">
+</form>
+{% endblock %}

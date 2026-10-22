@@ -6,6 +6,11 @@
 {% block content %}
 {% set balance_minutes = (summary.balance_hours * 60)|round|int %}
 <section class="card cal-card" aria-labelledby="cal-title">
+  <nav class="seg" aria-label="Calendar view">
+    <a href="{{ url_for('main.calendar_day') }}">Day</a>
+    <a href="{{ url_for('main.calendar_week') }}">Week</a>
+    <a href="{{ url_for('main.calendar', year=year, month=month) }}" aria-current="page">Month</a>
+  </nav>
   <div class="month-nav">
     <a class="btn btn-icon" href="{{ url_for('main.calendar', year=prev_year, month=prev_month) }}"
        aria-label="Previous month">{{ icon('chevron-left') }}</a>
