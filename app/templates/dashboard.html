@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "partials/icons.html" import icon %}
+{% from "partials/timer.html" import timer_card %}
 {% block title %}Home{% endblock %}
 {% block page_title %}
   {%- set first_name = ((current_user.display_name or current_user.username).split() or [current_user.username])[0] -%}
@@ -7,6 +8,7 @@
 {%- endblock %}
 
 {% block content %}
+{{ timer_card(timer, can_time, recent, 'dashboard') }}
 {% if to_fill %}
 <section class="card fill-card" aria-labelledby="fill-heading">
   <h2 id="fill-heading" class="card-title">{{ icon('clipboard') }}Timesheet to fill in</h2>

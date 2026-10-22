@@ -841,6 +841,23 @@
     });
   }
 
+  // ------------------------------------------------------------ timer
+  // The running timer's clock, counting on from the seconds the page was
+  // given, so it stays right however long the page is left open.
+  function initTimerClock() {
+    var run = document.querySelector(".timer-run[data-elapsed]");
+    if (!run) return;
+    var clock = run.querySelector(".timer-clock");
+    var started = Date.now() - parseInt(run.dataset.elapsed, 10) * 1000;
+    function pad(n) { return (n < 10 ? "0" : "") + n; }
+    function tick() {
+      var s = Math.max(0, Math.floor((Date.now() - started) / 1000));
+      clock.textContent = Math.floor(s / 3600) + ":" + pad(Math.floor(s / 60) % 60) + ":" + pad(s % 60);
+    }
+    tick();
+    setInterval(tick, 1000);
+  }
+
   // ------------------------------------------------------------ page wait
   // A press that loads another page -- a form sent, a link followed --
   // puts a small spinning circle over the page until the next one arrives,
@@ -896,6 +913,7 @@
     initFlashes();
     initForms();
     initPageWait();
+    initTimerClock();
     initLiveTimer();
     initStatusPoll();
     initBreakRows();

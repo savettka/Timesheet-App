@@ -616,6 +616,39 @@ table { border-collapse: collapse; width: 100%; }
 
 .saturday-card .banner { margin: 0; }
 
+/* The timer: a running task with its clock and Stop, and a box to start or
+   switch, with the latest tasks a tap away. */
+.timer-card { margin-bottom: var(--s4); display: flex; flex-direction: column; gap: var(--s3); }
+.ts-timer { margin-bottom: var(--s4); }
+.ts-timer .timer-card { margin: 0; }
+.timer-run, .timer-new { display: flex; align-items: center; gap: var(--s3); }
+.timer-run { padding: var(--s2) var(--s2) var(--s2) var(--s4); border-radius: var(--r-md); background: var(--accent-soft); }
+.timer-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--go); flex: none; }
+@media (prefers-reduced-motion: no-preference) { .timer-dot { animation: pulse 2.4s ease-in-out infinite; } }
+.timer-text { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.timer-clock { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.timer-input { flex: 1; min-width: 0; }
+.timer-btn { flex: none; }
+.timer-run form, .timer-new { margin: 0; }
+.timer-new { flex: 1; }
+.timer-again-row { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.timer-again-row form { margin: 0; min-width: 0; }
+.timer-again {
+  display: inline-flex; align-items: center; gap: 6px; max-width: 100%;
+  min-height: 40px; padding: 0 14px;
+  border: 1px solid var(--line); border-radius: 999px;
+  background: var(--surface); color: var(--text-2);
+  font-size: 14px; font-weight: 500; cursor: pointer;
+}
+.timer-again span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.timer-again:hover { background: var(--surface-2); color: var(--text); }
+.timer-again .icon { color: var(--accent-text); }
+@media (max-width: 520px) {
+  .timer-run { flex-wrap: wrap; }
+  .timer-text { flex-basis: calc(100% - 30px); }
+  .timer-run form { margin-left: auto; }
+}
+
 /* Home: days with Timesheet lines still to fill in, newest first. */
 .fill-card { margin-bottom: var(--s4); display: flex; align-items: center; flex-wrap: wrap; gap: var(--s3) var(--s4); }
 .fill-card .card-title { display: flex; align-items: center; gap: var(--s2); }

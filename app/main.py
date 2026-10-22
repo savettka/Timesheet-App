@@ -322,6 +322,9 @@ def dashboard():
         current_user, month_entries, today.year, today.month, today, now=ctx["now"]
     )
     ctx["to_fill"] = days_to_fill(current_user.id, ctx["now"])
+    ctx["timer"] = timer_view(current_user, ctx["now"])
+    ctx["can_time"] = ctx["day_state"] == "working"
+    ctx["recent"] = recent_texts(current_user.id, today)
     return render_template("dashboard.html", **ctx)
 
 
@@ -397,6 +400,106 @@ def stale_shift_redirect(entry):
 def mark_label(entry, mark):
     """Names the latest recorded point on a shift, for an error message."""
     return "you logged in" if mark == logic.shift_login_dt(entry) else "your last break"
+
+
+# ------------------------------------------------------------------ timer
+
+def timer_view(user, now):
+    """The running timer as the page shows it, or None."""
+    if user.timer_start is None:
+        return None
+    elapsed = max(0, int((now - user.timer_start).total_seconds()))
+    h, rest = divmod(elapsed, 3600)
+    return SimpleNamespace(text=user.timer_text or "", elapsed=elapsed, clock=f"{h}:{rest // 60:02d}:{rest % 60:02d}")
+
+
+def place_timed_line(user_id, day, a, b, text):
+    """Write a timed line, a to b in minutes, onto a day's Timesheet. The same
+    words carrying straight on from a line make that line longer; lines it
+    runs over give way -- cut short, or split around it."""
+    blocks = WorkBlock.query.filter_by(user_id=user_id, date=day).all()
+    line = next((blk for blk in blocks if blk.text == text
+                 and logic.clock_minutes(blk.end_time, ending=True) == a), None)
+    if line is not None:
+        a = logic.clock_minutes(line.start_time)
+        line.end_time = logic.minutes_clock(b)
+    else:
+        line = WorkBlock(user_id=user_id, date=day, start_time=logic.minutes_clock(a),
+                         end_time=logic.minutes_clock(b), text=text)
+        db.session.add(line)
+    for blk in blocks:
+        if blk is line:
+            continue
+        s, e = logic.clock_minutes(blk.start_time), logic.clock_minutes(blk.end_time, ending=True)
+        if e <= a or s >= b:
+            continue
+        if s < a and e > b:
+            db.session.add(WorkBlock(user_id=user_id, date=day, start_time=logic.minutes_clock(b),
+                                     end_time=blk.end_time, text=blk.text))
+            blk.end_time = logic.minutes_clock(a)
+        elif s < a:
+            blk.end_time = logic.minutes_clock(a)
+        elif e > b:
+            blk.start_time = logic.minutes_clock(b)
+        elif not blk.text:
+            db.session.delete(blk)  # a deleted line's time, now the timer's
+    return line
+
+
+def stop_timer(user, entry, when):
+    """Stop the timer at `when` and write its line on the shift's day, with
+    the exact times. Under a minute isn't a line. Returns the line, or None."""
+    started, text = user.timer_start, user.timer_text or ""
+    user.timer_start = user.timer_text = None
+    if started is None or entry is None or not text or started.date() > entry.date:
+        return None
+    a = started.hour * 60 + started.minute
+    b = 1440 if when.date() > entry.date else when.hour * 60 + when.minute
+    if b <= a:
+        return None
+    return place_timed_line(user.id, entry.date, a, b, text)
+
+
+def timer_back():
+    return url_for("main.timesheet" if request.form.get("back") == "timesheet" else "main.dashboard")
+
+
+@main_bp.route("/timer/start", methods=["POST"])
+@login_required
+def timer_start():
+    back = timer_back()
+    text = " ".join(request.form.get("text", "").split())[:WorkBlock.MAX_LENGTH].rstrip()
+    if not text:
+        flash("Type what you're working on, then press Start.", "error")
+        return redirect(back)
+    now = datetime.now()
+    entry = get_open_entry(current_user.id)
+    if entry is None or entry.open_break() or logic.is_stale_shift(entry, now):
+        flash("Log in (or come back from your break) to start the timer.", "error")
+        return redirect(back)
+    if current_user.timer_start is not None:
+        if current_user.timer_text == text:
+            return redirect(back)  # already timing that
+        stop_timer(current_user, entry, now)
+    current_user.timer_start, current_user.timer_text = now, text
+    db.session.commit()
+    return redirect(back)
+
+
+@main_bp.route("/timer/stop", methods=["POST"])
+@login_required
+def timer_stop():
+    back = timer_back()
+    now = datetime.now()
+    text = current_user.timer_text
+    line = stop_timer(current_user, get_open_entry(current_user.id), now)
+    db.session.commit()
+    if line is not None:
+        span = logic.fmt_span(logic.clock_minutes(line.start_time), logic.clock_minutes(line.end_time, ending=True))
+        flash(f"Saved {span}: {line.text}.", "success")
+    elif text:
+        flash("Timer stopped. Under a minute isn't a line.", "success")
+    return redirect(back)
 
 
 def fit_line_to_break(entry, break_start):
@@ -521,6 +624,9 @@ def punch_break_start():
             flash(error, "error")
             return redirect(url_for("main.dashboard"))
     t = typed or now.time()
+    # The timer stops at the break, its line ending there.
+    stop_timer(current_user, entry, logic.place_on_shift(entry.date, typed, logic.shift_login_dt(entry))
+               if typed else now)
     fit_line_to_break(entry, t)
     db.session.add(BreakSegment(entry_id=entry.id, break_start=t))
     db.session.commit()
@@ -599,6 +705,7 @@ def punch_out():
         )
         return redirect(url_for("main.dashboard"))
 
+    stop_timer(current_user, entry, when)
     entry.logout_time = when.time()
     db.session.commit()
     total = logic.entry_total_hours(entry)
@@ -805,6 +912,9 @@ def timesheet(date_str=None):
                                             f"the {later} line{'s' if later > 1 else ''} after it?")
         return views
 
+    open_entry = get_open_entry(current_user.id) if day == today else None
+    can_time = open_entry is not None and not open_entry.open_break() and not logic.is_stale_shift(open_entry, now)
+
     def show(views):
         # The day at the top of the page, and above the lines in its picture
         # (Download PNG): 1:00 PM – 6:00 PM · 4h 30m worked.
@@ -829,6 +939,8 @@ def timesheet(date_str=None):
             stamp=f"{now:%a %d %b %Y}, {logic.fmt_time(now.time())}",
             logout_label=logic.fmt_time(entry.logout_time) if logout_at is not None else "",
             recent=recent_texts(current_user.id, day),
+            timer=timer_view(current_user, now) if day == today else None,
+            can_time=day == today and can_time,
         )
 
     if request.method == "POST":

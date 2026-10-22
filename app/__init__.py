@@ -33,6 +33,10 @@ def _run_light_migrations():
 
     if "user" in table_names:
         user_columns = {c["name"] for c in inspector.get_columns("user")}
+        if "timer_text" not in user_columns:
+            statements.append("ALTER TABLE user ADD COLUMN timer_text VARCHAR(300)")
+        if "timer_start" not in user_columns:
+            statements.append("ALTER TABLE user ADD COLUMN timer_start DATETIME")
         if "saturday_login_hint" not in user_columns:
             statements.append("ALTER TABLE user ADD COLUMN saturday_login_hint TIME")
         if "is_admin" not in user_columns:

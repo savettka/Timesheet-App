@@ -42,6 +42,11 @@ class User(UserMixin, db.Model):
     weekday_break_minutes = db.Column(db.Integer, nullable=False, default=60)
     saturday_break_minutes = db.Column(db.Integer, nullable=False, default=30)
 
+    # The Timesheet timer, while it runs: what's being worked on and since
+    # when. Stopping it (or a Break or Logout) writes the line.
+    timer_text = db.Column(db.String(300), nullable=True)
+    timer_start = db.Column(db.DateTime, nullable=True)
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     entries = db.relationship(

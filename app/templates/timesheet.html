@@ -1,9 +1,11 @@
 {% extends "base.html" %}
 {% from "partials/icons.html" import icon %}
+{% from "partials/timer.html" import timer_card %}
 {% block title %}Timesheet{% endblock %}
 {% block page_title %}Timesheet{% endblock %}
 
 {% block content %}
+{% if timer or can_time %}<div class="ts-card ts-timer">{{ timer_card(timer, can_time, recent, 'timesheet') }}</div>{% endif %}
 <section class="card form-card ts-card" aria-labelledby="day-title">
   <div class="day-nav">
     <a class="btn btn-icon" href="{{ url_for('main.timesheet', date_str=prev_date.isoformat()) }}"
