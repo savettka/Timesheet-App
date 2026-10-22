@@ -841,10 +841,61 @@
     });
   }
 
+  // ------------------------------------------------------------ page wait
+  // A press that loads another page -- a form sent, a link followed --
+  // puts a small spinning circle over the page until the next one arrives,
+  // and nothing can be pressed or typed into meanwhile. Downloads, new tabs,
+  // jumps within the page and anything the page handles itself don't. If
+  // the next page never comes (a lost connection), the page comes back
+  // after 20 seconds.
+  var WAIT_GIVE_UP_MS = 20000;
+
+  function initPageWait() {
+    var wait = document.getElementById("page-wait");
+    if (!wait) return;
+    var timer = null, frozen = [];
+
+    function show() {
+      if (!wait.hidden) return;
+      wait.hidden = false;
+      frozen = [].filter.call(document.body.children, function (el) { return el !== wait && !el.inert; });
+      frozen.forEach(function (el) { el.inert = true; });
+      timer = setTimeout(hide, WAIT_GIVE_UP_MS);
+    }
+    function hide() {
+      clearTimeout(timer);
+      wait.hidden = true;
+      frozen.forEach(function (el) { el.inert = false; });
+      frozen = [];
+    }
+
+    // Checked once every other handler has had its say -- a "Delete...?"
+    // answered No, a second press ignored -- so only a page really on its
+    // way waits.
+    document.addEventListener("submit", function (e) {
+      var form = e.target;
+      setTimeout(function () {
+        if (!e.defaultPrevented && (!form.target || form.target === "_self")) show();
+      }, 0);
+    });
+    document.addEventListener("click", function (e) {
+      if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      var link = e.target.closest && e.target.closest("a[href]");
+      if (!link || link.hasAttribute("download") || (link.target && link.target !== "_self")) return;
+      var url = new URL(link.href, window.location.href);
+      if (url.origin !== window.location.origin) return;
+      if (url.hash && url.pathname === window.location.pathname && url.search === window.location.search) return;
+      setTimeout(function () { if (!e.defaultPrevented) show(); }, 0);
+    });
+    // Back to this page from the next one: it's usable again.
+    window.addEventListener("pageshow", function (e) { if (e.persisted) hide(); });
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     initTheme();
     initFlashes();
     initForms();
+    initPageWait();
     initLiveTimer();
     initStatusPoll();
     initBreakRows();

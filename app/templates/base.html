@@ -136,6 +136,12 @@
   </main>
   {% endif %}
 
+  {# Shown by app.js while the next page loads: a small circle over the page,
+     which can't be pressed or typed into meanwhile. #}
+  <div class="page-wait" id="page-wait" hidden>
+    <span class="page-wait-circle" role="status" aria-label="Loading"></span>
+  </div>
+
   <script src="{{ url_for('static', filename='js/app.js') }}"></script>
   {% block scripts %}{% endblock %}
 </body>

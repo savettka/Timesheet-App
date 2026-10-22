@@ -463,6 +463,24 @@ table { border-collapse: collapse; width: 100%; }
 @media (prefers-reduced-motion: no-preference) {
   .state-working .status-dot { animation: pulse 2.4s ease-in-out infinite; }
 }
+/* While the next page loads: a small spinning circle in the middle, over a
+   lightly dimmed page that can't be pressed meanwhile. The dimming waits a
+   moment, so a page that comes straight back doesn't flicker. */
+.page-wait {
+  position: fixed; inset: 0; z-index: 1000;
+  display: grid; place-items: center;
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+  cursor: progress;
+  animation: page-wait-in .15s ease .12s both;
+}
+.page-wait-circle {
+  width: 44px; height: 44px; border-radius: 50%;
+  border: 4px solid var(--accent-soft); border-top-color: var(--accent);
+  animation: page-wait-spin .8s linear infinite;
+}
+@keyframes page-wait-in { from { opacity: 0; } }
+@keyframes page-wait-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .page-wait-circle { animation-duration: 2.4s; } }
 @keyframes pulse { 50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--go) 10%, transparent); } }
 
 .status-title { font-size: 22px; font-weight: 700; }
