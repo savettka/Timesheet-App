@@ -55,6 +55,12 @@ This mirrors the logic in the original spreadsheet:
 - **Timer** — type what you're working on and press Start (Home or today's Timesheet).
   Stop, Break or Logout writes the Timesheet line with the exact times; starting another
   task writes the running one first. The latest tasks are a tap from starting again.
+- **Timesheet without the arrows** — the Day tab shows the day's week as a strip (each day
+  one tap away, with its hours) and a date box to go anywhere; the **All** tab lists every
+  line written, newest first a day at a time, with search across all your history.
+- **Boards** — **Posting**: To fill in, Written and Posted columns; drag a card across (or
+  use its button) and the line turns green as posted. **Week**: a column a day, its hours
+  against target over that day's lines as cards.
 - **Week timesheet** — what you worked on down the side, the days across, each day's
   hours against the weekly target, "Not written yet" for hours with no words, **Copy
   week** (every line, day by day, ready to paste) and **Mark week posted**.

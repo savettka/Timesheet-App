@@ -841,6 +841,127 @@
     });
   }
 
+  // ------------------------------------------------------------ boards
+  // Drag a card from Written to Posted (or back) and its line's copied mark
+  // follows, saved there and then; the card's button does the same without
+  // a drag, which is the way on a phone.
+  function initBoards() {
+    var board = document.querySelector(".kb[data-mark-url]");
+    if (!board) return;
+    var status = document.getElementById("kb-status");
+    var dragging = null;
+
+    function tally(col) {
+      var cards = col.querySelectorAll(".kb-card");
+      var minutes = [].reduce.call(cards, function (sum, c) { return sum + parseInt(c.dataset.minutes, 10); }, 0);
+      col.querySelector(".kb-count").textContent = cards.length;
+      var h = Math.floor(minutes / 60), m = minutes % 60;
+      col.querySelector(".kb-hours").textContent = (h ? h + "h" : "") + (h && m ? " " : "") + (m || !h ? m + "m" : "");
+      var none = col.querySelector(".kb-none");
+      if (none) none.hidden = cards.length > 0;
+    }
+    function restyle(card, posted) {
+      card.classList.toggle("kind-posted", posted);
+      card.classList.toggle("kind-written", !posted);
+      var form = card.querySelector(".kb-move");
+      if (!form) return;
+      var text = card.querySelector(".kb-text").textContent;
+      form.querySelector('[name="mark"]').value = posted ? "0" : "1";
+      form.querySelector(".kb-btn").setAttribute("aria-label",
+        posted ? "Move " + text + " back to written" : "Mark " + text + " as posted");
+    }
+    function move(card, to) {
+      var from = card.closest(".kb-col");
+      if (from === to) return;
+      var posted = to.dataset.status === "posted";
+      to.querySelector(".kb-list").appendChild(card);
+      restyle(card, posted);
+      tally(from); tally(to);
+      var body = new FormData();
+      body.append("id", card.dataset.id);
+      body.append("mark", posted ? "1" : "0");
+      fetch(board.dataset.markUrl, { method: "POST", body: body, credentials: "same-origin",
+                                     headers: { "Accept": "application/json" } })
+        .then(function (r) { if (!r.ok) throw new Error("not saved"); return r.json(); })
+        .then(function () {
+          if (status) status.textContent = (posted ? "Posted: " : "Back to written: ") + card.querySelector(".kb-text").textContent;
+        })
+        .catch(function () {
+          from.querySelector(".kb-list").appendChild(card);  // put it back: nothing was saved
+          restyle(card, !posted);
+          tally(from); tally(to);
+          if (status) status.textContent = "Couldn't save that. Try again.";
+        });
+    }
+
+    board.addEventListener("dragstart", function (e) {
+      var card = e.target.closest('.kb-card[draggable="true"]');
+      if (!card) return;
+      dragging = card;
+      card.classList.add("is-dragging");
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", card.dataset.id);
+    });
+    board.addEventListener("dragend", function () {
+      if (dragging) dragging.classList.remove("is-dragging");
+      dragging = null;
+      board.querySelectorAll(".kb-col.is-over").forEach(function (c) { c.classList.remove("is-over"); });
+    });
+    board.addEventListener("dragover", function (e) {
+      var col = e.target.closest('.kb-col[data-status="written"], .kb-col[data-status="posted"]');
+      if (!col || !dragging) return;
+      e.preventDefault();
+      board.querySelectorAll(".kb-col.is-over").forEach(function (c) { if (c !== col) c.classList.remove("is-over"); });
+      col.classList.add("is-over");
+    });
+    board.addEventListener("drop", function (e) {
+      var col = e.target.closest('.kb-col[data-status="written"], .kb-col[data-status="posted"]');
+      if (!col || !dragging) return;
+      e.preventDefault();
+      col.classList.remove("is-over");
+      move(dragging, col);
+    });
+    // The button: the same move, without leaving the page.
+    board.addEventListener("submit", function (e) {
+      var form = e.target.closest(".kb-move");
+      if (!form || !window.fetch) return;
+      e.preventDefault();
+      e.stopPropagation();
+      var card = form.closest(".kb-card");
+      var to = board.querySelector('.kb-col[data-status="' + (form.querySelector('[name="mark"]').value === "1" ? "posted" : "written") + '"]');
+      move(card, to);
+    }, true);
+  }
+
+  // Reports: the day under the pointer (or tapped) in words, for a month
+  // whose bars are too narrow for their numbers.
+  function initReportBars() {
+    var readout = document.getElementById("rp-readout");
+    if (!readout) return;
+    function show(e) {
+      var bar = e.target.closest && e.target.closest(".rp-bar");
+      if (bar) readout.textContent = bar.getAttribute("aria-label");
+    }
+    var bars = document.querySelector(".rp-bars");
+    bars.addEventListener("mouseover", show);
+    bars.addEventListener("focusin", show);
+    bars.addEventListener("click", show);
+  }
+
+  // The Timesheet's date box goes as soon as a date is picked.
+  function initDayJump() {
+    var form = document.querySelector(".day-jump");
+    if (!form) return;
+    var input = form.querySelector('input[type="date"]');
+    var go = form.querySelector(".day-jump-go");
+    if (go) go.hidden = true;
+    input.addEventListener("change", function () {
+      if (input.value && input.value !== input.defaultValue) {
+        if (form.requestSubmit) form.requestSubmit(); else form.submit();
+      }
+    });
+  }
+
   // ------------------------------------------------------------ copy week
   // The week's lines, day by day, onto the clipboard: to paste into the
   // other timesheet in one go.
@@ -1021,6 +1142,9 @@
     initTimerClock();
     initCalendarGrid();
     initWeekCopy();
+    initBoards();
+    initReportBars();
+    initDayJump();
     initLiveTimer();
     initStatusPoll();
     initBreakRows();

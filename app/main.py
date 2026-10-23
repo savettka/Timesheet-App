@@ -722,6 +722,218 @@ def punch_out():
 
 # ------------------------------------------------------- week and reports
 
+def week_strip(user, day, now):
+    """The week around a day, for the Timesheet's strip: each day's date,
+    hours worked, and whether it can be opened yet."""
+    today = now.date()
+    days = logic.week_dates(day)
+    entries = get_entries_for_range(user.id, days[0], days[-1])
+    strip = []
+    for d in days:
+        entry = entries.get(d)
+        worked = logic.entry_total_hours(entry, now=now) if entry is not None and entry.login_time else 0
+        leave = entry is not None and entry.target_override is not None and not worked
+        strip.append(SimpleNamespace(date=d, is_today=d == today, is_future=d > today,
+                                     hours=logic.fmt_hours_compact(worked) if worked else ("Leave" if leave else "")))
+    return strip
+
+
+@main_bp.route("/timesheet/go")
+@login_required
+def timesheet_go():
+    """The date picker on the Timesheet: straight to that day."""
+    try:
+        day = datetime.strptime(request.args.get("d", ""), "%Y-%m-%d").date()
+    except ValueError:
+        return redirect(url_for("main.timesheet"))
+    if day >= datetime.now().date():
+        return redirect(url_for("main.timesheet"))
+    return redirect(url_for("main.timesheet", date_str=day.isoformat()))
+
+
+def day_label(d, today):
+    if d == today:
+        return "Today"
+    if d == today - timedelta(days=1):
+        return "Yesterday"
+    return d.strftime("%a %d %b")
+
+
+@main_bp.route("/timesheet/all", endpoint="timesheet_all")
+@login_required
+def timesheet_all():
+    """Every line written, newest first, a day at a time -- or, with a search,
+    every line in all your history that matches."""
+    now = datetime.now()
+    today = now.date()
+    query = " ".join(request.args.get("q", "").split())[:100]
+    groups, older = [], None
+
+    def line_view(d, a, b, block):
+        return SimpleNamespace(span=logic.fmt_span(a, b), text=block.text, length=logic.fmt_length(b - a),
+                               copied=block.is_copied, minutes=b - a)
+
+    if query:
+        found = (WorkBlock.query
+                 .filter(WorkBlock.user_id == current_user.id, WorkBlock.text != "",
+                         func.lower(WorkBlock.text).contains(query.lower(), autoescape=True))
+                 .order_by(WorkBlock.date.desc(), WorkBlock.start_time).limit(300).all())
+        by_day = defaultdict(list)
+        for block in found:
+            if block.text.casefold() != "break":
+                by_day[block.date].append(block)
+        for d in sorted(by_day, reverse=True):
+            lines = [line_view(d, logic.clock_minutes(b.start_time), logic.clock_minutes(b.end_time, ending=True), b)
+                     for b in by_day[d]]
+            groups.append(SimpleNamespace(date=d, label=day_label(d, today), lines=lines,
+                                          written=sum(x.minutes for x in lines), worked=None, empty=0))
+        total = sum(len(g.lines) for g in groups)
+    else:
+        try:
+            before = datetime.strptime(request.args.get("before", ""), "%Y-%m-%d").date()
+        except ValueError:
+            before = today + timedelta(days=1)
+        last = min(before - timedelta(days=1), today)
+        first = last - timedelta(days=13)
+        lines, entries = written_lines(current_user.id, first, last, now)
+        saved = defaultdict(list)
+        for b in WorkBlock.query.filter(WorkBlock.user_id == current_user.id, WorkBlock.date >= first,
+                                        WorkBlock.date <= last):
+            saved[b.date].append(b)
+        minute = now.hour * 60 + now.minute
+        d = last
+        while d >= first:
+            entry = entries.get(d)
+            day_lines = [line_view(*line) for line in lines if line[0] == d]
+            empty = 0
+            if entry is not None and entry.login_time:
+                empty = sum(1 for _, end, block in logic.timesheet_lines(entry, d, now, saved[d])
+                            if block is None and (d < today or end <= minute))
+            worked = logic.entry_total_hours(entry, now=now) if entry is not None and entry.login_time else 0
+            if day_lines or worked:
+                groups.append(SimpleNamespace(date=d, label=day_label(d, today), lines=day_lines, empty=empty,
+                                              written=sum(x.minutes for x in day_lines), worked=worked))
+            d -= timedelta(days=1)
+        has_older = (WorkBlock.query.filter(WorkBlock.user_id == current_user.id, WorkBlock.date < first).first()
+                     or TimeEntry.query.filter(TimeEntry.user_id == current_user.id, TimeEntry.date < first).first())
+        older = first if has_older else None
+        total = sum(len(g.lines) for g in groups)
+    return render_template(
+        "timesheet_all.html", groups=groups, query=query, older=older, total=total, today=today,
+        written=sum(g.written for g in groups), fmt_length=logic.fmt_length, fmt_hours=logic.fmt_hours,
+    )
+
+
+# ------------------------------------------------------------------ boards
+
+def board_card(d, a, b, block, kind):
+    return SimpleNamespace(
+        date=d, day=d.strftime("%a %d"), start=a, span=logic.fmt_span(a, b), length=logic.fmt_length(b - a),
+        minutes=b - a, kind=kind,
+        id=str(block.id) if block is not None and block != logic.TIMESHEET_BREAK else "",
+        text="Break" if block == logic.TIMESHEET_BREAK else (block.text if block is not None else ""),
+        start_hhmm=logic.minutes_clock(a).strftime("%H:%M"), end_hhmm=logic.minutes_clock(b).strftime("%H:%M"),
+    )
+
+
+@main_bp.route("/boards", endpoint="boards")
+@login_required
+def boards():
+    """Two boards of the week's lines. Posting: what's still to fill in,
+    written, and posted on the other timesheet -- drag a card across to mark
+    it. Week: a column a day, its hours against target over its lines."""
+    now = datetime.now()
+    today = now.date()
+    view = "week" if request.args.get("view") == "week" else "posting"
+    try:
+        day = datetime.strptime(request.args.get("week", ""), "%Y-%m-%d").date()
+    except ValueError:
+        day = today
+    days = logic.week_dates(day)
+    entries = get_entries_for_range(current_user.id, days[0], days[-1])
+    saved = defaultdict(list)
+    for b in WorkBlock.query.filter(WorkBlock.user_id == current_user.id, WorkBlock.date >= days[0],
+                                    WorkBlock.date <= days[-1]):
+        saved[b.date].append(b)
+    minute = now.hour * 60 + now.minute
+    columns = {"empty": [], "written": [], "posted": []}
+    week = []
+    for d in days:
+        entry = entries.get(d)
+        worked = logic.entry_total_hours(entry, now=now) if entry is not None and entry.login_time else 0.0
+        target = logic.target_hours_for(current_user, d, entry)
+        cards = []
+        if d <= today:
+            day_lines = logic.timesheet_lines(entry, d, now, saved[d])
+            if entry is None or not entry.login_time:
+                # Not worked: only lines written in by hand, no empty hours.
+                day_lines = [x for x in day_lines if x[2] not in (None, logic.TIMESHEET_BREAK)]
+            for a, b, block in day_lines:
+                text = "Break" if block == logic.TIMESHEET_BREAK else (block.text if block is not None else "")
+                if text.casefold() == "break":
+                    kind = "break"
+                elif not text:
+                    if d == today and b > minute:
+                        continue  # still to come
+                    kind = "empty"
+                else:
+                    kind = "posted" if block.is_copied else "written"
+                card = board_card(d, a, b, block, kind)
+                cards.append(card)
+                if kind in ("written", "posted"):
+                    columns[kind].append(card)
+            # To fill in: a card a day, however many lines it's missing.
+            empty = [c for c in cards if c.kind == "empty"]
+            if empty:
+                minutes = sum(c.minutes for c in empty)
+                columns["empty"].append(SimpleNamespace(
+                    date=d, day=d.strftime("%a %d"), kind="empty", id="", count=len(empty), minutes=minutes,
+                    length=logic.fmt_length(minutes), text=""))
+        if entry is not None and entry.target_override is not None and not worked:
+            status = entry.leave_label or "Leave"
+        elif d > today:
+            status = "To come"
+        elif not worked:
+            status = "Rest day" if target == 0 else "Not logged"
+        elif d == today and entry.logout_time is None:
+            status = "In progress"
+        else:
+            status = "Done" if worked >= target else "Short"
+        week.append(SimpleNamespace(
+            date=d, is_today=d == today, worked=worked, target=target, status=status, cards=cards,
+            pct=min(100, round(worked / target * 100)) if target else (100 if worked else 0),
+            written=sum(c.minutes for c in cards if c.kind in ("written", "posted")),
+        ))
+    titles = {"empty": "To fill in", "written": "Written", "posted": "Posted"}
+    return render_template(
+        "boards.html", view=view, days=days, week=week, today=today,
+        columns=[SimpleNamespace(key=k, title=titles[k], cards=v, minutes=sum(c.minutes for c in v))
+                 for k, v in columns.items()],
+        prev_week=days[0] - timedelta(days=7), next_week=days[0] + timedelta(days=7) if days[-1] < today else None,
+        is_current=days[0] <= today <= days[-1],
+        fmt_length=logic.fmt_length, fmt_hours_compact=logic.fmt_hours_compact, fmt_hours=logic.fmt_hours,
+    )
+
+
+@main_bp.route("/boards/mark", methods=["POST"])
+@login_required
+def boards_mark():
+    """A card moved to Posted (mark=1) or back to Written (mark=0): its line's
+    copied mark, as the green on the Timesheet. JSON for a drag; a page
+    otherwise."""
+    block_id = request.form.get("id", "")
+    block = None
+    if block_id.isascii() and block_id.isdigit() and len(block_id) < 19:
+        block = WorkBlock.query.filter_by(id=int(block_id), user_id=current_user.id).first()
+    if block is None or not block.text or block.text.casefold() == "break":
+        abort(404)
+    block.copied = block.copy_mark() if request.form.get("mark") == "1" else None
+    db.session.commit()
+    if request.accept_mimetypes.best == "application/json":
+        return jsonify(copied=block.is_copied)
+    back = request.form.get("back", "")
+    return redirect(back if back.startswith("/boards") and "//" not in back else url_for("main.boards"))
+
 def written_lines(user_id, first, last, now):
     """Every Timesheet line with words from first to last (breaks aside), as
     (date, start, end, block) in time order, and each day's TimeEntry."""
@@ -1283,6 +1495,10 @@ def timesheet(date_str=None):
             is_today=day == today,
             prev_date=day - timedelta(days=1),
             next_date=None if day == today else day + timedelta(days=1),
+            strip=week_strip(current_user, day, now),
+            today_date=today,
+            prev_week=day - timedelta(days=7),
+            next_week=None if day >= today else min(today, day + timedelta(days=7)),
             lines=views,
             max_length=WorkBlock.MAX_LENGTH,
             who=current_user.display_name or current_user.username,

@@ -8,6 +8,7 @@
   <nav class="seg" aria-label="Timesheet view">
     <a href="{{ url_for('main.timesheet', date_str=days[0].isoformat()) if not is_current else url_for('main.timesheet') }}">Day</a>
     <a href="{{ url_for('main.timesheet_week', date_str=days[0].isoformat()) }}" aria-current="page">Week</a>
+    <a href="{{ url_for('main.timesheet_all') }}">All</a>
   </nav>
   <div class="month-nav">
     <a class="btn btn-icon" href="{{ prev_url }}" aria-label="Previous week">{{ icon('chevron-left') }}</a>

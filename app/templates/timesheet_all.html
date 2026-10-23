@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% block title %}Timesheet{% endblock %}
+{% block page_title %}Timesheet{% endblock %}
+
+{% block content %}
+<section class="card ta-card" aria-labelledby="ta-title">
+  <nav class="seg" aria-label="Timesheet view">
+    <a href="{{ url_for('main.timesheet') }}">Day</a>
+    <a href="{{ url_for('main.timesheet_week') }}">Week</a>
+    <a href="{{ url_for('main.timesheet_all') }}" aria-current="page">All</a>
+  </nav>
+  <h2 id="ta-title" class="visually-hidden">Everything you've written</h2>
+
+  <form class="ta-search" method="get" action="{{ url_for('main.timesheet_all') }}" role="search">
+    {{ icon('search') }}
+    <input type="search" name="q" value="{{ query }}" placeholder="Search everything you've written" aria-label="Search your lines" maxlength="100">
+    {% if query %}<a class="link" href="{{ url_for('main.timesheet_all') }}">Clear</a>{% endif %}
+  </form>
+  {% if query %}
+  <p class="ta-found"><b>{{ total }}</b> line{{ 's' if total != 1 }} with “{{ query }}” · {{ fmt_length(written) or '0m' }}{% if total >= 300 %} · the latest 300{% endif %}</p>
+  {% endif %}
+
+  {% for g in groups %}
+  <section class="ta-day" aria-label="{{ g.date.strftime('%A %d %B') }}">
+    <header class="ta-head">
+      <a class="ta-date" href="{{ url_for('main.timesheet') if g.date == today else url_for('main.timesheet', date_str=g.date.isoformat()) }}">
+        <b>{{ g.label }}</b>{% if g.label in ('Today', 'Yesterday') %} <span>{{ g.date.strftime('%a %d %b') }}</span>{% endif %}
+      </a>
+      <span class="ta-totals">
+        {% if g.empty %}<a class="ta-empty" href="{{ url_for('main.timesheet') if g.date == today else url_for('main.timesheet', date_str=g.date.isoformat()) }}">{{ g.empty }} to fill in</a>{% endif %}
+        {% if g.worked is not none %}<span>{{ fmt_hours(g.worked) }} worked</span>{% else %}<span>{{ fmt_length(g.written) }}</span>{% endif %}
+      </span>
+    </header>
+    {% if g.lines %}
+    <ul class="ta-lines">
+      {% for line in g.lines %}
+      <li class="ta-line{{ ' is-copied' if line.copied }}">
+        <span class="ta-span">{{ line.span }}</span>
+        <span class="ta-text">{{ line.text }}</span>
+        <span class="ta-len">{{ line.length }}</span>
+        <span class="ta-mark" {% if line.copied %}title="Copied"{% endif %}>{% if line.copied %}{{ icon('check', 'icon icon-inline') }}<span class="visually-hidden">copied</span>{% endif %}</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="ta-none">Nothing written yet.</p>
+    {% endif %}
+  </section>
+  {% else %}
+  <p class="ta-none ta-nothing">{{ 'No lines match “' ~ query ~ '”.' if query else 'Nothing written in these two weeks.' }}</p>
+  {% endfor %}
+
+  {% if older %}
+  <p class="ta-more"><a class="btn btn-secondary" href="{{ url_for('main.timesheet_all', before=older.isoformat()) }}">{{ icon('chevron-down') }}Older</a></p>
+  {% endif %}
+</section>
+{% endblock %}

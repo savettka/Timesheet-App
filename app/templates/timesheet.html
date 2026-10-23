@@ -10,18 +10,40 @@
   <nav class="seg" aria-label="Timesheet view">
     <a href="{{ url_for('main.timesheet', date_str=day.isoformat()) }}" aria-current="page">Day</a>
     <a href="{{ url_for('main.timesheet_week', date_str=day.isoformat()) }}">Week</a>
+    <a href="{{ url_for('main.timesheet_all') }}">All</a>
   </nav>
-  <div class="day-nav">
-    <a class="btn btn-icon" href="{{ url_for('main.timesheet', date_str=prev_date.isoformat()) }}"
-       aria-label="Previous day, {{ prev_date.strftime('%A %d %B') }}">{{ icon('chevron-left') }}</a>
+  {# The day's week, each day one tap away with its hours; the arrows move a
+     week at a time, and the date box goes anywhere. #}
+  <div class="ds">
+    <a class="btn btn-icon ds-step" href="{{ url_for('main.timesheet', date_str=prev_week.isoformat()) }}"
+       aria-label="The week before">{{ icon('chevron-left') }}</a>
+    <ol class="ds-days">
+      {% for s in strip %}
+      <li>
+        {% if s.is_future %}
+        <span class="ds-day is-future" aria-hidden="true"><span class="ds-name">{{ s.date.strftime('%a') }}</span><span class="ds-num">{{ s.date.day }}</span><span class="ds-hours"></span></span>
+        {% else %}
+        <a class="ds-day{{ ' is-selected' if s.date == day }}{{ ' is-today' if s.is_today }}{{ ' has-hours' if s.hours }}"
+           href="{{ url_for('main.timesheet') if s.is_today else url_for('main.timesheet', date_str=s.date.isoformat()) }}"
+           aria-label="{{ s.date.strftime('%A %d %B') }}{{ ', ' ~ s.hours if s.hours }}"
+           {%- if s.date == day %} aria-current="date"{% endif %}>
+          <span class="ds-name">{{ s.date.strftime('%a') }}</span><span class="ds-num">{{ s.date.day }}</span><span class="ds-hours">{{ s.hours or '–' }}</span>
+        </a>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ol>
+    {% if next_week %}
+    <a class="btn btn-icon ds-step" href="{{ url_for('main.timesheet', date_str=next_week.isoformat()) if next_week != today_date else url_for('main.timesheet') }}"
+       aria-label="The week after">{{ icon('chevron-right') }}</a>
+    {% else %}<span class="btn btn-icon ds-step day-nav-blank" aria-hidden="true"></span>{% endif %}
+  </div>
+  <div class="day-head">
     <h2 id="day-title" class="day-title">{{ day.strftime('%A %d %B') }}</h2>
-    {% if next_date %}
-    <a class="btn btn-icon" href="{{ url_for('main.timesheet', date_str=next_date.isoformat()) }}"
-       aria-label="Next day, {{ next_date.strftime('%A %d %B') }}">{{ icon('chevron-right') }}</a>
-    {% else %}
-    {# Today has no next day yet; this keeps the date centred. #}
-    <span class="btn btn-icon day-nav-blank" aria-hidden="true"></span>
-    {% endif %}
+    <form class="day-jump" method="get" action="{{ url_for('main.timesheet_go') }}">
+      <input type="date" name="d" value="{{ day.isoformat() }}" max="{{ today_date.isoformat() }}" aria-label="Go to a date">
+      <button type="submit" class="btn btn-secondary btn-sm day-jump-go">Go</button>
+    </form>
   </div>
   {% if not is_today %}
     <p class="day-nav-back"><a class="link" href="{{ url_for('main.timesheet') }}">Jump to today</a></p>

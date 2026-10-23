@@ -10,7 +10,7 @@
   <a href="{{ url_for('main.reports', range=key) }}"{{ ' aria-current="page"'|safe if key == name }}>{{ label }}</a>
   {% endfor %}
 </nav>
-<p class="rp-period">{{ first.strftime('%a %d %b') }} – {{ last.strftime('%a %d %b %Y') }}</p>
+<p class="rp-period">{{ first.strftime('%a %d %b') }} – {{ last.strftime('%a %d %b %Y') }} · <a class="link" href="{{ url_for('main.history', year=first.year, month=first.month) }}">Every day</a></p>
 
 <dl class="rp-stats">
   <div class="rp-stat"><dt>Worked</dt><dd>{{ fmt_hours(worked) }}</dd></div>
@@ -25,10 +25,11 @@
 <div class="rp-grid">
   <section class="card" aria-labelledby="rp-days">
     <h2 id="rp-days" class="card-title">Hours by day</h2>
-    <ol class="rp-bars" style="--days: {{ days|length }}">
+    <ol class="rp-bars{{ ' is-month' if days|length > 7 }}" style="--days: {{ days|length }}">
       {% for d in days %}
       {% set label = d.date.strftime('%a %d %b') ~ ': ' ~ (fmt_hours(d.worked) ~ ' worked' if d.worked else 'nothing worked') ~ (', target ' ~ fmt_hours(d.target) if d.target else '') %}
-      <li class="rp-bar{{ ' is-today' if d.is_today }}{{ ' is-future' if d.future }}" aria-label="{{ label }}" title="{{ label }}">
+      <li class="rp-bar{{ ' is-today' if d.is_today }}{{ ' is-future' if d.future }}{{ ' is-tick' if d.date.day in (1, 8, 15, 22, 29) }}"
+          tabindex="0" aria-label="{{ label }}" title="{{ label }}">
         <span class="rp-bar-col">
           {% if d.target %}<span class="rp-target" style="--h: {{ (d.target / scale * 100)|round(1) }}%"></span>{% endif %}
           <span class="rp-fill{{ ' is-met' if d.target and d.worked >= d.target }}" style="--h: {{ (d.worked / scale * 100)|round(1) }}%"></span>
@@ -38,6 +39,7 @@
       </li>
       {% endfor %}
     </ol>
+    <p class="rp-readout" id="rp-readout" aria-live="polite">{{ 'Point at or tap a bar for its day.' if days|length > 7 else '' }}</p>
   </section>
 
   <section class="card" aria-labelledby="rp-tasks">

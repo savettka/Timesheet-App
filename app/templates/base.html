@@ -74,8 +74,9 @@
   {% set nav_sections = [
       ('Track', [
           ('main.dashboard', 'Home', 'home', ['main.dashboard']),
-          ('main.timesheet', 'Timesheet', 'clipboard', ['main.timesheet', 'main.timesheet_week']),
+          ('main.timesheet', 'Timesheet', 'clipboard', ['main.timesheet', 'main.timesheet_week', 'main.timesheet_all']),
           ('main.calendar', 'Calendar', 'calendar', ['main.calendar', 'main.calendar_week', 'main.calendar_day']),
+          ('main.boards', 'Boards', 'board', ['main.boards']),
       ]),
       ('Analyse', [
           ('main.reports', 'Reports', 'chart', ['main.reports']),
@@ -86,7 +87,7 @@
       ]),
   ] %}
   {% set nav_items = nav_sections|map(attribute=1)|sum(start=[]) %}
-  {% set tab_items = nav_items|rejectattr(0, 'equalto', 'main.settings')|list %}
+  {% set tab_items = nav_items|rejectattr(0, 'in', ['main.settings', 'main.history'])|list %}
   <div class="app-shell">
     <aside class="sidebar">
       <a class="brand" href="{{ url_for('main.dashboard') }}">

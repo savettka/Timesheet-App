@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% block title %}Boards{% endblock %}
+{% block page_title %}Boards{% endblock %}
+
+{% macro week_url(d) -%}
+{{ url_for('main.boards', view=view, week=d.isoformat()) }}
+{%- endmacro %}
+
+{% block content %}
+<nav class="seg" aria-label="Board">
+  <a href="{{ url_for('main.boards', view='posting', week=days[0].isoformat()) }}"{{ ' aria-current="page"'|safe if view == 'posting' }}>Posting</a>
+  <a href="{{ url_for('main.boards', view='week', week=days[0].isoformat()) }}"{{ ' aria-current="page"'|safe if view == 'week' }}>Week</a>
+</nav>
+<div class="month-nav kb-nav">
+  <a class="btn btn-icon" href="{{ week_url(prev_week) }}" aria-label="The week before">{{ icon('chevron-left') }}</a>
+  <h2 class="month-title">{{ days[0].strftime('%d %b') }} – {{ days[-1].strftime('%d %b %Y') }}</h2>
+  {% if next_week %}<a class="btn btn-icon" href="{{ week_url(next_week) }}" aria-label="The week after">{{ icon('chevron-right') }}</a>
+  {% else %}<span class="btn btn-icon day-nav-blank" aria-hidden="true"></span>{% endif %}
+</div>
+{% if not is_current %}<p class="month-jump"><a class="link" href="{{ url_for('main.boards', view=view) }}">Jump to this week</a></p>{% endif %}
+
+{% if view == 'posting' %}
+{# Written lines move to Posted once they're on the other timesheet: drag a
+   card across, or use its button. Empty lines wait in To fill in. #}
+<div class="kb" data-mark-url="{{ url_for('main.boards_mark') }}">
+  {% for col in columns %}
+  <section class="kb-col kb-{{ col.key }}" data-status="{{ col.key }}" aria-labelledby="kb-{{ col.key }}">
+    <header class="kb-head">
+      <h3 id="kb-{{ col.key }}">{{ col.title }}</h3>
+      <span class="kb-count">{{ col.cards|length }}</span>
+      <span class="kb-hours">{{ fmt_length(col.minutes) or '0m' }}</span>
+    </header>
+    <ul class="kb-list">
+      {% for c in col.cards %}
+      <li class="kb-card kind-{{ c.kind }}" data-id="{{ c.id }}" data-minutes="{{ c.minutes }}"
+          {%- if c.id %} draggable="true"{% endif %}>
+        {% if c.kind == 'empty' %}
+        <a class="kb-open" href="{{ url_for('main.timesheet', date_str=c.date.isoformat()) }}">
+          <span class="kb-text">{{ c.count }} line{{ 's' if c.count != 1 }} to fill in</span>
+          <span class="kb-when">{{ c.day }} · {{ c.length }}</span>
+        </a>
+        {% else %}
+        <span class="kb-text">{{ c.text }}</span>
+        <span class="kb-when">{{ c.day }} · {{ c.span }} · {{ c.length }}</span>
+        <form method="post" action="{{ url_for('main.boards_mark') }}" class="kb-move js-once">
+          <input type="hidden" name="id" value="{{ c.id }}">
+          <input type="hidden" name="back" value="{{ url_for('main.boards', view='posting', week=days[0].isoformat()) }}">
+          <input type="hidden" name="mark" value="{{ '1' if c.kind == 'written' else '0' }}">
+          <button type="submit" class="kb-btn" aria-label="{{ ('Mark ' ~ c.text ~ ' as posted') if c.kind == 'written' else ('Move ' ~ c.text ~ ' back to written') }}">
+            <span class="kb-to-posted">{{ icon('check', 'icon icon-inline') }}Posted</span><span class="kb-to-written">{{ icon('undo', 'icon icon-inline') }}Undo</span>
+          </button>
+        </form>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% if not col.cards %}
+    <p class="kb-none">{{ {'empty': 'Every line has words.', 'written': 'Nothing waiting to post.', 'posted': 'Nothing posted yet.'}[col.key] }}</p>
+    {% endif %}
+  </section>
+  {% endfor %}
+</div>
+<p class="visually-hidden" aria-live="polite" id="kb-status"></p>
+
+{% else %}
+{# Karbon's capacity view, for one person's week: a column a day, its hours
+   against target, and its lines as cards. #}
+<div class="wb">
+  {% for col in week %}
+  <section class="wb-col{{ ' is-today' if col.is_today }}" aria-label="{{ col.date.strftime('%A %d %B') }}">
+    <a class="wb-head" href="{{ url_for('main.timesheet') if col.is_today else url_for('main.timesheet', date_str=col.date.isoformat()) }}">
+      <span class="wb-day"><b>{{ col.date.strftime('%a') }}</b> {{ col.date.day }}</span>
+      <span class="wb-status status-{{ col.status|lower|replace(' ', '-') }}">{{ col.status }}</span>
+      <span class="wb-hours"><b>{{ fmt_hours_compact(col.worked) if col.worked else '0h' }}</b>{% if col.target %} of {{ fmt_hours_compact(col.target) }}{% endif %}</span>
+      <span class="wb-bar" aria-hidden="true"><span style="width: {{ col.pct }}%"></span></span>
+    </a>
+    <ul class="wb-cards">
+      {% for c in col.cards %}
+      <li class="wb-card kind-{{ c.kind }}">
+        <span class="wb-text">{{ c.text or 'Empty' }}</span>
+        <span class="wb-when">{{ c.span }} · {{ c.length }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}
