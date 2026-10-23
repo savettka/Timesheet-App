@@ -43,7 +43,7 @@
         {% else %}
         <span class="kb-text">{{ c.text }}</span>
         <span class="kb-when">{{ c.day }} · {{ c.span }} · {{ c.length }}</span>
-        <form method="post" action="{{ url_for('main.boards_mark') }}" class="kb-move js-once">
+        <form method="post" action="{{ url_for('main.boards_mark') }}" class="kb-move js-once" autocomplete="off">
           <input type="hidden" name="id" value="{{ c.id }}">
           <input type="hidden" name="back" value="{{ url_for('main.boards', view='posting', week=days[0].isoformat()) }}">
           <input type="hidden" name="mark" value="{{ '1' if c.kind == 'written' else '0' }}">

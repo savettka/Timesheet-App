@@ -69,7 +69,7 @@
     {% endif %}
     <span class="tw-gap"></span>
     {% if total_lines %}
-    <form method="post" action="{{ url_for('main.timesheet_week_posted', date_str=days[0].isoformat()) }}" class="js-once">
+    <form method="post" action="{{ url_for('main.timesheet_week_posted', date_str=days[0].isoformat()) }}" class="js-once" autocomplete="off">
       {% if copied == total_lines %}
       <input type="hidden" name="mark" value="0">
       <button type="submit" class="btn btn-ghost">{{ icon('undo') }}Mark not posted</button>

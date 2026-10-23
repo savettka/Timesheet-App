@@ -12,14 +12,14 @@
     <span class="timer-dot" aria-hidden="true"></span>
     <span class="timer-text">{{ timer.text }}</span>
     <span class="timer-clock">{{ timer.clock }}</span>
-    <form method="post" action="{{ url_for('main.timer_stop') }}" class="js-once">
+    <form method="post" action="{{ url_for('main.timer_stop') }}" class="js-once" autocomplete="off">
       <input type="hidden" name="back" value="{{ back }}">
       <button type="submit" class="btn btn-stop timer-btn">{{ icon('stop') }}Stop</button>
     </form>
   </div>
   {% endif %}
   {% if can_start %}
-  <form method="post" action="{{ url_for('main.timer_start') }}" class="timer-new js-once">
+  <form method="post" action="{{ url_for('main.timer_start') }}" class="timer-new js-once" autocomplete="off">
     <input type="hidden" name="back" value="{{ back }}">
     <input type="text" name="text" class="timer-input" maxlength="300" autocomplete="off" required
            placeholder="{{ 'Switch to…' if timer else 'What are you working on?' }}"
@@ -31,7 +31,7 @@
   <datalist id="timer-recent">{% for text in recent %}<option value="{{ text }}">{% endfor %}</datalist>
   <div class="timer-again-row">
     {% for text in recent[:4] if not timer or text != timer.text %}
-    <form method="post" action="{{ url_for('main.timer_start') }}" class="js-once">
+    <form method="post" action="{{ url_for('main.timer_start') }}" class="js-once" autocomplete="off">
       <input type="hidden" name="back" value="{{ back }}">
       <input type="hidden" name="text" value="{{ text }}">
       <button type="submit" class="timer-again" aria-label="Start {{ text }}">{{ icon('play', 'icon icon-inline') }}<span>{{ text }}</span></button>

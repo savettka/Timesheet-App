@@ -61,7 +61,7 @@
 </section>
 
 <dialog class="cg-dialog" id="cg-dialog" aria-labelledby="cg-dialog-title">
-  <form method="post" action="{{ url_for('main.calendar_line') }}" class="form js-once" id="cg-form">
+  <form method="post" action="{{ url_for('main.calendar_line') }}" class="form js-once" id="cg-form" autocomplete="off">
     <h2 class="card-title" id="cg-dialog-title">Line</h2>
     <input type="hidden" name="date">
     <input type="hidden" name="id">
@@ -84,7 +84,7 @@
   </form>
 </dialog>
 {# What a drag sends: the block's new end, its start and words as they were. #}
-<form method="post" action="{{ url_for('main.calendar_line') }}" id="cg-resize" class="js-once" hidden>
+<form method="post" action="{{ url_for('main.calendar_line') }}" id="cg-resize" class="js-once" autocomplete="off" hidden>
   <input type="hidden" name="date"><input type="hidden" name="id"><input type="hidden" name="start">
   <input type="hidden" name="end"><input type="hidden" name="text"><input type="hidden" name="back" value="{{ here }}">
 </form>

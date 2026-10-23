@@ -61,7 +61,11 @@
   <form method="post" class="ts-form js-once" action="{{ url_for('main.timesheet', date_str=day.isoformat()) }}"
         data-png-name="STM timesheet {{ day.isoformat() }}.png" data-png-day="{{ day.strftime('%A %d %B %Y') }}"
         data-png-who="{{ who }}" data-png-summary="{{ summary }}" data-png-stamp="{{ stamp }}"
-        data-mark-url="{{ url_for('main.timesheet_mark') }}">
+        data-mark-url="{{ url_for('main.timesheet_mark') }}"
+        {#- Firefox otherwise refills every box on a reload -- hidden ones
+            too -- by position, from a page whose lines may have moved since:
+            wrong times in the wrong lines, which autosave would then save. #}
+        autocomplete="off">
     {# Enter in any box presses the form's first button, so that one saves. #}
     <button type="submit" class="visually-hidden" tabindex="-1" aria-hidden="true">Save</button>
 
