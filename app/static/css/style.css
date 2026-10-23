@@ -191,7 +191,7 @@ table { border-collapse: collapse; width: 100%; }
 [hidden] { display: none !important; }
 
 ::selection { background: var(--focus-ring); }
-html { scrollbar-color: var(--line-strong) transparent; }
+html { scrollbar-color: var(--line-strong) transparent; -webkit-tap-highlight-color: transparent; }
 input, textarea { caret-color: var(--accent); }
 
 /* One focus style everywhere: thick enough to find at a glance, in a colour
@@ -489,14 +489,14 @@ input, textarea { caret-color: var(--accent); }
   display: grid; place-items: center;
   background: color-mix(in srgb, var(--bg) 55%, transparent);
   cursor: progress;
-  animation: page-wait-in .15s ease .12s both;
+  animation: page-wait-in .15s var(--ease-out) both;
 }
 .page-wait-circle {
   width: 44px; height: 44px; border-radius: 50%;
   border: 4px solid var(--accent-soft); border-top-color: var(--accent);
   animation: page-wait-spin .8s linear infinite;
 }
-@keyframes page-wait-in { from { opacity: 0; } }
+@keyframes page-wait-in { from { opacity: .4; } }
 @keyframes page-wait-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .page-wait-circle { animation-duration: 2.4s; } }
 @keyframes pulse { 50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--go) 10%, transparent); } }
@@ -830,6 +830,23 @@ input, textarea { caret-color: var(--accent); }
 .rp-task-bar { grid-column: 1 / -1; height: 6px; border-radius: 6px; background: var(--surface-3); overflow: hidden; }
 .rp-task-bar span { display: block; height: 100%; border-radius: 6px; background: var(--accent); }
 .rp-attendance .card-title { padding: var(--s4) var(--s4) 0; }
+
+/* The Timesheet saves as you type; this says how that's going, in Save's
+   place: a dot that fills as it saves, and when it last did. */
+.ts-autosave {
+  display: inline-flex; align-items: center; gap: 8px; margin: 0;
+  min-height: 44px; padding: 0 14px; border-radius: 999px;
+  background: var(--surface-2); color: var(--text-2); font-size: 15px; font-weight: 500;
+  font-variant-numeric: tabular-nums; transition: background-color .25s ease, color .25s ease;
+}
+.ts-autosave-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--go); transition: background-color .25s ease, transform .25s var(--ease-out); }
+.ts-autosave[data-state="editing"] .ts-autosave-dot { background: var(--line-strong); }
+.ts-autosave[data-state="saving"] .ts-autosave-dot { background: var(--accent); transform: scale(1.3); }
+.ts-autosave[data-state="saved"] { background: var(--success-bg); color: var(--success-text); }
+.ts-autosave[data-state="warn"] { background: var(--warn-bg); color: var(--warn-text); }
+.ts-autosave[data-state="warn"] .ts-autosave-dot { background: var(--pause); }
+.ts-autosave[data-state="error"] { background: var(--error-bg); color: var(--error-text); }
+.ts-autosave[data-state="error"] .ts-autosave-dot { background: var(--stop); }
 
 /* Timesheet: the week strip -- each day a tap away, with its hours. */
 .ds { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--s2); }
@@ -1311,6 +1328,12 @@ input[type="number"] { -moz-appearance: textfield; }
    ========================================================================== */
 
 @media (max-width: 899px) {
+  input[type="time"], input[type="date"], .ts-when input[type="time"], .day-jump input[type="date"] { font-size: 16px; }
+  .content { padding-left: max(var(--s4), env(safe-area-inset-left)); padding-right: max(var(--s4), env(safe-area-inset-right)); }
+  .topbar { padding-left: max(var(--s4), env(safe-area-inset-left)); padding-right: max(var(--s4), env(safe-area-inset-right)); }
+  .wb { scroll-snap-type: x mandatory; grid-template-columns: repeat(7, minmax(78%, 1fr)); }
+  .wb-col { scroll-snap-align: start; }
+  .ts-foot .ts-autosave { flex: 1 1 100%; justify-content: center; order: -1; }
   .sidebar { display: none; }
 
   .topbar { min-height: 64px; padding: var(--s2) var(--s4); gap: var(--s2); }
@@ -1466,3 +1489,55 @@ input[type="number"] { -moz-appearance: textfield; }
   body, .card { background: #fff; color: #000; box-shadow: none; }
   .content { padding: 0; }
 }
+
+/* ==========================================================================
+   Motion: things slide, nothing fades. Going to another page, the content
+   slides across -- in from the right going on, from the left going back --
+   while the menu and top bar stay put. On each page its parts slide into
+   place one after another; messages slide down, the Calendar's box slides
+   up. Nothing moves for anyone who asks their device for less motion.
+   ========================================================================== */
+
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition { navigation: auto; }
+  .content, .auth-shell { view-transition-name: stm-page; }
+  .topbar { view-transition-name: stm-topbar; }
+  /* The content slides within its own box: never over the menu, and the
+     two pages side by side rather than on top of each other. */
+  ::view-transition-group(stm-page) { animation: none; overflow: hidden; }
+  ::view-transition-old(stm-page), ::view-transition-new(stm-page) { mix-blend-mode: normal; height: 100%; object-fit: none; object-position: top; }
+  ::view-transition-old(root), ::view-transition-new(root),
+  ::view-transition-old(stm-topbar), ::view-transition-new(stm-topbar) { animation: none; }
+  ::view-transition-old(stm-page) { animation: stm-page-out .38s var(--ease-out) both; }
+  ::view-transition-new(stm-page) { animation: stm-page-in .38s var(--ease-out) both; }
+  :root[data-slide="back"]::view-transition-old(stm-page) { animation-name: stm-page-out-back; }
+  :root[data-slide="back"]::view-transition-new(stm-page) { animation-name: stm-page-in-back; }
+
+  /* Each part, one after another (app.js numbers them --i). */
+  .content > section, .content > .dash-grid > *, .content > div > .card, .rp-stat, .ts-line, .kb-col, .kb-card,
+  .wb-col, .ta-day, .tw tbody tr, .cg-col, .ds-day, .fill-day, .timer-again-row form, .rp-tasks li, .days tbody tr {
+    animation: stm-slide-in .5s var(--ease-out) backwards;
+    animation-delay: calc(var(--i, 0) * 40ms);
+  }
+  .flash { animation: stm-slide-down .42s var(--ease-out) both; }
+  .cg-dialog[open] { animation: stm-sheet-up .36s var(--ease-out); }
+  .nav-link[aria-current="page"], .tab-link[aria-current="page"] .icon, .seg a[aria-current="page"] {
+    animation: stm-pill-in .4s var(--ease-out) backwards;
+  }
+  .progress-fill, .wb-bar span, .rp-task-bar span { transform-origin: left; animation: stm-grow-x .8s var(--ease-out) both; }
+  .rp-fill { transform-origin: bottom; animation: stm-grow-y .7s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 40ms); }
+  .kb-card.is-dropped { animation: stm-drop-in .34s var(--ease-out); }
+  .ts-line, .kb-card, .wb-card, .ta-line { transition: background-color .3s ease, box-shadow .3s ease, transform .16s var(--ease-out); }
+}
+/* Where pages can't slide across (older browsers), the parts still slide in. */
+@keyframes stm-page-in { from { transform: translateX(100%); } }
+@keyframes stm-page-out { to { transform: translateX(-100%); } }
+@keyframes stm-page-in-back { from { transform: translateX(-100%); } }
+@keyframes stm-page-out-back { to { transform: translateX(100%); } }
+@keyframes stm-slide-in { from { transform: translateX(28px); } }
+@keyframes stm-slide-down { from { transform: translateY(-140%); } }
+@keyframes stm-sheet-up { from { transform: translateY(60px); } }
+@keyframes stm-pill-in { from { transform: translateX(-14px); } }
+@keyframes stm-grow-x { from { transform: scaleX(0); } }
+@keyframes stm-grow-y { from { transform: scaleY(0); } }
+@keyframes stm-drop-in { from { transform: translateY(-10px); } }

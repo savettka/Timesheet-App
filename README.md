@@ -55,6 +55,9 @@ This mirrors the logic in the original spreadsheet:
 - **Timer** — type what you're working on and press Start (Home or today's Timesheet).
   Stop, Break or Logout writes the Timesheet line with the exact times; starting another
   task writes the running one first. The latest tasks are a tap from starting again.
+- **Saves as you type** — the Timesheet saves a moment after typing stops (or when a box is
+  left), and says when: "Saved · 2:41 PM". Enter saves there and then; anything still
+  waiting is sent on the way out. A line with a problem waits, marked, while the rest save.
 - **Timesheet without the arrows** — the Day tab shows the day's week as a strip (each day
   one tap away, with its hours) and a date box to go anywhere; the **All** tab lists every
   line written, newest first a day at a time, with search across all your history.

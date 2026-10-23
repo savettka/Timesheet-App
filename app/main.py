@@ -1544,13 +1544,17 @@ def timesheet(date_str=None):
                 abort(400)
             return value
 
+        # Saved as you type (app.js): what can be saved is, a line with a
+        # problem waits for more typing, and the answer is the lines as saved.
+        autosave = form.get("autosave") == "1"
+
         # A line squeezed to nothing by a time changed beside it goes. A page
         # from before this was added sends no "drop" at all.
         dropped = form.getlist("drop") or [""] * len(fields[0])
         if len(dropped) != len(fields[0]):
             abort(400)
         by_id = {str(b.id): b for b in blocks}
-        changed, drafts, gone, saved = [], [], 0, {}
+        changed, drafts, gone, saved, cleared, vanished = [], [], 0, {}, set(), set()
         to_delete = line_number("delete")
         to_copy, to_uncopy = line_number("copied"), line_number("uncopied")
         to_logout = line_number("to_logout")
@@ -1601,17 +1605,19 @@ def timesheet(date_str=None):
             block = by_id.get(block_id)
             if block_id and block is None:
                 gone += 1  # cleared on another device since: it stays gone
+                vanished.add(index)
                 continue
             if block is not None:
                 if text_changed and not text:
                     changed.append((block.start_time, block.end_time, "Cleared"))
                     db.session.delete(block)
+                    cleared.add(index)
                     continue
                 start = start if start_changed else block.start_time
                 end = end if end_changed else block.end_time
                 text = text if text_changed else block.text
             elif not text:
-                if start_changed or end_changed:
+                if (start_changed or end_changed) and not autosave:
                     draft.error, draft.error_on = "Write what you worked on, to keep these times.", "text"
                 continue
             if start is None or end is None:
@@ -1657,6 +1663,24 @@ def timesheet(date_str=None):
                 removed += 1
 
         bad = [d for d in drafts if d.error]
+        if autosave:
+            db.session.commit()
+            lines = []
+            for index, draft in enumerate(drafts):
+                block = saved.get(index)
+                if block is not None:
+                    lines.append({"id": str(block.id), "was_start": block.start_time.strftime("%H:%M"),
+                                  "was_end": block.end_time.strftime("%H:%M"), "was_text": block.text})
+                elif dropped[index] == "1":
+                    lines.append({"removed": True})
+                elif index in cleared or index in vanished:
+                    # No words now: an ordinary empty line, at the times it shows.
+                    lines.append({"id": "", "was_start": draft.start, "was_end": draft.end, "was_text": ""})
+                elif draft.error:
+                    lines.append({"error": draft.error, "error_on": draft.error_on})
+                else:
+                    lines.append(None)  # nothing changed
+            return jsonify(ok=not bad, saved_at=logic.fmt_time(datetime.now().time()), lines=lines)
         if bad:
             db.session.rollback()
             flash("Nothing was saved yet. " + ("Fix the line marked below" if len(bad) == 1

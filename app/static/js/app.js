@@ -562,13 +562,23 @@
         var b = base[j];
         if (j !== i || name !== "start") field(line, "start").value = b.start;
         if (j !== i || name !== "end") field(line, "end").value = b.end;
-        field(line, "was_start").value = b.wasStart;
-        field(line, "was_end").value = b.wasEnd;
+        // Only a suggestion's "was" times are the follow's to put back; a
+        // saved line's belong to the autosave, which may have moved them on.
+        if (loose(line)) {
+          field(line, "was_start").value = b.wasStart;
+          field(line, "was_end").value = b.wasEnd;
+        }
         line.classList.toggle("is-squeezed", b.squeezed);
       });
       var own = lines[i];
       var a = clockMinutes(field(own, "start").value, "start"), z = clockMinutes(field(own, "end").value, "end");
       if (a !== null && z !== null && z > a) own.classList.remove("is-squeezed");
+      // Half-typed (an end before its own start): nothing beside it moves yet.
+      if (a === null || z === null || z <= a) {
+        lines.forEach(refreshLine);
+        refreshCount();
+        return;
+      }
 
       var dir = name === "end" ? 1 : -1;
       var near = dir > 0 ? "start" : "end", far = dir > 0 ? "end" : "start";
@@ -841,6 +851,153 @@
     });
   }
 
+  // ------------------------------------------------------------ slides
+  // Each part slides in after the one before it: its place among its
+  // siblings, as --i (capped, so a long list doesn't keep you waiting).
+  function initSlideOrder() {
+    var groups = document.querySelectorAll(
+      ".dash-grid, .rp-stats, .ts-lines, .kb, .kb-list, .wb, .ta-card, .tw tbody, .cg-body, .ds-days, .fill-days, " +
+      ".timer-again-row, .rp-tasks, .rp-bars, .days tbody, .content");
+    groups.forEach(function (group) {
+      var n = 0;
+      [].forEach.call(group.children, function (child) {
+        child.style.setProperty("--i", Math.min(n, 12));
+        n += 1;
+      });
+    });
+  }
+
+  // ------------------------------------------------------------ autosave
+  // The Timesheet saves itself: a moment after typing stops, or when a box
+  // is left, the page's lines go to the server, which answers with them as
+  // saved -- new lines' ids, what each now holds -- and the status says when.
+  // One save at a time; changes made meanwhile go in the next. Leaving the
+  // page sends anything still waiting. Enter saves there and then.
+  var AUTOSAVE_PAUSE_MS = 900;
+
+  function initAutosave() {
+    var form = document.querySelector(".ts-form");
+    var status = document.getElementById("ts-autosave");
+    if (!form || !status || !window.fetch || !window.FormData) return;
+    var text = status.querySelector(".ts-autosave-text");
+    var save = form.querySelector(".ts-save");
+    if (save) save.hidden = true;
+    status.hidden = false;
+    var timer = null, busy = false, waiting = false, failures = 0;
+
+    function say(words, state) {
+      text.textContent = words;
+      status.dataset.state = state;
+    }
+    function field(line, name) { return line.querySelector('[name="' + name + '"]'); }
+    function body() {
+      // Squeezed lines without words go; one with words waits (and says so).
+      form.querySelectorAll(".ts-line").forEach(function (line) {
+        var squeezed = line.classList.contains("is-squeezed") && !field(line, "text").value.trim();
+        field(line, "drop").value = squeezed || line.dataset.removed ? "1" : "";
+      });
+      var data = new FormData(form);
+      data.append("autosave", "1");
+      return data;
+    }
+    function showError(line, message, on) {
+      var p = line.querySelector(".ts-error");
+      line.querySelectorAll('[aria-invalid="true"]').forEach(function (el) { el.removeAttribute("aria-invalid"); });
+      line.classList.toggle("has-error", !!message);
+      if (!message) { if (p) p.remove(); return; }
+      if (!p) {
+        p = document.createElement("p");
+        p.className = "ts-error";
+        line.appendChild(p);
+      }
+      p.textContent = message;
+      var boxes = on === "text" ? [field(line, "text")] : [field(line, "start"), field(line, "end")];
+      boxes.forEach(function (el) { el.setAttribute("aria-invalid", "true"); });
+    }
+    function apply(result) {
+      var lines = form.querySelectorAll(".ts-line");
+      var problems = 0;
+      result.lines.forEach(function (r, i) {
+        var line = lines[i];
+        if (!line) return;
+        if (!r) {  // as saved already: nothing wrong with it any more
+          showError(line, "");
+          return;
+        }
+        if (r.removed) {
+          line.dataset.removed = "1";
+          line.hidden = true;
+          return;
+        }
+        if (r.error) {
+          problems += 1;
+          showError(line, r.error, r.error_on);
+          return;
+        }
+        showError(line, "");
+        field(line, "id").value = r.id;
+        field(line, "was_start").value = r.was_start;
+        field(line, "was_end").value = r.was_end;
+        field(line, "was_text").value = r.was_text;
+      });
+      if (problems) say("Saved " + result.saved_at + " · " + problems + (problems > 1 ? " lines need" : " line needs") + " a look", "warn");
+      else say("Saved · " + result.saved_at, "saved");
+    }
+    function run() {
+      clearTimeout(timer);
+      timer = null;
+      if (busy) { waiting = true; return; }
+      busy = true;
+      waiting = false;
+      say("Saving…", "saving");
+      fetch(form.action, { method: "POST", body: body(), credentials: "same-origin",
+                           headers: { "Accept": "application/json" } })
+        .then(function (r) {
+          if (!r.ok || (r.headers.get("Content-Type") || "").indexOf("json") < 0) throw new Error("not saved");
+          return r.json();
+        })
+        .then(function (result) { failures = 0; apply(result); })
+        .catch(function () {
+          failures += 1;
+          say("Not saved yet · trying again", "error");
+          waiting = true;
+          timer = setTimeout(run, Math.min(30000, 3000 * failures));
+        })
+        .then(function () {
+          busy = false;
+          if (waiting && !timer) run();
+        });
+    }
+    function soon(ms) {
+      clearTimeout(timer);
+      say("Editing…", "editing");
+      timer = setTimeout(run, ms);
+    }
+    form.addEventListener("input", function (e) {
+      if (e.target.matches('input[name="text"], input[type="time"]')) soon(AUTOSAVE_PAUSE_MS);
+    });
+    form.addEventListener("focusout", function (e) {
+      if (timer && e.target.matches('input[name="text"], input[type="time"]')) soon(150);
+    });
+    // Enter, or a Save left on the page: save now, without leaving.
+    form.addEventListener("submit", function (e) {
+      if (e.defaultPrevented) return;
+      var by = e.submitter;
+      if (!by || !(by === save || (by.type === "submit" && !by.name && by.classList.contains("visually-hidden")))) return;
+      e.preventDefault();
+      e.stopPropagation();
+      run();
+    });
+    // Leaving with a save still waiting: send it on the way out.
+    window.addEventListener("pagehide", function () {
+      if (timer || waiting) {
+        clearTimeout(timer);
+        if (navigator.sendBeacon) navigator.sendBeacon(form.action, body());
+      }
+    });
+    window.addEventListener("online", function () { if (waiting && !busy) run(); });
+  }
+
   // ------------------------------------------------------------ boards
   // Drag a card from Written to Posted (or back) and its line's copied mark
   // follows, saved there and then; the card's button does the same without
@@ -875,6 +1032,9 @@
       if (from === to) return;
       var posted = to.dataset.status === "posted";
       to.querySelector(".kb-list").appendChild(card);
+      card.classList.remove("is-dropped");
+      void card.offsetWidth;  // restart the settle, if it's moved twice
+      card.classList.add("is-dropped");
       restyle(card, posted);
       tally(from); tally(to);
       var body = new FormData();
@@ -1112,14 +1272,14 @@
       frozen = [];
     }
 
-    // Checked once every other handler has had its say -- a "Delete...?"
-    // answered No, a second press ignored -- so only a page really on its
-    // way waits.
+    // Shown at once, on the tap itself: Safari on an iPhone stops drawing
+    // the page as soon as the next one is on its way, so anything left for
+    // later never appears. These listeners are the last a tap reaches (the
+    // document's own, added after the rest), so a "Delete...?" answered No or
+    // a second press ignored has already said so.
     document.addEventListener("submit", function (e) {
       var form = e.target;
-      setTimeout(function () {
-        if (!e.defaultPrevented && (!form.target || form.target === "_self")) show();
-      }, 0);
+      if (!e.defaultPrevented && (!form.target || form.target === "_self")) show();
     });
     document.addEventListener("click", function (e) {
       if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
@@ -1128,7 +1288,15 @@
       var url = new URL(link.href, window.location.href);
       if (url.origin !== window.location.origin) return;
       if (url.hash && url.pathname === window.location.pathname && url.search === window.location.search) return;
-      setTimeout(function () { if (!e.defaultPrevented) show(); }, 0);
+      if (e.defaultPrevented) return;
+      try {
+        if (link.matches('[aria-label^="Previous"], [aria-label^="The week before"], [rel="prev"]')
+            || (link.closest(".ds-days")
+                && link.compareDocumentPosition(document.querySelector(".ds-day.is-selected") || link) & Node.DOCUMENT_POSITION_FOLLOWING)) {
+          sessionStorage.setItem("stm-slide", "back");
+        }
+      } catch (err) { /* storage blocked - slides forward */ }
+      show();
     });
     // Back to this page from the next one: it's usable again.
     window.addEventListener("pageshow", function (e) { if (e.persisted) hide(); });
@@ -1143,6 +1311,8 @@
     initCalendarGrid();
     initWeekCopy();
     initBoards();
+    initAutosave();
+    initSlideOrder();
     initReportBars();
     initDayJump();
     initLiveTimer();

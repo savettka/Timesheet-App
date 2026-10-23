@@ -19,6 +19,15 @@
           document.documentElement.setAttribute("data-theme", saved);
         }
       } catch (e) { /* storage blocked - follow the device */ }
+      // Which way the page slides in: back for the browser's Back button,
+      // or a link to an earlier day, week or month.
+      try {
+        var nav = performance.getEntriesByType && performance.getEntriesByType("navigation")[0];
+        if ((nav && nav.type === "back_forward") || sessionStorage.getItem("stm-slide") === "back") {
+          document.documentElement.setAttribute("data-slide", "back");
+        }
+        sessionStorage.removeItem("stm-slide");
+      } catch (e) { /* storage blocked - slide forward */ }
     })();
   </script>
 

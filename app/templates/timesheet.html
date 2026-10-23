@@ -128,6 +128,8 @@
       {# Drawn by app.js from the boxes as they are, so it needs the script. #}
       <button type="button" class="btn btn-secondary ts-png" hidden>{{ icon('download') }}Download PNG</button>
       <button type="submit" class="btn btn-primary ts-save">{{ icon('check') }}Save</button>
+      {# Shown by app.js, which saves as you type -- in Save's place. #}
+      <p class="ts-autosave" id="ts-autosave" role="status" hidden><span class="ts-autosave-dot" aria-hidden="true"></span><span class="ts-autosave-text">All changes saved</span></p>
     </div>
   </form>
 </section>
