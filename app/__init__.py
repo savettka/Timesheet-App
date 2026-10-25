@@ -37,6 +37,8 @@ def _run_light_migrations():
             statements.append("ALTER TABLE user ADD COLUMN timer_text VARCHAR(300)")
         if "timer_start" not in user_columns:
             statements.append("ALTER TABLE user ADD COLUMN timer_start DATETIME")
+        if "pay_currency" not in user_columns:
+            statements.append("ALTER TABLE user ADD COLUMN pay_currency VARCHAR(4)")
         if "saturday_login_hint" not in user_columns:
             statements.append("ALTER TABLE user ADD COLUMN saturday_login_hint TIME")
         if "is_admin" not in user_columns:

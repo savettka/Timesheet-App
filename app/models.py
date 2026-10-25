@@ -47,6 +47,9 @@ class User(UserMixin, db.Model):
     timer_text = db.Column(db.String(300), nullable=True)
     timer_start = db.Column(db.DateTime, nullable=True)
 
+    # The symbol pay is shown in (Settings -> Pay). None means rupees.
+    pay_currency = db.Column(db.String(4), nullable=True)
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     entries = db.relationship(
@@ -58,6 +61,19 @@ class User(UserMixin, db.Model):
     work_blocks = db.relationship(
         "WorkBlock", backref="user", lazy=True, cascade="all, delete-orphan"
     )
+    salaries = db.relationship(
+        "Salary", backref="user", lazy=True, cascade="all, delete-orphan",
+        order_by="Salary.starts.desc()",
+    )
+    pay_records = db.relationship(
+        "PayRecord", backref="user", lazy=True, cascade="all, delete-orphan"
+    )
+
+    PAY_CURRENCIES = {"₹": "₹ Rupee", "£": "£ Pound", "$": "$ Dollar", "€": "€ Euro"}
+
+    @property
+    def pay_symbol(self):
+        return self.pay_currency if self.pay_currency in self.PAY_CURRENCIES else "₹"
 
     def set_password(self, raw_password):
         self.password_hash = generate_password_hash(raw_password)
@@ -195,6 +211,31 @@ class WorkBlock(db.Model):
     @property
     def is_copied(self):
         return bool(self.text) and self.copied == self.copy_mark()
+
+
+class Salary(db.Model):
+    """A monthly salary and the month it starts from (always the 1st). Each
+    month's pay uses the latest one starting on or before it, so a rise
+    never rewrites the months before it."""
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    starts = db.Column(db.Date, nullable=False)
+    amount = db.Column(db.Float, nullable=False)
+
+    __table_args__ = (db.UniqueConstraint("user_id", "starts", name="uq_salary_user_starts"),)
+
+
+class PayRecord(db.Model):
+    """What a month's salary really came to, typed from the payslip, to set
+    beside STM's estimate on the Pay page. month is the month's 1st."""
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    month = db.Column(db.Date, nullable=False)
+    paid = db.Column(db.Float, nullable=False)
+
+    __table_args__ = (db.UniqueConstraint("user_id", "month", name="uq_pay_record_user_month"),)
 
 
 class LoginCode(db.Model):

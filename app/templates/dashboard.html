@@ -128,6 +128,22 @@
       </span>
     </p>
     <p class="card-note">{{ fmt_hours(month.worked_hours) }} worked of {{ fmt_hours(month.target_hours) }} due so far{% if month.today_in_progress %} &middot; today counts as you go{% endif %}.</p>
+    {% if pay %}
+    {# What this month's overtime pays at its hourly rate, and the salary at
+       month end with it -- moving as the hours do. #}
+    <a class="pay-figs" href="{{ url_for('main.pay') }}" aria-label="{{ today.strftime('%B') }} pay: {{ pay.overtime_pay|money }} overtime, {{ pay.total|money }} at month end">
+      <span class="pay-fig is-overtime">
+        <span class="pay-fig-label">Overtime pay</span>
+        <span class="pay-fig-value">{{ pay.overtime_pay|money }}</span>
+        <span class="pay-fig-note">{{ fmt_hours(pay.overtime_hours) }} at {{ pay.rate|money(exact=True) }}/h</span>
+      </span>
+      <span class="pay-fig">
+        <span class="pay-fig-label">Month end</span>
+        <span class="pay-fig-value">{{ pay.total|money }}</span>
+        <span class="pay-fig-note">{{ pay.salary|money }} + overtime</span>
+      </span>
+    </a>
+    {% endif %}
   </section>
 
   {# ------------------------------------------------------------- today #}

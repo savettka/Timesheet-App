@@ -236,6 +236,46 @@ def month_summary(user, entries_by_date, year, month, today, now=None):
     }
 
 
+def month_workdays(user, year, month):
+    """How many of the month's days are workdays in Settings: Mon-Sat gives
+    26 in September 2026. Leave days count -- they're paid."""
+    work = user.workday_set()
+    return sum(1 for d in range(1, calendar.monthrange(year, month)[1] + 1)
+               if date(year, month, d).weekday() in work)
+
+
+def salary_in(salaries, year, month):
+    """The salary a month is paid on: the latest one starting on or before
+    its 1st. None before the first salary."""
+    first = date(year, month, 1)
+    started = [s for s in salaries if s.starts <= first]
+    return max(started, key=lambda s: s.starts).amount if started else None
+
+
+def month_pay(user, salary, year, month, balance_hours):
+    """A month's pay as STM estimates it: the salary over the month's working
+    hours (its workdays times the daily target) gives an hourly rate, and
+    the month's overtime -- its balance, as Calendar shows it -- is paid at
+    that rate. A month behind earns no overtime. None without a salary."""
+    if not salary:
+        return None
+    workdays = month_workdays(user, year, month)
+    hours = workdays * user.daily_target_hours
+    if hours <= 0:
+        return None
+    rate = salary / hours
+    overtime = max(0, round(balance_hours * 60)) / 60
+    return {
+        "salary": salary,
+        "workdays": workdays,
+        "rate": rate,
+        "balance_hours": balance_hours,
+        "overtime_hours": overtime,
+        "overtime_pay": overtime * rate,
+        "total": salary + overtime * rate,
+    }
+
+
 def week_bounds(any_date):
     start = any_date - timedelta(days=any_date.weekday())  # Monday
     end = start + timedelta(days=6)  # Sunday
@@ -764,3 +804,24 @@ def fmt_target_hours(value):
 
 def fmt_time(t):
     return fmt_clock(t) if t else "--:--"
+
+
+def fmt_money(amount, symbol="₹", exact=False, signed=False):
+    """Money as it's written on a payslip: ₹24,390, or ₹106.48 with exact.
+    Rupees are grouped the Indian way (₹1,23,456); signed gives +₹390 and
+    −₹460, with a real minus sign like fmt_balance."""
+    places = 2 if exact else 0
+    value = round(abs(amount or 0), places)
+    whole, _, pence = f"{value:.{places}f}".partition(".")
+    if symbol == "₹" and len(whole) > 3:
+        head, groups = whole[:-3], []
+        while len(head) > 2:
+            groups.insert(0, head[-2:])
+            head = head[:-2]
+        whole = ",".join([head] + groups + [whole[-3:]])
+    else:
+        whole = f"{int(whole):,}"
+    text = symbol + whole + ("." + pence if pence else "")
+    if signed and value:
+        return ("+" if amount > 0 else "−") + text
+    return ("−" + text) if (amount or 0) < 0 and value else text

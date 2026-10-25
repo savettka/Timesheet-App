@@ -69,78 +69,83 @@
     </form>
   </section>
 
-  <section class="card" aria-labelledby="profile-heading">
-    <div class="card-head">
-      <h2 id="profile-heading" class="card-title">Profile</h2>
-      {% if user.is_admin %}<span class="badge badge-accent">Admin</span>{% endif %}
-    </div>
-    <form method="post" class="form" enctype="multipart/form-data">
-      <input type="hidden" name="form_type" value="profile">
-
-      <div class="avatar-field">
-        {{ avatar(user, 'avatar avatar-xl', alt='Your profile picture') }}
-        <div class="avatar-field-controls">
-          <span class="avatar-field-label" id="avatar-label">Profile picture</span>
-          <input type="file" name="avatar" id="avatar-input" accept="image/*" class="file-input"
-                 aria-describedby="avatar-filename">
-          <label for="avatar-input" class="btn btn-ghost">Choose a photo</label>
-          <span class="hint" id="avatar-filename">A square photo works best &mdash; it's resized for you.</span>
+  <section class="card" id="pay" aria-labelledby="pay-heading">
+    <h2 id="pay-heading" class="card-title">Pay</h2>
+    {% if user.salaries %}
+    <ul class="pay-salaries">
+      {% for s in user.salaries %}
+      {% set label = s.amount|money ~ ' from ' ~ s.starts.strftime('%B %Y') %}
+      <li>
+        <span class="pay-salary"><b>{{ s.amount|money }}</b> from {{ s.starts.strftime('%B %Y') }}</span>
+        <form method="post" autocomplete="off" data-confirm="Remove {{ label }}?">
+          <input type="hidden" name="form_type" value="salary_remove">
+          <input type="hidden" name="salary_id" value="{{ s.id }}">
+          <button type="submit" class="btn btn-ghost btn-sm" aria-label="Remove {{ label }}">Remove</button>
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    <form method="post" class="form" autocomplete="off">
+      <input type="hidden" name="form_type" value="salary">
+      <div class="field-row pay-amount-row">
+        <div class="field">
+          <label for="pay-amount">{{ 'New monthly salary' if user.salaries else 'Monthly salary' }}</label>
+          <input type="text" id="pay-amount" name="amount" inputmode="decimal"
+                 placeholder="{{ '%g'|format(user.salaries[0].amount) if user.salaries else '23000' }}">
+        </div>
+        <div class="field">
+          <label for="pay-currency">Currency</label>
+          <select id="pay-currency" name="currency">
+            {% for symbol, name in user.PAY_CURRENCIES.items() %}
+            <option value="{{ symbol }}" {{ 'selected' if symbol == user.pay_symbol }}>{{ name }}</option>
+            {% endfor %}
+          </select>
         </div>
       </div>
-
-      <div class="field">
-        <label for="display_name">Display name</label>
-        <input type="text" id="display_name" name="display_name" maxlength="120"
-               autocomplete="name" value="{{ user.display_name or '' }}">
-      </div>
-      <div class="field">
-        <label for="email">Email address <span class="optional">(for sign-in codes)</span></label>
-        <input type="email" id="email" name="email" value="{{ user.email or '' }}"
-               autocomplete="email" placeholder="you@example.com">
-      </div>
-      <div class="field">
-        <label for="username">Username</label>
-        <input type="text" id="username" value="{{ user.username }}" disabled>
+      <div class="field-row">
+        <div class="field">
+          <label for="pay-month">From</label>
+          <select id="pay-month" name="month">
+            {% for name in month_names %}
+            <option value="{{ loop.index }}" {{ 'selected' if loop.index == today.month }}>{{ name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label for="pay-year">Year</label>
+          <select id="pay-year" name="year">
+            {% for y in years %}
+            <option value="{{ y }}" {{ 'selected' if y == today.year }}>{{ y }}</option>
+            {% endfor %}
+          </select>
+        </div>
       </div>
       <div class="form-actions">
-        <button type="submit" class="btn btn-primary">Save profile</button>
-        {% if user.avatar_filename %}
-        <button type="submit" name="remove_avatar" value="1" class="btn btn-danger-ghost">Remove photo</button>
+        <button type="submit" class="btn btn-primary">Save salary</button>
+        {% if user.salaries %}
+        <a class="btn btn-secondary" href="{{ url_for('main.pay') }}">{{ icon('wallet') }}See pay</a>
         {% endif %}
       </div>
     </form>
   </section>
 
-  <section class="card" aria-labelledby="password-heading">
-    <h2 id="password-heading" class="card-title">Change password</h2>
-    <form method="post" class="form">
-      <input type="hidden" name="form_type" value="password">
-      <div class="field">
-        <label for="current_password">Current password</label>
-        <input type="password" id="current_password" name="current_password" required autocomplete="current-password">
+  <section class="card" aria-labelledby="profile-heading">
+    <div class="card-head">
+      <h2 id="profile-heading" class="card-title">Profile</h2>
+      {% if user.is_admin %}<span class="badge badge-accent">Admin</span>{% endif %}
+    </div>
+    <div class="pf-summary">
+      {{ avatar(user, 'avatar avatar-xl', alt='Your profile picture') }}
+      <div class="pf-who">
+        <p class="pf-name">{{ user.display_name or user.username }}</p>
+        <p class="pf-sub">{{ user.username }}{% if user.email %} &middot; {{ user.email }}{% endif %}</p>
       </div>
-      <div class="field">
-        <label for="new_password">New password</label>
-        <input type="password" id="new_password" name="new_password" required minlength="6"
-               autocomplete="new-password" aria-describedby="pw-hint">
-        <p class="hint" id="pw-hint">At least 6 characters.</p>
-      </div>
-      <div class="field">
-        <label for="confirm_password">Type the new password again</label>
-        <input type="password" id="confirm_password" name="confirm_password" required minlength="6" autocomplete="new-password">
-      </div>
-      <div class="form-actions">
-        <button type="submit" class="btn btn-primary">Update password</button>
-      </div>
-    </form>
-  </section>
-
-  <section class="card" aria-labelledby="account-heading">
-    <h2 id="account-heading" class="card-title">Account</h2>
-    <p class="card-note">Signed in as <strong>{{ user.username }}</strong>. Signing out doesn't log you out
-      of work &mdash; your hours keep counting until you tap Logout on Home.</p>
+    </div>
     <div class="form-actions">
-      <a class="btn btn-secondary" href="{{ url_for('auth.logout') }}">{{ icon('power') }}Sign out of STM</a>
+      <button type="button" class="btn btn-secondary" data-profile-open="edit">{{ icon('user') }}Edit profile</button>
+      <button type="button" class="btn btn-secondary" data-profile-open="password">{{ icon('lock') }}Change password</button>
+      <a class="btn btn-ghost" href="{{ url_for('auth.logout') }}">{{ icon('power') }}Sign out of STM</a>
     </div>
   </section>
 

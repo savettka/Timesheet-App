@@ -25,6 +25,9 @@
     <strong>{{ fmt_hours(summary.worked_hours) }}</strong> worked &middot;
     <strong class="{{ 'is-ahead' if balance_minutes > 0 else ('is-behind' if balance_minutes < 0 else '') }}">{{ fmt_balance(summary.balance_hours) }}</strong>
     {% if balance_minutes > 0 %}ahead{% elif balance_minutes < 0 %}behind{% else %}on target{% endif %}
+    {%- if pay %} &middot;
+    <a class="cal-pay" href="{{ url_for('main.pay') }}"><strong>{{ pay.overtime_pay|money }}</strong> overtime</a>
+    {%- endif %}
   </p>
 
   <table class="cal">

@@ -76,8 +76,18 @@ This mirrors the logic in the original spreadsheet:
 - **Dashboard** — today's hours, this week's progress bar toward your target, a
   suggested logout time once you're close to (or past) the weekly target, and the last
   week's days with Timesheet lines still to fill in.
-- **Settings** — change daily/weekly targets, workdays, display name, profile picture
-  and password.
+- **Pay** — put your monthly salary in **Settings → Pay**, with the month it starts from
+  (a rise gets its own line, so earlier months keep their old salary). Each month's
+  hourly rate is the salary over its working hours (its workdays in Settings × the daily
+  target: ₹23,000 over 27 days of 8h is ₹106.48), and the month's overtime -- its balance
+  on Calendar -- is paid at that rate; a month behind earns none. Home shows this
+  month's overtime pay and the salary at month end, Calendar adds the month's overtime
+  pay to its top line, and the **Pay** page lists every month with an overall total,
+  with a box for what the payslip really said beside STM's estimate. An estimate, not
+  a payslip: an employer's own rules can land a few hundred either way.
+- **Settings** — change daily/weekly targets, workdays and your salary.
+- **Profile** — tap your name or photo for a small window of your own settings: photo,
+  name and email, password, dark mode, Pay and sign out. Settings opens it too.
 - **Team members (admin only)** — the first account created owns the install. Only it
   can add people, reset their passwords, or remove them; everyone else never even sees
   that other accounts exist. Each person's hours, history and targets are their own.

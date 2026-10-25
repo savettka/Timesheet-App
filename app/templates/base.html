@@ -79,7 +79,9 @@
 
   {% if current_user.is_authenticated %}
   {# The menu in three groups, as time trackers lay it out: what you track,
-     what you look back on, and your own settings. #}
+     what you look back on, and your own settings. Pay joins once there's a
+     salary to work it out from. #}
+  {% set has_pay = current_user.salaries|length > 0 %}
   {% set nav_sections = [
       ('Track', [
           ('main.dashboard', 'Home', 'home', ['main.dashboard']),
@@ -90,13 +92,13 @@
       ('Analyse', [
           ('main.reports', 'Reports', 'chart', ['main.reports']),
           ('main.history', 'History', 'list', ['main.history', 'main.edit_entry']),
-      ]),
+      ] + ([('main.pay', 'Pay', 'wallet', ['main.pay'])] if has_pay else [])),
       ('Manage', [
           ('main.settings', 'Settings', 'sliders', ['main.settings']),
       ]),
   ] %}
   {% set nav_items = nav_sections|map(attribute=1)|sum(start=[]) %}
-  {% set tab_items = nav_items|rejectattr(0, 'in', ['main.settings', 'main.history'])|list %}
+  {% set tab_items = nav_items|rejectattr(0, 'in', ['main.settings', 'main.history', 'main.pay'])|list %}
   <div class="app-shell">
     <aside class="sidebar">
       <a class="brand" href="{{ url_for('main.dashboard') }}">
@@ -129,7 +131,8 @@
         </a>
         <h1 class="page-title">{% block page_title %}STM{% endblock %}</h1>
         {{ theme_toggle('theme-toggle-icon') }}
-        <a class="topbar-user" href="{{ url_for('main.settings') }}">
+        <a class="topbar-user" href="{{ url_for('main.settings') }}" data-profile-open=""
+           aria-haspopup="dialog" aria-controls="profile-pop">
           <span class="user-name">{{ current_user.display_name or current_user.username }}</span>
           {{ avatar(current_user) }}
         </a>
@@ -152,6 +155,82 @@
       {% endfor %}
     </nav>
   </div>
+
+  {# Your own settings in a small window (app.js opens it from your name or
+     photo, and from Settings): profile, password, dark mode, sign out. Each
+     form comes back to the page it was sent from. #}
+  {% set back_here = request.full_path if request.query_string else request.path %}
+  <dialog class="pf-pop" id="profile-pop" aria-labelledby="pf-name">
+    <div class="pf-inner">
+      <div class="pf-head">
+        {{ avatar(current_user, 'avatar avatar-lg') }}
+        <div class="pf-who">
+          <p class="pf-name" id="pf-name">{{ current_user.display_name or current_user.username }}</p>
+          <p class="pf-sub">{{ current_user.email or current_user.username }}</p>
+        </div>
+        <button type="button" class="btn btn-icon pf-close" data-profile-close aria-label="Close">{{ icon('x') }}</button>
+      </div>
+
+      <details class="pf-sec" id="pf-edit">
+        <summary>{{ icon('user') }}<span>Edit profile</span>{{ icon('chevron-down', 'icon pf-chev') }}</summary>
+        <form method="post" action="{{ url_for('main.settings') }}" class="form pf-form" enctype="multipart/form-data">
+          <input type="hidden" name="form_type" value="profile">
+          <input type="hidden" name="next" value="{{ back_here }}">
+          <div class="pf-photo">
+            <input type="file" name="avatar" id="avatar-input" accept="image/*" class="file-input"
+                   aria-describedby="avatar-filename">
+            <label for="avatar-input" class="btn btn-ghost btn-sm">Choose a photo</label>
+            {% if current_user.avatar_filename %}
+            <button type="submit" name="remove_avatar" value="1" class="btn btn-danger-ghost btn-sm">Remove photo</button>
+            {% endif %}
+            <span class="hint" id="avatar-filename">A square photo works best.</span>
+          </div>
+          <div class="field">
+            <label for="pf-display-name">Display name</label>
+            <input type="text" id="pf-display-name" name="display_name" maxlength="120"
+                   autocomplete="name" value="{{ current_user.display_name or '' }}">
+          </div>
+          <div class="field">
+            <label for="pf-email">Email <span class="optional">(for sign-in codes)</span></label>
+            <input type="email" id="pf-email" name="email" value="{{ current_user.email or '' }}"
+                   autocomplete="email" placeholder="you@example.com">
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">Save profile</button>
+        </form>
+      </details>
+
+      <details class="pf-sec" id="pf-password">
+        <summary>{{ icon('lock') }}<span>Change password</span>{{ icon('chevron-down', 'icon pf-chev') }}</summary>
+        <form method="post" action="{{ url_for('main.settings') }}" class="form pf-form">
+          <input type="hidden" name="form_type" value="password">
+          <input type="hidden" name="next" value="{{ back_here }}">
+          <input type="text" name="username" value="{{ current_user.username }}" autocomplete="username" hidden>
+          <div class="field">
+            <label for="pf-current-password">Current password</label>
+            <input type="password" id="pf-current-password" name="current_password" required autocomplete="current-password">
+          </div>
+          <div class="field">
+            <label for="pf-new-password">New password <span class="optional">(6 or more characters)</span></label>
+            <input type="password" id="pf-new-password" name="new_password" required minlength="6" autocomplete="new-password">
+          </div>
+          <div class="field">
+            <label for="pf-confirm-password">New password again</label>
+            <input type="password" id="pf-confirm-password" name="confirm_password" required minlength="6" autocomplete="new-password">
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">Update password</button>
+        </form>
+      </details>
+
+      <div class="pf-links">
+        {{ theme_toggle() }}
+        {% if has_pay %}
+        <a class="pf-row" href="{{ url_for('main.pay') }}">{{ icon('wallet') }}<span>Pay</span></a>
+        {% endif %}
+        <a class="pf-row" href="{{ url_for('main.settings') }}">{{ icon('sliders') }}<span>All settings</span></a>
+        <a class="pf-row" href="{{ url_for('auth.logout') }}">{{ icon('power') }}<span>Sign out</span></a>
+      </div>
+    </div>
+  </dialog>
   {% else %}
   <div class="auth-top">{{ theme_toggle('theme-toggle-icon') }}</div>
   <main id="main" class="auth-shell" tabindex="-1">

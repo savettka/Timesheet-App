@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% block title %}Pay{% endblock %}
+{% block page_title %}Pay{% endblock %}
+
+{% block content %}
+{% if not months %}
+<section class="card pay-empty" aria-labelledby="pay-empty-title">
+  <h2 id="pay-empty-title" class="card-title">{{ 'No hours since your first salary' if current_user.salaries else 'No salary yet' }}</h2>
+  <a class="btn btn-primary" href="{{ url_for('main.settings') }}#pay">{{ icon('wallet') }}Salary in Settings</a>
+</section>
+{% else %}
+<dl class="pay-stats">
+  {% if this_month %}
+  {% set month_word = this_month.first.strftime('%B') %}
+  <div class="rp-stat is-ahead"><dt>{{ month_word }} overtime</dt><dd>{{ this_month.overtime_pay|money }}</dd></div>
+  <div class="rp-stat"><dt>{{ month_word }} month end</dt><dd>{{ this_month.total|money }}</dd></div>
+  {% endif %}
+  <div class="rp-stat is-ahead"><dt>Overtime pay, all months</dt><dd>{{ totals.overtime_pay|money }}</dd></div>
+  <div class="rp-stat"><dt>Overtime, all months</dt><dd>{{ fmt_hours(totals.overtime_hours) }}</dd></div>
+</dl>
+
+<section class="card pay-card" aria-labelledby="pay-months-title">
+  <div class="card-head">
+    <h2 id="pay-months-title" class="card-title">Every month</h2>
+    <a class="link" href="{{ url_for('main.settings') }}#pay">Salary {{ icon('chevron-right', 'icon icon-inline') }}</a>
+  </div>
+  <form method="post" autocomplete="off">
+    <table class="pay-table">
+      <thead>
+        <tr>
+          <th scope="col">Month</th>
+          <th scope="col">Salary</th>
+          <th scope="col">Per hour</th>
+          <th scope="col">Overtime</th>
+          <th scope="col">Overtime pay</th>
+          <th scope="col">Month end</th>
+          <th scope="col">Paid</th>
+          <th scope="col">Difference</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in months %}
+        {% set month_label = m.first.strftime('%B %Y') %}
+        <tr class="{{ 'is-current' if m.is_current }}">
+          <th scope="row" class="pay-month">{{ month_label }}{% if m.is_current %} <span class="badge badge-accent">So far</span>{% endif %}</th>
+          <td data-label="Salary">{{ m.salary|money }}</td>
+          <td data-label="Per hour" title="{{ m.workdays }} days × {{ '%g'|format(current_user.daily_target_hours) }}h">{{ m.rate|money(exact=True) }}</td>
+          <td data-label="Overtime">{{ fmt_hours(m.overtime_hours) }}</td>
+          <td data-label="Overtime pay" class="is-ahead pay-strong">{{ m.overtime_pay|money }}</td>
+          <td data-label="Month end" class="pay-strong">{{ m.total|money }}</td>
+          <td data-label="Paid" class="pay-paid">
+            <input type="text" name="paid_{{ m.first.strftime('%Y-%m') }}" inputmode="decimal"
+                   value="{{ '%g'|format(m.paid) if m.paid is not none }}" placeholder="–"
+                   aria-label="Paid for {{ month_label }}">
+          </td>
+          <td data-label="Difference">{{ (m.paid - m.total)|money(signed=True) if m.paid is not none else '–' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr>
+          <th scope="row" class="pay-month">All months</th>
+          <td data-label="Salary"></td>
+          <td data-label="Per hour"></td>
+          <td data-label="Overtime">{{ fmt_hours(totals.overtime_hours) }}</td>
+          <td data-label="Overtime pay" class="is-ahead pay-strong">{{ totals.overtime_pay|money }}</td>
+          <td data-label="Month end" class="pay-strong">{{ totals.total|money }}</td>
+          <td data-label="Paid">{{ totals.paid|money if totals.has_paid else '–' }}</td>
+          <td data-label="Difference">{{ totals.gap|money(signed=True) if totals.has_paid else '–' }}</td>
+        </tr>
+      </tfoot>
+    </table>
+    <div class="form-actions pay-save">
+      <button type="submit" class="btn btn-primary">Save paid amounts</button>
+    </div>
+  </form>
+</section>
+{% endif %}
+{% endblock %}

@@ -306,6 +306,32 @@
     });
   }
 
+  // -------------------------------------------------------------- profile
+  // Your name or photo opens a small window of your own settings instead of
+  // the whole Settings page, and Settings' Edit profile / Change password
+  // open it at that part. Escape, the cross or a press outside shuts it.
+  // Caught on the way down, before the loading circle sees the link.
+  function initProfilePop() {
+    var pop = document.getElementById("profile-pop");
+    if (!pop || typeof pop.showModal !== "function") return;
+    document.addEventListener("click", function (e) {
+      var opener = e.target.closest && e.target.closest("[data-profile-open]");
+      if (!opener || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey) return;
+      e.preventDefault();
+      var part = "pf-" + opener.getAttribute("data-profile-open");
+      pop.querySelectorAll("details").forEach(function (d) { d.open = d.id === part; });
+      if (!pop.open) pop.showModal();
+      var first = document.getElementById(part);
+      var field = first && first.querySelector("input:not([type=hidden]):not([hidden]):not(.file-input)");
+      if (field) field.focus();
+    }, true);
+    pop.addEventListener("click", function (e) {
+      if (e.target === pop || (e.target.closest && e.target.closest("[data-profile-close]"))) pop.close();
+    });
+    // Sending a form: out of the way, so the loading circle shows.
+    pop.addEventListener("submit", function () { pop.close(); });
+  }
+
   // ------------------------------------------------------------- day type
   // The hours box only matters for a custom day, and a reason only for a day
   // that isn't an ordinary working day.
@@ -1319,6 +1345,7 @@
     initStatusPoll();
     initBreakRows();
     initAvatarPicker();
+    initProfilePop();
     initDayType();
     initTimesheetCopy();
     initTimesheetFollow();

@@ -27,7 +27,7 @@ from sqlalchemy import func
 
 from app import db
 from app import logic
-from app.models import BreakSegment, TimeEntry, User, WorkBlock
+from app.models import BreakSegment, PayRecord, Salary, TimeEntry, User, WorkBlock
 
 main_bp = Blueprint("main", __name__)
 
@@ -133,6 +133,24 @@ def parse_time_field(value):
         return datetime.strptime(value, "%H:%M").time()
     except ValueError:
         return None
+
+
+def local_path(value):
+    """A page on this site to go back to, or None -- never another site."""
+    value = (value or "").strip()
+    return value if value.startswith("/") and "//" not in value and "\\" not in value else None
+
+
+def pay_for(user, year, month, balance_hours):
+    """A month's estimated pay (logic.month_pay) on the salary in force that
+    month, or None before any salary."""
+    salary = logic.salary_in(user.salaries, year, month)
+    return logic.month_pay(user, salary, year, month, balance_hours)
+
+
+@main_bp.app_template_filter("money")
+def money_filter(amount, exact=False, signed=False):
+    return logic.fmt_money(amount, current_user.pay_symbol, exact=exact, signed=signed)
 
 
 def build_dashboard_context():
@@ -327,6 +345,7 @@ def dashboard():
     ctx["timer"] = timer_view(current_user, ctx["now"])
     ctx["can_time"] = ctx["day_state"] == "working"
     ctx["recent"] = recent_texts(current_user.id, today)
+    ctx["pay"] = pay_for(current_user, today.year, today.month, ctx["month"]["balance_hours"])
     return render_template("dashboard.html", **ctx)
 
 
@@ -1383,6 +1402,9 @@ def calendar_page(year=None, month=None):
     cells = [None] * page["rows"][0]["date"].weekday() + page["rows"]
     cells += [None] * (-len(cells) % 7)
     page["weeks"] = [cells[i:i + 7] for i in range(0, len(cells), 7)]
+    today = date.today()
+    page["pay"] = (pay_for(current_user, page["year"], page["month"], page["summary"]["balance_hours"])
+                   if (page["year"], page["month"]) <= (today.year, today.month) else None)
     return render_template(
         "calendar.html",
         fmt_hours_compact=logic.fmt_hours_compact,
@@ -1912,6 +1934,89 @@ def delete_entry(date_str):
     return redirect(url_for(view, year=entry_date.year, month=entry_date.month))
 
 
+# -------------------------------------------------------------------- pay
+
+def pay_months(user, now):
+    """Every month from the first salary to this one with hours in STM,
+    newest first: what each pays (logic.month_pay), its hours, and what the
+    payslip said, where that's been typed in."""
+    if not user.salaries:
+        return []
+    today = now.date()
+    first = min(s.starts for s in user.salaries)
+    by_month = defaultdict(dict)
+    for d, entry in get_entries_for_range(user.id, first, today).items():
+        by_month[(d.year, d.month)][d] = entry
+    paid = {r.month: r.paid for r in user.pay_records}
+    months = []
+    for year, month in sorted(by_month, reverse=True):
+        summary = logic.month_summary(user, by_month[(year, month)], year, month, today, now=now)
+        pay = pay_for(user, year, month, summary["balance_hours"])
+        if pay is None:
+            continue
+        first_day = date(year, month, 1)
+        pay.update(
+            first=first_day,
+            worked_hours=summary["worked_hours"],
+            is_current=(year, month) == (today.year, today.month),
+            paid=paid.get(first_day),
+        )
+        months.append(pay)
+    return months
+
+
+@main_bp.route("/pay", methods=["GET", "POST"])
+@login_required
+def pay():
+    """Each month's salary with its overtime paid at the month's hourly
+    rate, beside what the payslip really said."""
+    user = current_user
+    if request.method == "POST":
+        records = {r.month: r for r in user.pay_records}
+        bad = False
+        for key, value in request.form.items():
+            if not key.startswith("paid_"):
+                continue
+            try:
+                month = datetime.strptime(key[5:], "%Y-%m").date()
+            except ValueError:
+                continue
+            value = value.replace(",", "").strip()
+            record = records.get(month)
+            if not value:
+                if record is not None:
+                    db.session.delete(record)
+                continue
+            try:
+                amount = float(value)
+            except ValueError:
+                amount = float("nan")
+            if not (math.isfinite(amount) and 0 <= amount < 1e9):
+                bad = True
+                continue
+            if record is None:
+                db.session.add(PayRecord(user_id=user.id, month=month, paid=amount))
+            else:
+                record.paid = amount
+        db.session.commit()
+        flash("Type amounts as numbers, like 23848." if bad else "Saved.", "error" if bad else "success")
+        return redirect(url_for("main.pay"))
+
+    months = pay_months(user, datetime.now())
+    with_paid = [m for m in months if m["paid"] is not None]
+    totals = {
+        "overtime_hours": sum(m["overtime_hours"] for m in months),
+        "overtime_pay": sum(m["overtime_pay"] for m in months),
+        "total": sum(m["total"] for m in months),
+        "paid": sum(m["paid"] for m in with_paid),
+        "gap": sum(m["paid"] - m["total"] for m in with_paid),
+        "has_paid": bool(with_paid),
+    }
+    return render_template("pay.html", months=months, totals=totals,
+                           this_month=months[0] if months and months[0]["is_current"] else None,
+                           fmt_hours=logic.fmt_hours)
+
+
 # --------------------------------------------------------------- settings
 
 @main_bp.route("/settings", methods=["GET", "POST"])
@@ -1921,6 +2026,8 @@ def settings():
 
     if request.method == "POST":
         form_type = request.form.get("form_type")
+        # The profile pop-up posts here from any page, and goes back to it.
+        back = local_path(request.form.get("next")) or url_for("main.settings")
 
         if form_type == "targets":
             try:
@@ -1968,7 +2075,7 @@ def settings():
                 ).first() if email else None
                 if clash:
                     flash("That email address is already used by another account.", "error")
-                    return redirect(url_for("main.settings"))
+                    return redirect(back)
                 user.email = email
 
             if request.form.get("remove_avatar"):
@@ -1976,20 +2083,21 @@ def settings():
                 user.avatar_filename = None
                 db.session.commit()
                 flash("Profile picture removed.", "success")
-                return redirect(url_for("main.settings"))
+                return redirect(back)
 
             upload = request.files.get("avatar")
             if upload and upload.filename:
                 stored_name, error = save_avatar(upload)
                 if error:
                     flash(error, "error")
-                    return redirect(url_for("main.settings"))
+                    return redirect(back)
                 # Only drop the old file once the new one is safely written.
                 delete_avatar_file(user.avatar_filename)
                 user.avatar_filename = stored_name
 
             db.session.commit()
             flash("Profile updated.", "success")
+            return redirect(back)
 
         elif form_type == "password":
             current_pw = request.form.get("current_password", "")
@@ -2006,6 +2114,48 @@ def settings():
                 user.set_password(new_pw)
                 db.session.commit()
                 flash("Password changed.", "success")
+            return redirect(back)
+
+        elif form_type == "salary":
+            currency = request.form.get("currency")
+            if currency in User.PAY_CURRENCIES:
+                user.pay_currency = currency
+            raw = (request.form.get("amount") or "").replace(",", "").strip()
+            if not raw:
+                db.session.commit()
+                if currency in User.PAY_CURRENCIES:
+                    flash("Currency saved.", "success")
+                else:
+                    flash("Enter your monthly salary.", "error")
+                return redirect(url_for("main.settings") + "#pay")
+            try:
+                amount = float(raw)
+                starts = date(int(request.form.get("year", "")), int(request.form.get("month", "")), 1)
+            except ValueError:
+                amount = starts = None
+            if (amount is None or not (math.isfinite(amount) and 0 < amount < 1e9)
+                    or not 2000 <= starts.year <= 2100):
+                flash("Enter your monthly salary as a number, like 23000.", "error")
+                return redirect(url_for("main.settings") + "#pay")
+            salary = Salary.query.filter_by(user_id=user.id, starts=starts).first()
+            if salary is None:
+                db.session.add(Salary(user_id=user.id, starts=starts, amount=amount))
+            else:
+                salary.amount = amount
+            db.session.commit()
+            flash(f"Salary saved: {logic.fmt_money(amount, user.pay_symbol)} from {starts:%B %Y}.", "success")
+            return redirect(url_for("main.settings") + "#pay")
+
+        elif form_type == "salary_remove":
+            salary = Salary.query.filter_by(
+                id=request.form.get("salary_id", type=int), user_id=user.id
+            ).first()
+            if salary is not None:
+                label = f"{logic.fmt_money(salary.amount, user.pay_symbol)} from {salary.starts:%B %Y}"
+                db.session.delete(salary)
+                db.session.commit()
+                flash(f"Removed {label}.", "success")
+            return redirect(url_for("main.settings") + "#pay")
 
         elif form_type == "add_user":
             # Hiding the form isn't access control -- a non-admin can still
@@ -2083,4 +2233,9 @@ def settings():
     # Non-admins are never sent the list, so other accounts aren't merely
     # hidden in the markup -- they never reach the page.
     all_users = User.query.order_by(User.username).all() if user.is_admin else []
-    return render_template("settings.html", user=user, all_users=all_users)
+    today = date.today()
+    return render_template(
+        "settings.html", user=user, all_users=all_users,
+        month_names=list(calendar.month_name)[1:],
+        years=range(today.year + 1, today.year - 6, -1),
+    )

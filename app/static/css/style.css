@@ -1483,6 +1483,146 @@ input[type="number"] { -moz-appearance: textfield; }
   .status-dot { forced-color-adjust: none; }
 }
 
+/* ==========================================================================
+   Pay: a salary per month it starts from, overtime at the month's hourly
+   rate. Home and Calendar show the month; the Pay page shows every month
+   beside what the payslip said.
+   ========================================================================== */
+
+select {
+  padding-right: 42px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237b8396' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 14px center; background-size: 18px;
+  cursor: pointer;
+}
+
+.pay-figs {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s3);
+  margin-top: var(--s4); color: inherit; text-decoration: none;
+}
+.pay-fig {
+  display: flex; flex-direction: column; gap: 1px; min-width: 0;
+  padding: var(--s3) var(--s4); border-radius: var(--r-md); background: var(--surface-2);
+  transition: background-color .15s ease;
+}
+.pay-fig.is-overtime { background: var(--success-bg); }
+.pay-figs:hover .pay-fig { background: var(--surface-3); }
+.pay-figs:hover .pay-fig.is-overtime { background: color-mix(in srgb, var(--success-bg) 80%, var(--ahead)); }
+.pay-fig-label { font-size: 14px; font-weight: 500; color: var(--text-2); }
+.pay-fig-value { font-size: 24px; font-weight: 700; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.pay-fig.is-overtime .pay-fig-value { color: var(--success-text); }
+.pay-fig-note { font-size: 13px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+
+.cal-pay { color: inherit; text-decoration: none; }
+.cal-pay strong { color: var(--ahead); }
+.cal-pay:hover { text-decoration: underline; }
+
+.pay-salaries { list-style: none; display: flex; flex-direction: column; gap: var(--s2); margin-bottom: var(--s5); }
+.pay-salaries li {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s3);
+  padding: var(--s2) var(--s2) var(--s2) var(--s4); border-radius: var(--r-md); background: var(--surface-2);
+}
+.pay-salaries li:first-child { background: var(--success-bg); }
+.pay-salary { color: var(--text-2); font-variant-numeric: tabular-nums; }
+.pay-salary b { color: var(--text); font-size: 17px; }
+.pay-amount-row { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); }
+
+.pay-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s3); margin: 0 0 var(--s4); }
+@media (min-width: 900px) { .pay-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.pay-empty { display: flex; flex-direction: column; align-items: flex-start; gap: var(--s4); }
+.pay-empty .card-title { margin: 0; }
+
+.pay-card { padding-bottom: var(--s4); }
+.pay-table { font-size: 15px; font-variant-numeric: tabular-nums; }
+.pay-table th, .pay-table td { padding: var(--s3) var(--s2); text-align: right; vertical-align: middle; white-space: nowrap; }
+.pay-table thead th { font-size: 13px; font-weight: 600; color: var(--text-3); border-bottom: 1px solid var(--line); }
+.pay-table .pay-month, .pay-table thead th:first-child { text-align: left; padding-left: 0; }
+.pay-table tbody tr { border-bottom: 1px solid var(--line); }
+.pay-table tbody .pay-month { font-weight: 600; }
+.pay-table tr.is-current { background: var(--accent-soft); }
+.pay-table tr.is-current .pay-month { padding-left: var(--s2); }
+.pay-table .pay-strong { font-weight: 700; }
+.pay-table .is-ahead { color: var(--ahead); }
+.pay-table tfoot th, .pay-table tfoot td { font-weight: 700; border-top: 2px solid var(--line-strong); }
+.pay-paid { width: 120px; }
+.pay-paid input { min-height: 40px; padding: 0 var(--s2); font-size: 15px; text-align: right; }
+.pay-save { margin-top: var(--s4); justify-content: flex-end; }
+
+@media (max-width: 899px) {
+  .pay-table, .pay-table tbody, .pay-table tfoot { display: block; }
+  .pay-table thead { display: none; }
+  .pay-table tr {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s2) var(--s3);
+    padding: var(--s3) 0;
+  }
+  .pay-table tr.is-current { margin: 0 calc(var(--s3) * -1); padding: var(--s3); border-radius: var(--r-md); border-bottom: none; }
+  .pay-table th, .pay-table td { display: flex; flex-direction: column; gap: 1px; padding: 0; text-align: left; white-space: normal; }
+  .pay-table .pay-month { grid-column: 1 / -1; flex-direction: row; align-items: center; gap: var(--s2); font-size: 17px; }
+  .pay-table tr.is-current .pay-month { padding-left: 0; }
+  .pay-table td::before { content: attr(data-label); font-size: 13px; font-weight: 500; color: var(--text-3); }
+  .pay-table td:empty { display: none; }
+  .pay-table tfoot th, .pay-table tfoot td { border-top: none; }
+  .pay-table tfoot tr { border-top: 2px solid var(--line-strong); }
+  .pay-paid { width: auto; }
+  .pay-paid input { font-size: 16px; text-align: left; }
+  .pay-save .btn { width: 100%; }
+}
+
+/* ==========================================================================
+   Your profile in a small window: from your name or photo at the top, or
+   Settings' buttons. Under the name on a wide screen; on a phone, a sheet
+   that slides up from the bottom.
+   ========================================================================== */
+
+.pf-pop {
+  position: fixed; inset: 76px var(--s6) auto auto;
+  width: min(360px, calc(100vw - 2 * var(--s4)));
+  max-width: none; max-height: calc(100vh - 96px);
+  margin: 0; padding: 0; overflow: auto; overscroll-behavior: contain;
+  border: 1px solid var(--card-border); border-radius: 18px;
+  background: var(--surface); color: var(--text);
+  box-shadow: var(--shadow-lg);
+}
+.pf-pop::backdrop { background: rgba(10, 12, 18, 0.16); }
+.pf-inner { display: flex; flex-direction: column; gap: 2px; padding: var(--s3); }
+.pf-head { display: flex; align-items: center; gap: var(--s3); padding: var(--s1) var(--s1) var(--s3) var(--s2); margin-bottom: var(--s1); border-bottom: 1px solid var(--line); }
+.pf-who { flex: 1; min-width: 0; }
+.pf-name { font-size: 17px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pf-sub { font-size: 14px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.avatar-lg { width: 48px; height: 48px; font-size: 18px; }
+.pf-close { width: 40px; height: 40px; min-height: 40px; padding: 0; flex-shrink: 0; }
+
+.pf-sec > summary, .pf-row {
+  display: flex; align-items: center; gap: var(--s3);
+  min-height: 48px; padding: 0 var(--s3);
+  border-radius: var(--r-md);
+  color: var(--text-2); font-size: 16px; font-weight: 500; text-decoration: none;
+  list-style: none; cursor: pointer;
+}
+.pf-sec > summary::-webkit-details-marker { display: none; }
+.pf-sec > summary:hover, .pf-row:hover { background: var(--surface-2); color: var(--text); }
+.pf-sec > summary span { flex: 1; }
+.pf-chev { transition: transform .2s var(--ease-out); }
+.pf-sec[open] > summary { color: var(--text); font-weight: 600; }
+.pf-sec[open] .pf-chev { transform: rotate(180deg); }
+.pf-form { gap: var(--s3); padding: var(--s2) var(--s3) var(--s4); }
+.pf-photo { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); }
+.pf-photo .hint { flex-basis: 100%; }
+.pf-links { display: flex; flex-direction: column; gap: 2px; margin-top: var(--s1); padding-top: var(--s2); border-top: 1px solid var(--line); }
+
+.pf-summary { display: flex; align-items: center; gap: var(--s4); margin-bottom: var(--s5); }
+
+@media (max-width: 899px) {
+  .pf-pop {
+    inset: auto 0 0 0; width: 100%; max-height: 88vh;
+    border-radius: 20px 20px 0 0; border-bottom: none;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .pf-pop::backdrop { background: rgba(10, 12, 18, 0.4); }
+  .pf-inner { padding: var(--s3) max(var(--s3), env(safe-area-inset-right)) var(--s4) max(var(--s3), env(safe-area-inset-left)); }
+  .pf-form input { font-size: 16px; }
+}
+
 @media print {
   .sidebar, .tab-bar, .topbar .theme-toggle-icon, .topbar-user, .flash-stack,
   .actions, .skip-link, .c-go, .month-actions { display: none !important; }
@@ -1527,7 +1667,12 @@ input[type="number"] { -moz-appearance: textfield; }
   .progress-fill, .wb-bar span, .rp-task-bar span { transform-origin: left; animation: stm-grow-x .8s var(--ease-out) both; }
   .rp-fill { transform-origin: bottom; animation: stm-grow-y .7s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 40ms); }
   .kb-card.is-dropped { animation: stm-drop-in .34s var(--ease-out); }
+  .pf-pop[open] { animation: stm-drop-in .3s var(--ease-out); }
+  .pf-sec[open] > .pf-form { animation: stm-drop-in .3s var(--ease-out); }
   .ts-line, .kb-card, .wb-card, .ta-line { transition: background-color .3s ease, box-shadow .3s ease, transform .16s var(--ease-out); }
+}
+@media (prefers-reduced-motion: no-preference) and (max-width: 899px) {
+  .pf-pop[open] { animation: stm-sheet-in .4s var(--ease-out); }
 }
 /* Where pages can't slide across (older browsers), the parts still slide in. */
 @keyframes stm-page-in { from { transform: translateX(100%); } }
@@ -1541,3 +1686,4 @@ input[type="number"] { -moz-appearance: textfield; }
 @keyframes stm-grow-x { from { transform: scaleX(0); } }
 @keyframes stm-grow-y { from { transform: scaleY(0); } }
 @keyframes stm-drop-in { from { transform: translateY(-10px); } }
+@keyframes stm-sheet-in { from { transform: translateY(100%); } }
