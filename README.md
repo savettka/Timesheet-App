@@ -82,8 +82,9 @@ This mirrors the logic in the original spreadsheet:
   target: ₹23,000 over 27 days of 8h is ₹106.48), and the month's overtime -- its balance
   on Calendar -- is paid at that rate; a month behind earns none. Home shows this
   month's overtime pay and the salary at month end, Calendar adds the month's overtime
-  pay to its top line, and the **Pay** page lists every month with an overall total,
-  with a box for what the payslip really said beside STM's estimate. An estimate, not
+  pay to its top line, and the **Pay** page leads with this month's salary so far, then
+  lists every month with an overall total and a box for what the payslip really said --
+  saved as you type, with the difference from STM's estimate beside it. An estimate, not
   a payslip: an employer's own rules can land a few hundred either way.
 - **Settings** — change daily/weekly targets, workdays and your salary.
 - **Profile** — tap your name or photo for a small window of your own settings: photo,

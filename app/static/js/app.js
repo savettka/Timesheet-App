@@ -332,6 +332,89 @@
     pop.addEventListener("submit", function () { pop.close(); });
   }
 
+  // ------------------------------------------------------------------ pay
+  // The Pay page's Paid boxes save themselves, like the Timesheet: a moment
+  // after typing stops, when a box is left, or on Enter. The server answers
+  // with each month's difference and the totals worked out again, and the
+  // status says when it last saved. One save at a time; anything typed
+  // meanwhile goes in the next, and leaving the page sends what's waiting.
+  function initPayAutosave() {
+    var form = document.querySelector(".pay-form");
+    if (!form || !window.fetch || !window.FormData) return;
+    var status = document.getElementById("pay-status");
+    var timer = null, busy = false, again = false, retry = null;
+
+    function say(text, state) {
+      if (!status) return;
+      status.textContent = text;
+      status.setAttribute("data-state", state);
+    }
+    function body() {
+      var data = new FormData(form);
+      data.set("autosave", "1");
+      return data;
+    }
+    function pill(el, view) {
+      if (!el) return;
+      el.textContent = view.difference;
+      el.className = "pay-diff " + view.tone;
+    }
+    function apply(res) {
+      Object.keys(res.rows || {}).forEach(function (key) {
+        var row = form.querySelector('tr[data-month="' + key + '"]');
+        if (!row) return;
+        pill(row.querySelector(".pay-diff"), res.rows[key]);
+        var input = row.querySelector("input");
+        if (input) input.setAttribute("aria-invalid", res.rows[key].bad ? "true" : "false");
+      });
+      if (res.totals) {
+        pill(document.getElementById("pay-total-diff"), res.totals);
+        var paid = document.getElementById("pay-total-paid");
+        if (paid) paid.textContent = res.totals.paid;
+      }
+    }
+    function save() {
+      clearTimeout(timer);
+      clearTimeout(retry);
+      timer = null;
+      if (busy) { again = true; return; }
+      busy = true;
+      say("Saving…", "saving");
+      fetch(window.location.pathname, {
+        method: "POST", body: body(), credentials: "same-origin",
+        headers: { Accept: "application/json" }
+      }).then(function (r) {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+      }).then(function (res) {
+        apply(res);
+        if (res.ok) say("Saved · " + res.saved_at, "saved");
+        else say("Type amounts as numbers, like 23848", "error");
+      }).catch(function () {
+        say("Couldn't save — trying again", "error");
+        retry = setTimeout(save, 4000);
+      }).then(function () {
+        busy = false;
+        if (again) { again = false; save(); }
+      });
+    }
+
+    form.addEventListener("input", function (e) {
+      if (!e.target.matches("input")) return;
+      say("Editing…", "editing");
+      clearTimeout(timer);
+      timer = setTimeout(save, AUTOSAVE_PAUSE_MS);
+    });
+    form.addEventListener("change", function () { if (timer) save(); });
+    form.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" && e.target.matches("input")) { e.preventDefault(); save(); }
+    });
+    form.addEventListener("submit", function (e) { e.preventDefault(); save(); });
+    window.addEventListener("pagehide", function () {
+      if (timer && navigator.sendBeacon) navigator.sendBeacon(window.location.pathname, body());
+    });
+  }
+
   // ------------------------------------------------------------- day type
   // The hours box only matters for a custom day, and a reason only for a day
   // that isn't an ordinary working day.
@@ -883,7 +966,7 @@
   function initSlideOrder() {
     var groups = document.querySelectorAll(
       ".dash-grid, .rp-stats, .ts-lines, .kb, .kb-list, .wb, .ta-card, .tw tbody, .cg-body, .ds-days, .fill-days, " +
-      ".timer-again-row, .rp-tasks, .rp-bars, .days tbody, .content");
+      ".timer-again-row, .rp-tasks, .rp-bars, .days tbody, .pay-table tbody, .content");
     groups.forEach(function (group) {
       var n = 0;
       [].forEach.call(group.children, function (child) {
@@ -1346,6 +1429,7 @@
     initBreakRows();
     initAvatarPicker();
     initProfilePop();
+    initPayAutosave();
     initDayType();
     initTimesheetCopy();
     initTimesheetFollow();

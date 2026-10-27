@@ -1527,45 +1527,99 @@ select {
 .pay-salary b { color: var(--text); font-size: 17px; }
 .pay-amount-row { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); }
 
-.pay-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s3); margin: 0 0 var(--s4); }
-@media (min-width: 900px) { .pay-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 .pay-empty { display: flex; flex-direction: column; align-items: flex-start; gap: var(--s4); }
 .pay-empty .card-title { margin: 0; }
 
-.pay-card { padding-bottom: var(--s4); }
+/* The Pay page: the latest month as one figure on the page itself, then
+   the months as quiet rows -- money right-aligned in tabular figures, thin
+   dividers, the Paid box plain text until it's pointed at or typed in. */
+.pay-hero {
+  display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between;
+  gap: var(--s5) var(--s6); padding: var(--s3) var(--s1) var(--s6);
+}
+.pay-hero-label { font-size: 15px; font-weight: 600; color: var(--text-2); }
+.pay-hero-value {
+  margin: 2px 0 var(--s3);
+  font-size: 56px; font-weight: 700; line-height: 1.05; letter-spacing: -0.035em;
+  font-variant-numeric: tabular-nums;
+}
+.pay-hero-split { display: flex; flex-wrap: wrap; align-items: center; gap: 6px var(--s2); font-size: 16px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.pay-plus { color: var(--text-3); }
+.pay-ot { padding: 3px 11px; border-radius: 999px; background: var(--success-bg); color: var(--success-text); font-weight: 650; }
+.pay-hero-rate { color: var(--text-3); font-size: 15px; }
+.pay-hero-side { display: flex; gap: var(--s6); margin: 0; }
+.pay-hero-side dt { font-size: 13px; font-weight: 500; color: var(--text-3); }
+.pay-hero-side dd { margin: 2px 0 0; font-size: 22px; font-weight: 700; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+
+.pay-list { padding: var(--s2) var(--s5) var(--s2); }
+.pay-list-head { display: flex; align-items: center; gap: var(--s4); padding: var(--s3) 0; }
+.pay-list-head .card-title { margin: 0; margin-right: auto; }
+.pay-status { display: inline-flex; align-items: center; gap: 7px; font-size: 14px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.pay-status:empty { display: none; }
+.pay-status[data-state="saved"]::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--go); }
+.pay-status[data-state="error"] { color: var(--error-text); }
+
 .pay-table { font-size: 15px; font-variant-numeric: tabular-nums; }
-.pay-table th, .pay-table td { padding: var(--s3) var(--s2); text-align: right; vertical-align: middle; white-space: nowrap; }
-.pay-table thead th { font-size: 13px; font-weight: 600; color: var(--text-3); border-bottom: 1px solid var(--line); }
-.pay-table .pay-month, .pay-table thead th:first-child { text-align: left; padding-left: 0; }
-.pay-table tbody tr { border-bottom: 1px solid var(--line); }
-.pay-table tbody .pay-month { font-weight: 600; }
-.pay-table tr.is-current { background: var(--accent-soft); }
-.pay-table tr.is-current .pay-month { padding-left: var(--s2); }
-.pay-table .pay-strong { font-weight: 700; }
-.pay-table .is-ahead { color: var(--ahead); }
-.pay-table tfoot th, .pay-table tfoot td { font-weight: 700; border-top: 2px solid var(--line-strong); }
-.pay-paid { width: 120px; }
-.pay-paid input { min-height: 40px; padding: 0 var(--s2); font-size: 15px; text-align: right; }
-.pay-save { margin-top: var(--s4); justify-content: flex-end; }
+.pay-table thead th {
+  padding: var(--s2) var(--s3); text-align: right;
+  font-size: 13px; font-weight: 500; color: var(--text-3);
+}
+.pay-table thead th:first-child { text-align: left; padding-left: 0; }
+.pay-table thead th:last-child, .pay-table .c-diff { padding-right: 0; }
+.pay-table tbody tr, .pay-table tfoot tr { border-top: 1px solid var(--line); }
+.pay-table th[scope="row"], .pay-table td { padding: var(--s4) var(--s3); text-align: right; vertical-align: middle; white-space: nowrap; }
+.pay-table th[scope="row"] { padding-left: 0; text-align: left; font-weight: 400; }
+.pay-m { font-size: 16px; font-weight: 650; color: var(--text); }
+.pay-m-sub, .pay-ot-h { display: block; margin-top: 2px; font-size: 13px; color: var(--text-3); }
+.pay-ot-pay { font-weight: 650; color: var(--ahead); }
+.pay-table .c-end { font-size: 16px; font-weight: 700; }
+.pay-table .c-paid { width: 150px; }
+.pay-table .c-paid input {
+  min-height: 40px; padding: 0 var(--s2);
+  border-color: transparent; background: transparent;
+  font-size: 16px; font-weight: 600; text-align: right;
+}
+.pay-table .c-paid input::placeholder { color: var(--accent-text); font-weight: 500; }
+.pay-table .c-paid input:hover { border-color: var(--line); background: var(--surface-2); }
+.pay-table .c-paid input:focus { border-color: var(--focus); background: var(--surface); }
+.pay-table .c-paid input[aria-invalid="true"] { border-color: var(--stop); background: var(--error-bg); }
+.pay-diff {
+  display: inline-block; min-width: 72px; padding: 4px 11px; border-radius: 999px;
+  font-size: 14px; font-weight: 650; text-align: center;
+  background: var(--surface-2); color: var(--text-3);
+}
+.pay-diff.is-none { background: transparent; }
+.pay-diff.is-over { background: var(--success-bg); color: var(--success-text); }
+.pay-diff.is-under { background: var(--error-bg); color: var(--error-text); }
+.pay-table tfoot tr { border-top: 2px solid var(--line); }
+.pay-table tfoot .c-paid { padding-right: calc(var(--s3) + var(--s2)); font-weight: 650; }
+.pay-save { display: flex; justify-content: flex-end; padding: var(--s3) 0 var(--s4); }
 
 @media (max-width: 899px) {
+  .pay-hero { padding: var(--s1) var(--s1) var(--s5); }
+  .pay-hero-value { font-size: 44px; }
+  .pay-hero-side { gap: var(--s5); }
+  .pay-hero-side dd { font-size: 19px; }
+  .pay-list { padding: var(--s1) var(--s4) var(--s1); }
+
   .pay-table, .pay-table tbody, .pay-table tfoot { display: block; }
   .pay-table thead { display: none; }
   .pay-table tr {
-    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s2) var(--s3);
-    padding: var(--s3) 0;
+    display: grid; grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "month end" "ot ot" "paid diff";
+    gap: var(--s2) var(--s3); padding: var(--s4) 0;
   }
-  .pay-table tr.is-current { margin: 0 calc(var(--s3) * -1); padding: var(--s3); border-radius: var(--r-md); border-bottom: none; }
-  .pay-table th, .pay-table td { display: flex; flex-direction: column; gap: 1px; padding: 0; text-align: left; white-space: normal; }
-  .pay-table .pay-month { grid-column: 1 / -1; flex-direction: row; align-items: center; gap: var(--s2); font-size: 17px; }
-  .pay-table tr.is-current .pay-month { padding-left: 0; }
-  .pay-table td::before { content: attr(data-label); font-size: 13px; font-weight: 500; color: var(--text-3); }
-  .pay-table td:empty { display: none; }
-  .pay-table tfoot th, .pay-table tfoot td { border-top: none; }
-  .pay-table tfoot tr { border-top: 2px solid var(--line-strong); }
-  .pay-paid { width: auto; }
-  .pay-paid input { font-size: 16px; text-align: left; }
-  .pay-save .btn { width: 100%; }
+  .pay-table th[scope="row"], .pay-table td { padding: 0; white-space: normal; }
+  .pay-table .c-month { grid-area: month; }
+  .pay-table .c-end { grid-area: end; align-self: start; font-size: 17px; }
+  .pay-table .c-ot { grid-area: ot; display: flex; align-items: baseline; gap: var(--s2); text-align: left; }
+  .pay-table .c-ot::before { content: "Overtime"; font-size: 13px; color: var(--text-3); }
+  .pay-table .c-ot .pay-ot-h { display: inline; margin: 0; }
+  .pay-table .c-paid { grid-area: paid; width: auto; display: flex; align-items: center; gap: var(--s2); text-align: left; }
+  .pay-table .c-paid::before { content: "Paid"; font-size: 13px; color: var(--text-3); }
+  .pay-table .c-paid input { max-width: 150px; text-align: left; border-color: var(--line); }
+  .pay-table .c-diff { grid-area: diff; align-self: center; }
+  .pay-table tfoot .c-paid { padding-right: 0; }
 }
 
 /* ==========================================================================
@@ -1667,6 +1721,7 @@ select {
   .progress-fill, .wb-bar span, .rp-task-bar span { transform-origin: left; animation: stm-grow-x .8s var(--ease-out) both; }
   .rp-fill { transform-origin: bottom; animation: stm-grow-y .7s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 40ms); }
   .kb-card.is-dropped { animation: stm-drop-in .34s var(--ease-out); }
+  .pay-table tbody tr { animation: stm-slide-in .5s var(--ease-out) backwards; animation-delay: calc(var(--i, 0) * 40ms); }
   .pf-pop[open] { animation: stm-drop-in .3s var(--ease-out); }
   .pf-sec[open] > .pf-form { animation: stm-drop-in .3s var(--ease-out); }
   .ts-line, .kb-card, .wb-card, .ta-line { transition: background-color .3s ease, box-shadow .3s ease, transform .16s var(--ease-out); }

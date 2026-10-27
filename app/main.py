@@ -1957,23 +1957,48 @@ def pay_months(user, now):
         first_day = date(year, month, 1)
         pay.update(
             first=first_day,
+            key=first_day.strftime("%Y-%m"),
             worked_hours=summary["worked_hours"],
             is_current=(year, month) == (today.year, today.month),
             paid=paid.get(first_day),
         )
+        pay["gap"] = None if pay["paid"] is None else pay["paid"] - pay["total"]
         months.append(pay)
     return months
+
+
+def pay_totals(months):
+    """All the months together; paid and its gap only over the months whose
+    payslip has been typed in."""
+    with_paid = [m for m in months if m["paid"] is not None]
+    return {
+        "overtime_hours": sum(m["overtime_hours"] for m in months),
+        "overtime_pay": sum(m["overtime_pay"] for m in months),
+        "total": sum(m["total"] for m in months),
+        "paid": sum(m["paid"] for m in with_paid) if with_paid else None,
+        "gap": sum(m["gap"] for m in with_paid) if with_paid else None,
+    }
+
+
+def pay_tone(gap):
+    """How a payslip compares with STM's estimate: paid more, paid less, or
+    no payslip (or the same to the rupee)."""
+    if gap is None or round(gap) == 0:
+        return "is-none" if gap is None else "is-even"
+    return "is-over" if gap > 0 else "is-under"
 
 
 @main_bp.route("/pay", methods=["GET", "POST"])
 @login_required
 def pay():
     """Each month's salary with its overtime paid at the month's hourly
-    rate, beside what the payslip really said."""
+    rate, beside what the payslip really said. The Paid boxes save as
+    they're typed in (autosave=1, answered in JSON with the differences and
+    totals worked out again); without script, the form posts as usual."""
     user = current_user
     if request.method == "POST":
         records = {r.month: r for r in user.pay_records}
-        bad = False
+        bad = set()
         for key, value in request.form.items():
             if not key.startswith("paid_"):
                 continue
@@ -1992,29 +2017,35 @@ def pay():
             except ValueError:
                 amount = float("nan")
             if not (math.isfinite(amount) and 0 <= amount < 1e9):
-                bad = True
+                bad.add(key[5:])
                 continue
             if record is None:
                 db.session.add(PayRecord(user_id=user.id, month=month, paid=amount))
             else:
                 record.paid = amount
         db.session.commit()
+        if request.form.get("autosave") == "1":
+            months = pay_months(user, datetime.now())
+            totals = pay_totals(months)
+
+            def gap_view(gap):
+                return {"difference": "\u2013" if gap is None else logic.fmt_money(gap, user.pay_symbol, signed=True),
+                        "tone": pay_tone(gap)}
+
+            return jsonify(
+                ok=not bad,
+                saved_at=logic.fmt_time(datetime.now().time()),
+                rows={m["key"]: dict(gap_view(m["gap"]), bad=m["key"] in bad) for m in months},
+                totals=dict(gap_view(totals["gap"]),
+                            paid="\u2013" if totals["paid"] is None else logic.fmt_money(totals["paid"], user.pay_symbol)),
+            )
         flash("Type amounts as numbers, like 23848." if bad else "Saved.", "error" if bad else "success")
         return redirect(url_for("main.pay"))
 
     months = pay_months(user, datetime.now())
-    with_paid = [m for m in months if m["paid"] is not None]
-    totals = {
-        "overtime_hours": sum(m["overtime_hours"] for m in months),
-        "overtime_pay": sum(m["overtime_pay"] for m in months),
-        "total": sum(m["total"] for m in months),
-        "paid": sum(m["paid"] for m in with_paid),
-        "gap": sum(m["paid"] - m["total"] for m in with_paid),
-        "has_paid": bool(with_paid),
-    }
-    return render_template("pay.html", months=months, totals=totals,
-                           this_month=months[0] if months and months[0]["is_current"] else None,
-                           fmt_hours=logic.fmt_hours)
+    return render_template("pay.html", months=months, totals=pay_totals(months),
+                           headline=months[0] if months else None,
+                           pay_tone=pay_tone, fmt_hours=logic.fmt_hours)
 
 
 # --------------------------------------------------------------- settings
