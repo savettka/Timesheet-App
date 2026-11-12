@@ -87,6 +87,8 @@ This mirrors the logic in the original spreadsheet:
   saved as you type, with the difference from STM's estimate beside it. An estimate, not
   a payslip: an employer's own rules can land a few hundred either way.
 - **Settings** — change daily/weekly targets, workdays and your salary.
+- **More room** — the button at the top left hides the side menu entirely (the logo in the
+  top bar still goes home); press it again to bring the menu back. The browser remembers.
 - **Profile** — tap your name or photo for a small window of your own settings: photo,
   name and email, password, dark mode, Pay and sign out. Settings opens it too.
 - **Team members (admin only)** — the first account created owns the install. Only it

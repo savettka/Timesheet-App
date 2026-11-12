@@ -18,6 +18,11 @@
         if (saved === "dark" || saved === "light") {
           document.documentElement.setAttribute("data-theme", saved);
         }
+        // The side menu, if it was hidden: gone before the page draws, not
+        // sliding away on every page.
+        if (localStorage.getItem("stm-menu") === "hidden") {
+          document.documentElement.setAttribute("data-menu", "hidden");
+        }
       } catch (e) { /* storage blocked - follow the device */ }
       // Which way the page slides in: back for the browser's Back button,
       // or a link to an earlier day, week or month.
@@ -100,7 +105,7 @@
   {% set nav_items = nav_sections|map(attribute=1)|sum(start=[]) %}
   {% set tab_items = nav_items|rejectattr(0, 'in', ['main.settings', 'main.history', 'main.pay'])|list %}
   <div class="app-shell">
-    <aside class="sidebar">
+    <aside class="sidebar" id="side-menu">
       <a class="brand" href="{{ url_for('main.dashboard') }}">
         {{ stm_logo('logo-mark') }}
         <span class="brand-name">STM</span>
@@ -126,6 +131,9 @@
 
     <div class="main-col">
       <header class="topbar">
+        {# Hides the side menu entirely, and brings it back (app.js). #}
+        <button type="button" class="menu-toggle js-menu-toggle" aria-controls="side-menu"
+                aria-expanded="true" aria-label="Hide the menu" title="Hide the menu">{{ icon('sidebar') }}</button>
         <a class="topbar-brand" href="{{ url_for('main.dashboard') }}" aria-label="STM home">
           {{ stm_logo('logo-mark') }}
         </a>

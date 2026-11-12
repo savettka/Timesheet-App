@@ -50,6 +50,32 @@
     sync();
   }
 
+  // ----------------------------------------------------------------- menu
+  // The button at the top left hides the side menu entirely, and brings it
+  // back. Kept like dark mode, and put on the page before it draws (base.html).
+  function initMenuToggle() {
+    var button = document.querySelector(".js-menu-toggle");
+    if (!button) return;
+    var root = document.documentElement;
+
+    function sync() {
+      var hidden = root.getAttribute("data-menu") === "hidden";
+      var label = hidden ? "Show the menu" : "Hide the menu";
+      button.setAttribute("aria-expanded", hidden ? "false" : "true");
+      button.setAttribute("aria-label", label);
+      button.title = label;
+    }
+
+    button.addEventListener("click", function () {
+      var hide = root.getAttribute("data-menu") !== "hidden";
+      if (hide) root.setAttribute("data-menu", "hidden");
+      else root.removeAttribute("data-menu");
+      try { localStorage.setItem("stm-menu", hide ? "hidden" : "shown"); } catch (e) { /* not kept - still applied */ }
+      sync();
+    });
+    sync();
+  }
+
   // ------------------------------------------------------------- messages
   function initFlashes() {
     document.addEventListener("click", function (e) {
@@ -1413,6 +1439,7 @@
 
   document.addEventListener("DOMContentLoaded", function () {
     initTheme();
+    initMenuToggle();
     initFlashes();
     initForms();
     initPageWait();

@@ -328,6 +328,28 @@ input, textarea { caret-color: var(--accent); }
   border-bottom: 1px solid var(--line);
 }
 .topbar-brand { display: none; }
+
+/* The side menu can be hidden entirely: it slides off to the left and the
+   page takes the room, with the logo in the top bar for the way home. */
+.menu-toggle {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 40px; height: 40px; margin-left: calc(var(--s2) * -1);
+  border: none; border-radius: var(--r-md);
+  background: transparent; color: var(--text-2); cursor: pointer;
+  transition: background-color .15s ease, color .15s ease, transform .16s var(--ease-out);
+}
+.menu-toggle:hover { background: var(--surface-2); color: var(--text); }
+.menu-toggle:active { transform: scale(0.97); }
+.sidebar { transition: margin-left .34s var(--ease-out), visibility 0s; }
+:root[data-menu="hidden"] .sidebar {
+  margin-left: calc(-1 * var(--sidebar-w));
+  visibility: hidden;
+  transition: margin-left .34s var(--ease-out), visibility 0s .34s;
+}
+:root[data-menu="hidden"] .topbar-brand { display: flex; align-items: center; justify-content: center; width: 40px; height: 44px; }
+@media (prefers-reduced-motion: reduce) {
+  .sidebar, :root[data-menu="hidden"] .sidebar { transition: none; }
+}
 .page-title { flex: 1; min-width: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
 .topbar .theme-toggle-icon { display: none; }
 .topbar-user {
@@ -1334,7 +1356,7 @@ input[type="number"] { -moz-appearance: textfield; }
   .wb { scroll-snap-type: x mandatory; grid-template-columns: repeat(7, minmax(78%, 1fr)); }
   .wb-col { scroll-snap-align: start; }
   .ts-foot .ts-autosave { flex: 1 1 100%; justify-content: center; order: -1; }
-  .sidebar { display: none; }
+  .sidebar, .menu-toggle { display: none; }
 
   .topbar { min-height: 64px; padding: var(--s2) var(--s4); gap: var(--s2); }
   .topbar-brand { display: flex; align-items: center; justify-content: center; width: 40px; height: 44px; }
@@ -1678,7 +1700,7 @@ select {
 }
 
 @media print {
-  .sidebar, .tab-bar, .topbar .theme-toggle-icon, .topbar-user, .flash-stack,
+  .sidebar, .tab-bar, .menu-toggle, .topbar .theme-toggle-icon, .topbar-user, .flash-stack,
   .actions, .skip-link, .c-go, .month-actions { display: none !important; }
   body, .card { background: #fff; color: #000; box-shadow: none; }
   .content { padding: 0; }
