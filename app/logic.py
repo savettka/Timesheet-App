@@ -66,12 +66,28 @@ def is_stale_shift(entry, now=None):
     return now - login_dt > timedelta(hours=STALE_SHIFT_HOURS)
 
 
+def work_day(open_entry, now):
+    """The day being worked: the date -- or, past midnight on a shift begun
+    the day before and still open, that shift's day, until its logout. A
+    3 PM to 1 AM Friday stays Friday on every page through to 1 AM."""
+    if is_open_shift(open_entry) and open_entry.date < now.date() and not is_stale_shift(open_entry, now):
+        return open_entry.date
+    return now.date()
+
+
+def day_minute(day, now):
+    """Minutes into ``day`` at ``now``: 1,470 at 00:30 the morning after."""
+    return int((now - datetime.combine(day, time())).total_seconds() // 60)
+
+
 def break_segment_hours(entry, segment, now=None):
     """Hours for a single break segment. If the break is still open,
-    counts up to ``now`` (or the current time)."""
+    counts up to ``now`` (or the current time). A break starting at a time
+    of day before the login was taken after midnight, on an overnight shift."""
     if segment.break_start is None:
         return 0.0
-    start_dt = datetime.combine(entry.date, segment.break_start)
+    start_dt = place_on_shift(entry.date, segment.break_start,
+                              shift_login_dt(entry) if entry.login_time is not None else None)
     if segment.break_end is not None:
         end_dt = _combine(entry.date, segment.break_end, reference_dt=start_dt)
     else:
@@ -538,11 +554,14 @@ def timesheet_lines(entry, day, now, blocks=()):
     """
     start, end = timesheet_span(entry, day, now)
     minute = now.hour * 60 + now.minute
+    login = getattr(entry, "login_time", None)
     breaks = []
     for segment in getattr(entry, "breaks", None) or ():
         if segment.break_start is None:
             continue
         a = clock_minutes(segment.break_start)
+        if login is not None and a < start:
+            continue  # taken after midnight: past the end of this date's lines
         if segment.break_end is not None:
             b = clock_minutes(segment.break_end, ending=True)
             if b < a:

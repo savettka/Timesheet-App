@@ -47,6 +47,12 @@ def get_open_entry(user_id):
     )
 
 
+def work_day(user_id, now):
+    """The day being worked (logic.work_day): past midnight on a shift still
+    open from the day before, that day -- not the new date."""
+    return logic.work_day(get_open_entry(user_id), now)
+
+
 def get_entries_for_range(user_id, start_date, end_date):
     entries = TimeEntry.query.filter(
         TimeEntry.user_id == user_id,
@@ -156,8 +162,9 @@ def money_filter(amount, exact=False, signed=False):
 def build_dashboard_context():
     user = current_user
     now = datetime.now()
-    today = now.date()
     open_entry = get_open_entry(user.id)
+    # Past midnight on a shift begun yesterday, today is still that day.
+    today = logic.work_day(open_entry, now)
     # A shift left open so long it's almost certainly a forgotten logout:
     # logging out now would record a day of 20-odd hours, so the dashboard
     # asks when it really ended, and offers no suggestions built on it.
@@ -218,7 +225,7 @@ def build_dashboard_context():
         }
 
     saturday = logic.saturday_plan(
-        user, entries_by_date, week_start, date.today(), now=now
+        user, entries_by_date, week_start, today, now=now
     )
 
     open_break = open_entry.open_break() if open_entry else None
@@ -259,6 +266,7 @@ def build_dashboard_context():
     )
 
     return {
+        "today": today,
         "open_entry": open_entry,
         "open_break": open_break,
         "open_entry_closed_break_seconds": open_entry_closed_break_seconds,
@@ -298,17 +306,17 @@ def index():
     return redirect(url_for("main.dashboard"))
 
 
-def days_to_fill(user_id, now, days=7):
+def days_to_fill(user_id, now, today, days=7):
     """The last week's days with Timesheet lines still to fill in -- each
-    finished line of a worked day with no words yet -- newest first."""
-    today = now.date()
+    finished line of a worked day with no words yet -- newest first. today
+    is the day being worked (work_day)."""
     first = today - timedelta(days=days - 1)
     entries = TimeEntry.query.filter(TimeEntry.user_id == user_id, TimeEntry.date >= first,
                                      TimeEntry.date <= today, TimeEntry.login_time.isnot(None)).all()
     blocks = defaultdict(list)
     for b in WorkBlock.query.filter(WorkBlock.user_id == user_id, WorkBlock.date >= first, WorkBlock.date <= today):
         blocks[b.date].append(b)
-    minute = now.hour * 60 + now.minute
+    minute = logic.day_minute(today, now)
     out = []
     for entry in sorted(entries, key=lambda e: e.date, reverse=True):
         lines = logic.timesheet_lines(entry, entry.date, now, blocks[entry.date])
@@ -334,14 +342,14 @@ def recent_texts(user_id, day, limit=15):
 @login_required
 def dashboard():
     ctx = build_dashboard_context()
-    today = ctx["now"].date()
+    today = ctx["today"]
     first_day = today.replace(day=1)
     last_day = today.replace(day=calendar.monthrange(today.year, today.month)[1])
     month_entries = get_entries_for_range(current_user.id, first_day, last_day)
     ctx["month"] = logic.month_summary(
         current_user, month_entries, today.year, today.month, today, now=ctx["now"]
     )
-    ctx["to_fill"] = days_to_fill(current_user.id, ctx["now"])
+    ctx["to_fill"] = days_to_fill(current_user.id, ctx["now"], today)
     ctx["timer"] = timer_view(current_user, ctx["now"])
     ctx["can_time"] = ctx["day_state"] == "working"
     ctx["recent"] = recent_texts(current_user.id, today)
@@ -741,10 +749,9 @@ def punch_out():
 
 # ------------------------------------------------------- week and reports
 
-def week_strip(user, day, now):
+def week_strip(user, day, now, today):
     """The week around a day, for the Timesheet's strip: each day's date,
-    hours worked, and whether it can be opened yet."""
-    today = now.date()
+    hours worked, and whether it can be opened yet (today: work_day)."""
     days = logic.week_dates(day)
     entries = get_entries_for_range(user.id, days[0], days[-1])
     strip = []
@@ -765,7 +772,7 @@ def timesheet_go():
         day = datetime.strptime(request.args.get("d", ""), "%Y-%m-%d").date()
     except ValueError:
         return redirect(url_for("main.timesheet"))
-    if day >= datetime.now().date():
+    if day >= work_day(current_user.id, datetime.now()):
         return redirect(url_for("main.timesheet"))
     return redirect(url_for("main.timesheet", date_str=day.isoformat()))
 
@@ -784,7 +791,7 @@ def timesheet_all():
     """Every line written, newest first, a day at a time -- or, with a search,
     every line in all your history that matches."""
     now = datetime.now()
-    today = now.date()
+    today = work_day(current_user.id, now)
     query = " ".join(request.args.get("q", "").split())[:100]
     groups, older = [], None
 
@@ -862,7 +869,7 @@ def boards():
     written, and posted on the other timesheet -- drag a card across to mark
     it. Week: a column a day, its hours against target over its lines."""
     now = datetime.now()
-    today = now.date()
+    today = work_day(current_user.id, now)
     view = "week" if request.args.get("view") == "week" else "posting"
     try:
         day = datetime.strptime(request.args.get("week", ""), "%Y-%m-%d").date()
@@ -874,7 +881,7 @@ def boards():
     for b in WorkBlock.query.filter(WorkBlock.user_id == current_user.id, WorkBlock.date >= days[0],
                                     WorkBlock.date <= days[-1]):
         saved[b.date].append(b)
-    minute = now.hour * 60 + now.minute
+    minute = logic.day_minute(today, now)
     columns = {"empty": [], "written": [], "posted": []}
     week = []
     for d in days:
@@ -985,7 +992,8 @@ def timesheet_week(date_str=None):
     target, a copy of the whole week to paste elsewhere, and a way to mark
     it all as posted."""
     now = datetime.now()
-    day = now.date()
+    today = work_day(current_user.id, now)
+    day = today
     if date_str is not None:
         try:
             day = datetime.strptime(date_str, "%Y-%m-%d").date()
@@ -1014,10 +1022,10 @@ def timesheet_week(date_str=None):
         unwritten=[max(0, w - x) for w, x in zip(worked, written)],
         week_worked=sum(worked), week_target=max(0.0, week_target),
         copied=sum(1 for *_, block in lines if block.is_copied), total_lines=len(lines),
-        copy_text="\n".join(copy), today=now.date(),
+        copy_text="\n".join(copy), today=today,
         prev_url=url_for("main.timesheet_week", date_str=(days[0] - timedelta(days=7)).isoformat()),
         next_url=url_for("main.timesheet_week", date_str=(days[0] + timedelta(days=7)).isoformat()),
-        is_current=days[0] <= now.date() <= days[-1],
+        is_current=days[0] <= today <= days[-1],
         fmt_minutes=lambda m: f"{m // 60}:{m % 60:02d}" if m else "",
     )
 
@@ -1069,7 +1077,7 @@ def reports():
     """Hours by day against target, breaks, overtime, the tasks the time went
     on, and when each day began and ended -- for a week or a month."""
     now = datetime.now()
-    today = now.date()
+    today = work_day(current_user.id, now)
     name = request.args.get("range", "week")
     if name not in REPORT_RANGES:
         name = "week"
@@ -1160,14 +1168,14 @@ def move_line(block, a, b, blocks):
 def calendar_columns(user_id, days, now):
     """Each day's Timesheet lines as blocks for the time grid, and the hours
     the grid runs over (whole hours, at least 1 PM to 10 PM)."""
-    today = now.date()
+    today = work_day(user_id, now)
     entries = {e.date: e for e in TimeEntry.query.filter(
         TimeEntry.user_id == user_id, TimeEntry.date >= days[0], TimeEntry.date <= days[-1])}
     saved = defaultdict(list)
     for b in WorkBlock.query.filter(WorkBlock.user_id == user_id, WorkBlock.date >= days[0],
                                     WorkBlock.date <= days[-1]):
         saved[b.date].append(b)
-    minute = now.hour * 60 + now.minute
+    minute = logic.day_minute(today, now)
     columns, low, high = [], logic.TIMESHEET_DAY[0], logic.TIMESHEET_DAY[1]
     for d in days:
         entry = entries.get(d)
@@ -1194,14 +1202,14 @@ def calendar_columns(user_id, days, now):
             low, high = min(low, a), max(high, b)
         worked = logic.entry_total_hours(entry, now=now) if entry is not None and entry.login_time else 0
         columns.append(SimpleNamespace(date=d, blocks=blocks, is_today=d == today, worked=worked,
-                                       now_at=minute if d == today else None))
+                                       now_at=minute if d == today and minute < 1440 else None))
     low, high = low // 60 * 60, min(1440, -(-high // 60) * 60)
     return columns, low, high
 
 
 def calendar_grid(view, date_str):
     now = datetime.now()
-    today = now.date()
+    today = work_day(current_user.id, now)
     day = today
     if date_str is not None:
         try:
@@ -1308,7 +1316,7 @@ def _month_page(year, month):
     """Everything History and Calendar show for a month -- the same figures,
     laid out two ways. None for a month that can't exist (a hand-typed /13,
     which would otherwise be a server error)."""
-    today = date.today()
+    today = work_day(current_user.id, datetime.now())
     year = year or today.year
     month = month or today.month
     if not (1 <= month <= 12 and 1970 <= year <= 2100):
@@ -1402,7 +1410,7 @@ def calendar_page(year=None, month=None):
     cells = [None] * page["rows"][0]["date"].weekday() + page["rows"]
     cells += [None] * (-len(cells) % 7)
     page["weeks"] = [cells[i:i + 7] for i in range(0, len(cells), 7)]
-    today = date.today()
+    today = work_day(current_user.id, datetime.now())
     page["pay"] = (pay_for(current_user, page["year"], page["month"], page["summary"]["balance_hours"])
                    if (page["year"], page["month"]) <= (today.year, today.month) else None)
     return render_template(
@@ -1420,7 +1428,7 @@ def timesheet(date_str=None):
     """A day as lines of time -- an hour each, to begin with -- each saying
     what was worked on in it. Every line's times can be changed."""
     now = datetime.now()
-    today = now.date()
+    today = work_day(current_user.id, now)
     day = today
     if date_str is not None:
         try:
@@ -1517,7 +1525,7 @@ def timesheet(date_str=None):
             is_today=day == today,
             prev_date=day - timedelta(days=1),
             next_date=None if day == today else day + timedelta(days=1),
-            strip=week_strip(current_user, day, now),
+            strip=week_strip(current_user, day, now, today),
             today_date=today,
             prev_week=day - timedelta(days=7),
             next_week=None if day >= today else min(today, day + timedelta(days=7)),
@@ -1942,7 +1950,7 @@ def pay_months(user, now):
     payslip said, where that's been typed in."""
     if not user.salaries:
         return []
-    today = now.date()
+    today = work_day(user.id, now)
     first = min(s.starts for s in user.salaries)
     by_month = defaultdict(dict)
     for d, entry in get_entries_for_range(user.id, first, today).items():
