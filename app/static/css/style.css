@@ -405,22 +405,19 @@ input, textarea { caret-color: var(--accent); }
 .mini-title { font-size: 15px; font-weight: 650; color: var(--text-2); margin-bottom: var(--s2); }
 
 .dash-grid { display: grid; gap: var(--s4); grid-template-columns: minmax(0, 1fr); }
+/* Wide: in the order Arrange gives them, two to a row -- the clock beside
+   the month and today, which fill in next to it wherever they sit; the
+   rest the full width. */
 @media (min-width: 1040px) {
-  .dash-grid {
-    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
-    grid-template-areas:
-      "status month"
-      "status today"
-      "week   week"
-      "sat    sat";
-    align-items: start;
+  .dash-grid { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); grid-auto-flow: row dense; align-items: start; }
+  .dash-grid > .status-card { grid-row: span 2; align-self: stretch; }
+  .dash-grid > :is(.timer-card, .fill-card, .week-card, .saturday-card) { grid-column: 1 / -1; }
+  /* Nothing to sit beside it: the clock the full width too. */
+  .dash-grid:not(:has(> .month-card:not([hidden]), > .today-card:not([hidden]))) > .status-card {
+    grid-column: 1 / -1; grid-row: auto;
   }
-  .status-card { grid-area: status; align-self: stretch; }
-  .month-card { grid-area: month; }
-  .today-card { grid-area: today; }
-  .week-card { grid-area: week; }
-  .saturday-card { grid-area: sat; }
 }
+.dash-grid > .timer-card, .dash-grid > .fill-card { margin-bottom: 0; }
 
 .settings-grid { display: grid; gap: var(--s4); grid-template-columns: minmax(0, 1fr); align-items: start; }
 @media (min-width: 1040px) {
@@ -2092,7 +2089,12 @@ a.hm-day:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
    Goals: a tile each on Home, coloured by how today (or the week) stands.
    ========================================================================== */
 .dash-grid > .goals-card { grid-column: 1 / -1; }
-.goals { list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: var(--s3); margin-top: var(--s3); }
+.goals-card { container-type: inline-size; }
+.goals { list-style: none; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s3); margin-top: var(--s3); }
+/* Never three and one: two a row, or all in one row where they fit. */
+@container (min-width: 440px) { .goals:not([data-n="1"]) { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container (min-width: 660px) { .goals[data-n="3"] { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@container (min-width: 880px) { .goals[data-n="4"] { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 .goal {
   display: flex; flex-direction: column; gap: var(--s2);
   padding: var(--s3) var(--s4); border-radius: var(--r-md); background: var(--surface-2);
@@ -2109,6 +2111,31 @@ a.hm-day:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 .goal-streak { display: flex; align-items: center; gap: 6px; font-size: 15px; color: var(--text-2); }
 .goal-streak .icon { width: 16px; height: 16px; color: var(--text-3); }
 .goal-streak b { color: var(--text); }
+
+/* Arrange Home: the cards as a list to show, hide and put in order. */
+.dash-arrange {
+  margin-bottom: var(--s4); background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 25%, var(--card-border));
+}
+.dash-arrange .card-title:focus { outline: none; }
+.arr-list { list-style: none; display: flex; flex-direction: column; gap: 6px; margin-top: var(--s3); }
+.arr-item {
+  display: flex; align-items: center; gap: var(--s1); padding: 2px var(--s1);
+  border: 1px solid var(--card-border); border-radius: var(--r-md); background: var(--surface);
+}
+.arr-item.is-dragging { box-shadow: var(--shadow-lg); border-color: var(--accent); }
+.arr-item.is-over { box-shadow: inset 0 3px 0 var(--accent); }
+.arr-grip { display: inline-flex; justify-content: center; width: 28px; color: var(--text-3); cursor: grab; }
+.arr-show { flex: 1; display: flex; align-items: center; gap: var(--s2); min-height: 44px; min-width: 0; font-weight: 600; cursor: pointer; }
+.arr-show input { flex: none; width: 20px; height: 20px; accent-color: var(--accent); }
+.arr-show input:disabled + span { color: var(--text); }
+.arr-item:has(input:not(:checked)) .arr-show span { color: var(--text-3); }
+.arr-item .btn-icon { width: 44px; height: 44px; min-height: 44px; background: transparent; border-color: transparent; color: var(--text-2); }
+.arr-item .btn-icon:hover { background: var(--surface-2); }
+.arr-item .btn-icon[aria-disabled="true"] { color: var(--line-strong); background: transparent; cursor: default; }
+.arr-item.is-moved { animation: stm-drop-in .28s var(--ease-out); }
+.arr-actions { margin-top: var(--s4); justify-content: flex-end; }
+.dash-arrange-open { margin-top: var(--s5); text-align: center; }
 
 /* Settings: a goal a row -- on or off, and its value. */
 .goal-rows { list-style: none; display: flex; flex-direction: column; gap: var(--s2); }

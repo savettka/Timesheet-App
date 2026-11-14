@@ -441,6 +441,57 @@ def recent_texts(user_id, day, limit=15):
     return [text for text, in rows if text.casefold() != "break"][:limit]
 
 
+# Home's cards, in their usual order, by the names the layout keeps.
+DASHBOARD_CARDS = {
+    "timer": "Timer",
+    "fill": "To fill in",
+    "status": "Clock in and out",
+    "month": "This month",
+    "today": "Today",
+    "week": "This week",
+    "saturday": "Saturday plan",
+    "goals": "Goals",
+    "heatmap": "Last 12 months",
+}
+DASHBOARD_FIXED = {"status"}  # moved, never hidden: the way to log in
+
+
+def dashboard_layout(user):
+    """Home's cards as the user arranged them: each card's name, whether it
+    shows, and whether it has to. Anything unreadable in what's saved is
+    left out; a card it doesn't mention (a new one) goes at the end."""
+    try:
+        saved = json.loads(user.dashboard_layout or "{}")
+    except ValueError:
+        saved = {}
+    if not isinstance(saved, dict):
+        saved = {}
+
+    def names(key):
+        value = saved.get(key)
+        return [k for k in value if isinstance(k, str) and k in DASHBOARD_CARDS] if isinstance(value, list) else []
+
+    order = list(dict.fromkeys(names("order")))
+    order += [k for k in DASHBOARD_CARDS if k not in order]
+    hidden = set(names("hidden")) - DASHBOARD_FIXED
+    return [SimpleNamespace(key=k, name=DASHBOARD_CARDS[k], shown=k not in hidden, fixed=k in DASHBOARD_FIXED)
+            for k in order]
+
+
+@main_bp.route("/dashboard/layout", methods=["POST"])
+@login_required
+def dashboard_layout_save():
+    """Home's cards rearranged (Arrange): their order, and which are hidden."""
+    order = [k for k in dict.fromkeys(request.form.getlist("order")) if k in DASHBOARD_CARDS]
+    hidden = [k for k in dict.fromkeys(request.form.getlist("hidden"))
+              if k in DASHBOARD_CARDS and k not in DASHBOARD_FIXED]
+    current_user.dashboard_layout = json.dumps({"order": order, "hidden": hidden})
+    db.session.commit()
+    if request.accept_mimetypes.best == "application/json":
+        return jsonify(ok=True)
+    return redirect(url_for("main.dashboard"))
+
+
 @main_bp.route("/dashboard")
 @login_required
 def dashboard():
@@ -460,6 +511,8 @@ def dashboard():
     year = year_entries(current_user.id, today)
     ctx["heatmap"] = heatmap_view(current_user, today, ctx["now"], entries=year)
     ctx["goals"] = goals_view(current_user, today, ctx["now"], year)
+    ctx["layout"] = dashboard_layout(current_user)
+    ctx["layout_default"] = list(DASHBOARD_CARDS)
     return render_template("dashboard.html", **ctx)
 
 

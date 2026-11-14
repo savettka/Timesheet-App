@@ -9,22 +9,53 @@
 {%- endblock %}
 
 {% block content %}
-{{ timer_card(timer, can_time, recent, 'dashboard') }}
-{% if to_fill %}
-<section class="card fill-card" aria-labelledby="fill-heading">
-  <h2 id="fill-heading" class="card-title">{{ icon('clipboard') }}Timesheet to fill in</h2>
-  <ul class="fill-days">
-    {% for d, n in to_fill %}
-    <li><a class="fill-day" href="{{ url_for('main.timesheet') if d == today else url_for('main.timesheet', date_str=d.isoformat()) }}">
-      <b>{{ 'Today' if d == today else d.strftime('%a %d %b') }}</b>{{ n }} line{{ 's' if n != 1 }}</a></li>
+{# Arrange: the cards in a list to show, hide and put in order (app.js,
+   initArrange) -- Home below follows as it changes. #}
+<section class="card dash-arrange" id="dash-arrange" aria-labelledby="arrange-heading" hidden
+         data-url="{{ url_for('main.dashboard_layout_save') }}" data-default='{{ layout_default|tojson }}'>
+  <h2 id="arrange-heading" class="card-title" tabindex="-1">Arrange Home</h2>
+  <ol class="arr-list">
+    {% for card in layout %}
+    <li class="arr-item" data-card="{{ card.key }}" draggable="true">
+      <span class="arr-grip" aria-hidden="true">{{ icon('grip') }}</span>
+      <label class="arr-show"{% if card.fixed %} title="Always shown"{% endif %}>
+        <input type="checkbox" {{ 'checked' if card.shown }}{{ ' disabled' if card.fixed }}>
+        <span>{{ card.name }}</span>
+      </label>
+      <button type="button" class="btn btn-icon arr-up" aria-label="Move {{ card.name }} up">{{ icon('chevron-up') }}</button>
+      <button type="button" class="btn btn-icon arr-down" aria-label="Move {{ card.name }} down">{{ icon('chevron-down') }}</button>
+    </li>
     {% endfor %}
-  </ul>
+  </ol>
+  <div class="form-actions arr-actions">
+    <button type="button" class="btn btn-ghost arr-reset">{{ icon('undo') }}Reset</button>
+    <button type="button" class="btn btn-primary arr-done">{{ icon('check') }}Done</button>
+  </div>
+  <p class="visually-hidden" aria-live="polite" id="arr-status"></p>
 </section>
-{% endif %}
-<div class="dash-grid">
 
+<div class="dash-grid">
+  {% for card in layout %}
+  {% set hide = '' if card.shown else ' hidden' %}
+  {% if card.key == 'timer' %}
+  {{ timer_card(timer, can_time, recent, 'dashboard', card='timer', hidden=not card.shown) }}
+
+  {% elif card.key == 'fill' %}
+  {% if to_fill %}
+  <section class="card fill-card" data-card="fill"{{ hide }} aria-labelledby="fill-heading">
+    <h2 id="fill-heading" class="card-title">{{ icon('clipboard') }}Timesheet to fill in</h2>
+    <ul class="fill-days">
+      {% for d, n in to_fill %}
+      <li><a class="fill-day" href="{{ url_for('main.timesheet') if d == today else url_for('main.timesheet', date_str=d.isoformat()) }}">
+        <b>{{ 'Today' if d == today else d.strftime('%a %d %b') }}</b>{{ n }} line{{ 's' if n != 1 }}</a></li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  {% elif card.key == 'status' %}
   {# ------------------------------------------------------------ status #}
-  <section class="card status-card state-{{ day_state }}" id="clock-card"
+  <section class="card status-card state-{{ day_state }}" id="clock-card" data-card="status"
            aria-labelledby="status-heading"
            data-day-state="{{ day_state }}"
            data-worked-seconds="{{ shift_worked_seconds }}"
@@ -115,9 +146,10 @@
     {% endif %}
   </section>
 
+  {% elif card.key == 'month' %}
   {# ------------------------------------------------------------- month #}
   {% set month_minutes = (month.balance_hours * 60)|round|int %}
-  <section class="card month-card" aria-labelledby="month-heading">
+  <section class="card month-card" data-card="month"{{ hide }} aria-labelledby="month-heading">
     <div class="card-head">
       <h2 id="month-heading" class="card-title">{{ today.strftime('%B') }} so far</h2>
       <a class="link" href="{{ url_for('main.history') }}">Every day {{ icon('chevron-right', 'icon icon-inline') }}</a>
@@ -147,8 +179,9 @@
     {% endif %}
   </section>
 
+  {% elif card.key == 'today' %}
   {# ------------------------------------------------------------- today #}
-  <section class="card today-card" aria-labelledby="today-heading">
+  <section class="card today-card" data-card="today"{{ hide }} aria-labelledby="today-heading">
     <div class="card-head">
       <h2 id="today-heading" class="card-title">Today</h2>
       <span class="card-sub">{{ today.strftime('%a %d %b') }}</span>
@@ -185,8 +218,9 @@
     {% endif %}
   </section>
 
+  {% elif card.key == 'week' %}
   {# -------------------------------------------------------------- week #}
-  <section class="card week-card" aria-labelledby="week-heading">
+  <section class="card week-card" data-card="week"{{ hide }} aria-labelledby="week-heading">
     <div class="card-head">
       <h2 id="week-heading" class="card-title">This week</h2>
       <span class="card-sub">{{ weekly.span_start.strftime('%d %b') }}{% if weekly.span_end != weekly.span_start %} &ndash; {{ weekly.span_end.strftime('%d %b') }}{% endif %}</span>
@@ -263,9 +297,10 @@
     </ol>
   </section>
 
+  {% elif card.key == 'saturday' %}
   {# ---------------------------------------------------------- saturday #}
   {% if saturday %}
-  <section class="card saturday-card" id="saturday-card" aria-labelledby="saturday-heading">
+  <section class="card saturday-card" id="saturday-card" data-card="saturday"{{ hide }} aria-labelledby="saturday-heading">
     <div class="card-head">
       <h2 id="saturday-heading" class="card-title">Saturday plan</h2>
       <span class="card-sub">{{ saturday.saturday_date.strftime('%a %d %b') }}</span>
@@ -306,14 +341,15 @@
   </section>
   {% endif %}
 
+  {% elif card.key == 'goals' %}
   {# ------------------------------------------------------------- goals #}
-  <section class="card goals-card" aria-labelledby="goals-heading">
+  <section class="card goals-card" data-card="goals"{{ hide }} aria-labelledby="goals-heading">
     <div class="card-head">
       <h2 id="goals-heading" class="card-title">Goals</h2>
       <a class="link" href="{{ url_for('main.settings') }}#goals">{{ 'Change' if goals else 'Set a goal' }} {{ icon('chevron-right', 'icon icon-inline') }}</a>
     </div>
     {% if goals %}
-    <ul class="goals">
+    <ul class="goals" data-n="{{ goals|length }}">
       {% for g in goals %}
       <li class="goal is-{{ g.state }}">
         <p class="goal-title">{{ g.title }}{% if g.state == 'met' %}{{ icon('check', 'icon icon-inline') }}<span class="visually-hidden">, done</span>{% endif %}</p>
@@ -329,8 +365,12 @@
     {% endif %}
   </section>
 
-  {{ heatmap_card(heatmap) }}
+  {% elif card.key == 'heatmap' %}
+  {{ heatmap_card(heatmap, card='heatmap', hidden=not card.shown) }}
+  {% endif %}
+  {% endfor %}
 </div>
+<p class="dash-arrange-open"><button type="button" class="btn btn-ghost" aria-controls="dash-arrange" aria-expanded="false" hidden>{{ icon('sliders') }}Arrange Home</button></p>
 {% endblock %}
 
 {% block scripts %}

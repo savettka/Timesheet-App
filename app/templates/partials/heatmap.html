@@ -3,8 +3,8 @@
   the day's target worked, striped for leave. A square opens its day; the
   arrow keys move between them (app.js, initHeatmap).
 #}
-{% macro heatmap_card(hm) %}
-<section class="card hm-card" aria-labelledby="hm-title">
+{% macro heatmap_card(hm, card="", hidden=false) %}
+<section class="card hm-card" aria-labelledby="hm-title"{% if card %} data-card="{{ card }}"{% endif %}{% if hidden %} hidden{% endif %}>
   <div class="card-head">
     <h2 id="hm-title" class="card-title">Last 12 months</h2>
     <span class="card-sub">{{ hm.total }} · {{ hm.days_worked }} day{{ 's' if hm.days_worked != 1 }} worked</span>

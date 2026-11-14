@@ -50,6 +50,10 @@ class User(UserMixin, db.Model):
     # The symbol pay is shown in (Settings -> Pay). None means rupees.
     pay_currency = db.Column(db.String(4), nullable=True)
 
+    # Home's cards as arranged: JSON {"order": [...], "hidden": [...]} of
+    # card names (main.DASHBOARD_CARDS). None is the usual layout.
+    dashboard_layout = db.Column(db.Text, nullable=True)
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     entries = db.relationship(

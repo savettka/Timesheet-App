@@ -4,9 +4,9 @@
   one, with the latest tasks a tap away. Starting while one runs switches:
   the running one's line is written first.
 #}
-{% macro timer_card(timer, can_start, recent, back) %}
+{% macro timer_card(timer, can_start, recent, back, card="", hidden=false) %}
 {% if timer or can_start %}
-<section class="card timer-card" aria-label="Timer">
+<section class="card timer-card" aria-label="Timer"{% if card %} data-card="{{ card }}"{% endif %}{% if hidden %} hidden{% endif %}>
   {% if timer %}
   <div class="timer-run" data-elapsed="{{ timer.elapsed }}">
     <span class="timer-dot" aria-hidden="true"></span>

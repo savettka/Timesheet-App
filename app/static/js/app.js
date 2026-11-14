@@ -1563,6 +1563,132 @@
     });
   }
 
+  // ------------------------------------------------------------ arrange
+  // Home's cards in a list: tick to show, Up and Down (or drag) to put in
+  // order. Home follows straight away and the layout saves itself.
+  function initArrange() {
+    var panel = document.getElementById("dash-arrange");
+    var open = document.querySelector(".dash-arrange-open button");
+    var grid = document.querySelector(".dash-grid");
+    if (!panel || !open || !grid || !window.fetch) return;
+    var list = panel.querySelector(".arr-list");
+    var status = document.getElementById("arr-status");
+    var timer = null, dragging = null;
+    open.hidden = false;
+
+    function items() { return [].slice.call(list.children); }
+    function nameOf(item) { return item.querySelector(".arr-show span").textContent; }
+    function refresh() {
+      var all = items();
+      all.forEach(function (item, i) {
+        item.querySelector(".arr-up").setAttribute("aria-disabled", i === 0 ? "true" : "false");
+        item.querySelector(".arr-down").setAttribute("aria-disabled", i === all.length - 1 ? "true" : "false");
+      });
+    }
+    // Home as the list says: each card in its place, shown or not.
+    function apply() {
+      items().forEach(function (item) {
+        var card = grid.querySelector(':scope > [data-card="' + item.dataset.card + '"]');
+        if (!card) return;  // nothing to show today (Saturday plan, To fill in)
+        card.hidden = !item.querySelector("input").checked;
+        grid.appendChild(card);
+      });
+      refresh();
+      clearTimeout(timer);
+      timer = setTimeout(save, 400);
+    }
+    function save() {
+      var body = new FormData();
+      items().forEach(function (item) {
+        body.append("order", item.dataset.card);
+        if (!item.querySelector("input").checked) body.append("hidden", item.dataset.card);
+      });
+      fetch(panel.dataset.url, { method: "POST", body: body, credentials: "same-origin",
+                                 headers: { "Accept": "application/json" } })
+        .then(function (r) { if (!r.ok) throw new Error("not saved"); status.textContent = "Saved."; })
+        .catch(function () { status.textContent = "Couldn't save that. Try again."; });
+    }
+    function slide(item) {
+      item.classList.remove("is-moved");
+      void item.offsetWidth;
+      item.classList.add("is-moved");
+    }
+    function move(item, by) {
+      var all = items(), to = all.indexOf(item) + by;
+      if (to < 0 || to >= all.length) return false;
+      list.insertBefore(item, by < 0 ? all[to] : all[to].nextSibling);
+      slide(item);
+      status.textContent = nameOf(item) + ", " + (to + 1) + " of " + all.length + ".";
+      apply();
+      return true;
+    }
+    function show(on) {
+      panel.hidden = !on;
+      open.setAttribute("aria-expanded", on ? "true" : "false");
+      open.closest(".dash-arrange-open").hidden = on;
+      if (on) {
+        panel.querySelector(".card-title").focus();
+        panel.scrollIntoView({ block: "nearest" });
+      } else {
+        open.focus();
+      }
+    }
+
+    open.addEventListener("click", function () { show(true); });
+    panel.querySelector(".arr-done").addEventListener("click", function () { show(false); });
+    panel.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") { e.preventDefault(); show(false); }
+    });
+    panel.querySelector(".arr-reset").addEventListener("click", function () {
+      JSON.parse(panel.dataset.default).forEach(function (key) {
+        var item = list.querySelector('[data-card="' + key + '"]');
+        if (item) { item.querySelector("input").checked = true; list.appendChild(item); }
+      });
+      status.textContent = "Back to the usual layout.";
+      apply();
+    });
+    list.addEventListener("change", apply);
+    list.addEventListener("click", function (e) {
+      var button = e.target.closest(".arr-up, .arr-down");
+      if (!button || button.getAttribute("aria-disabled") === "true") return;
+      move(button.closest(".arr-item"), button.classList.contains("arr-up") ? -1 : 1);
+      // Kept on the same button as the line moves -- or its pair, at an end.
+      var pair = button.getAttribute("aria-disabled") === "true"
+        ? button.closest(".arr-item").querySelector(button.classList.contains("arr-up") ? ".arr-down" : ".arr-up")
+        : button;
+      pair.focus();
+    });
+    // Drag with a mouse; Up and Down do the same on a phone or keyboard.
+    list.addEventListener("dragstart", function (e) {
+      dragging = e.target.closest(".arr-item");
+      if (!dragging) return;
+      dragging.classList.add("is-dragging");
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", dragging.dataset.card);
+    });
+    list.addEventListener("dragover", function (e) {
+      var over = e.target.closest(".arr-item");
+      if (!dragging || !over) return;
+      e.preventDefault();
+      items().forEach(function (item) { item.classList.toggle("is-over", item === over && item !== dragging); });
+    });
+    list.addEventListener("drop", function (e) {
+      var over = e.target.closest(".arr-item");
+      if (!dragging || !over || over === dragging) return;
+      e.preventDefault();
+      var all = items();
+      list.insertBefore(dragging, all.indexOf(dragging) < all.indexOf(over) ? over.nextSibling : over);
+      slide(dragging);
+      apply();
+    });
+    list.addEventListener("dragend", function () {
+      if (dragging) dragging.classList.remove("is-dragging");
+      dragging = null;
+      items().forEach(function (item) { item.classList.remove("is-over"); });
+    });
+    refresh();
+  }
+
   // ------------------------------------------------------------ calendar grid
   // A block opens in a box to change its words or times (an empty one, or
   // a click on the grid, to write a new line); a written line's bottom edge
@@ -2279,6 +2405,7 @@
     initWeekCopy();
     initBatch();
     initHeatmap();
+    initArrange();
     initBoards();
     initAutosave();
     initSlideOrder();

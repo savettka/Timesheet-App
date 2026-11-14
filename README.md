@@ -116,6 +116,10 @@ This mirrors the logic in the original spreadsheet:
   with today's (or this week's) progress, the current streak and the best in the last year.
   Leave and rest days don't break a streak, and today can't until it's over; leave takes its
   hours off a week's goal.
+- **Arrange Home** — the button at the foot of Home lists its cards: untick one to hide it,
+  and put them in order with Up and Down (or drag). Home follows as you go and the layout is
+  saved for next time; Reset brings back the usual one. The clock card can move but not hide.
+  On a wide screen Month and Today sit beside the clock wherever they are in the list.
 - **Pay** — put your monthly salary in **Settings → Pay**, with the month it starts from
   (a rise gets its own line, so earlier months keep their old salary). Each month's
   hourly rate is the salary over its working hours (its workdays in Settings × the daily
