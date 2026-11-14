@@ -159,8 +159,8 @@
           {% endfor %}
         {% endfor %}
       </nav>
+      {# Dark mode lives in the profile pop-up (your name, top right). #}
       <div class="sidebar-footer">
-        {{ theme_toggle() }}
         <a class="nav-link" href="{{ url_for('auth.logout') }}">
           {{ icon('power') }}<span>Sign out</span>
         </a>
@@ -180,10 +180,11 @@
                 aria-keyshortcuts="Control+K" title="Go to or do (Ctrl+K)">
           {{ icon('search') }}<span class="cp-open-word">Search</span><kbd class="cp-kbd">Ctrl K</kbd></button>
         {{ timer_controls('bar') }}
-        {{ theme_toggle('theme-toggle-icon') }}
+        {# Just the photo (or initials): the name is in the pop-up it opens. #}
         <a class="topbar-user" href="{{ url_for('main.settings') }}" data-profile-open=""
-           aria-haspopup="dialog" aria-controls="profile-pop">
-          <span class="user-name">{{ current_user.display_name or current_user.username }}</span>
+           aria-haspopup="dialog" aria-controls="profile-pop"
+           aria-label="Profile: {{ current_user.display_name or current_user.username }}"
+           title="{{ current_user.display_name or current_user.username }}">
           {{ avatar(current_user) }}
         </a>
       </header>

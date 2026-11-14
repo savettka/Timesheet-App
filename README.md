@@ -177,8 +177,9 @@ This mirrors the logic in the original spreadsheet:
 - **Settings** — change daily/weekly targets, workdays and your salary.
 - **More room** — the button at the top left hides the side menu entirely (the logo in the
   top bar still goes home); press it again to bring the menu back. The browser remembers.
-- **Profile** — tap your name or photo for a small window of your own settings: photo,
-  name and email, password, dark mode, Pay and sign out. Settings opens it too.
+- **Profile** — tap your photo (or initials) at the top right for a small window of your own
+  settings: photo, name and email, password, dark mode, Pay and sign out. Settings opens it
+  too. Dark mode lives only here.
 - **Team members (admin only)** — the first account created owns the install. Only it
   can add people, reset their passwords, or remove them; everyone else never even sees
   that other accounts exist. Each person's hours, history and targets are their own.

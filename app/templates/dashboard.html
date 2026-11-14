@@ -3,10 +3,7 @@
 {% from "partials/timer.html" import timer_card %}
 {% from "partials/heatmap.html" import heatmap_card %}
 {% block title %}Home{% endblock %}
-{% block page_title %}
-  {%- set first_name = ((current_user.display_name or current_user.username).split() or [current_user.username])[0] -%}
-  {{ greeting }}, {{ first_name }}
-{%- endblock %}
+{% block page_title %}{{ greeting }}{% endblock %}
 
 {% block content %}
 {# Arrange: the cards in a list to show, hide and put in order (app.js,
