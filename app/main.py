@@ -442,15 +442,21 @@ def timer_view(user, now):
     return SimpleNamespace(text=user.timer_text or "", elapsed=elapsed, clock=f"{h}:{rest // 60:02d}:{rest % 60:02d}")
 
 
-def place_timed_line(user_id, day, a, b, text):
+def place_timed_line(user_id, day, a, b, text, now=None):
     """Write a timed line, a to b in minutes, onto a day's Timesheet. The same
     words carrying straight on from a line make that line longer; lines it
-    runs over give way -- cut short, or split around it."""
+    runs over give way -- cut short, or split around it. Minutes past 1,440
+    are after midnight, on a shift that runs on past it."""
+    now = now or datetime.now()
+    entry = TimeEntry.query.filter_by(user_id=user_id, date=day).first()
     blocks = WorkBlock.query.filter_by(user_id=user_id, date=day).all()
-    line = next((blk for blk in blocks if blk.text == text
-                 and logic.clock_minutes(blk.end_time, ending=True) == a), None)
+
+    def span(blk):
+        return logic.block_span(blk, entry, day, now)
+
+    line = next((blk for blk in blocks if blk.text == text and span(blk)[1] == a), None)
     if line is not None:
-        a = logic.clock_minutes(line.start_time)
+        a = span(line)[0]
         line.end_time = logic.minutes_clock(b)
     else:
         line = WorkBlock(user_id=user_id, date=day, start_time=logic.minutes_clock(a),
@@ -459,7 +465,7 @@ def place_timed_line(user_id, day, a, b, text):
     for blk in blocks:
         if blk is line:
             continue
-        s, e = logic.clock_minutes(blk.start_time), logic.clock_minutes(blk.end_time, ending=True)
+        s, e = span(blk)
         if e <= a or s >= b:
             continue
         if s < a and e > b:
@@ -477,16 +483,16 @@ def place_timed_line(user_id, day, a, b, text):
 
 def stop_timer(user, entry, when):
     """Stop the timer at `when` and write its line on the shift's day, with
-    the exact times. Under a minute isn't a line. Returns the line, or None."""
+    the exact times -- past midnight too, on a shift still going then. Under
+    a minute isn't a line. Returns the line, or None."""
     started, text = user.timer_start, user.timer_text or ""
     user.timer_start = user.timer_text = None
-    if started is None or entry is None or not text or started.date() > entry.date:
+    if started is None or entry is None or not text:
         return None
-    a = started.hour * 60 + started.minute
-    b = 1440 if when.date() > entry.date else when.hour * 60 + when.minute
-    if b <= a:
+    a, b = logic.day_minute(entry.date, started), min(2880, logic.day_minute(entry.date, when))
+    if a < 0 or b <= a:
         return None
-    return place_timed_line(user.id, entry.date, a, b, text)
+    return place_timed_line(user.id, entry.date, a, b, text, now=when)
 
 
 def timer_back():
@@ -521,10 +527,11 @@ def timer_stop():
     back = timer_back()
     now = datetime.now()
     text = current_user.timer_text
-    line = stop_timer(current_user, get_open_entry(current_user.id), now)
+    entry = get_open_entry(current_user.id)
+    line = stop_timer(current_user, entry, now)
     db.session.commit()
     if line is not None:
-        span = logic.fmt_span(logic.clock_minutes(line.start_time), logic.clock_minutes(line.end_time, ending=True))
+        span = logic.fmt_span(*logic.block_span(line, entry, entry.date, now))
         flash(f"Saved {span}: {line.text}.", "success")
     elif text:
         flash("Timer stopped. Under a minute isn't a line.", "success")
@@ -536,23 +543,49 @@ def fit_line_to_break(entry, break_start):
     one stopping up to half an hour short is stretched to it (7:00-8:00 PM
     and a break at 8:04 gives 7:00-8:04 PM), and one running on into it is
     cut there. Never over a deleted line, an earlier break or a Break line."""
-    at = logic.clock_minutes(break_start)
+    now = datetime.now()
+
+    def minutes(t, ending=False):
+        return logic.shift_minutes(t, entry, entry.date, now, ending=ending)
+
+    at = minutes(break_start)
     before = [b for b in WorkBlock.query.filter_by(user_id=entry.user_id, date=entry.date)
-              if logic.clock_minutes(b.start_time) < at]
+              if minutes(b.start_time) < at]
     if not before:
         return
-    line = max(before, key=lambda b: (logic.clock_minutes(b.start_time), b.id))
-    end = logic.clock_minutes(line.end_time, ending=True)
+    line = max(before, key=lambda b: (minutes(b.start_time), b.id))
+    end = minutes(line.end_time, ending=True)
     if not line.text or line.text.casefold() == "break" or end == at:
         return
     if end < at:
-        reach = max(logic.clock_minutes(b.end_time, ending=True) for b in before)
+        reach = max(minutes(b.end_time, ending=True) for b in before)
         away = any(s.break_start is not None and s.break_end is not None
-                   and logic.clock_minutes(s.break_start) < at
-                   and logic.clock_minutes(s.break_end, ending=True) > end for s in entry.breaks)
+                   and minutes(s.break_start) < at
+                   and minutes(s.break_end, ending=True) > end for s in entry.breaks)
         if reach >= at or away or at - end > logic.TIMESHEET_SHORT_PIECE:
             return
     line.end_time = break_start.replace(second=0, microsecond=0)
+
+
+# Logging in again this soon after a shift that ended after midnight (or
+# just before it) carries that shift on, the time away a break, rather than
+# starting the new date's day at 12:40 AM.
+OVERNIGHT_RETURN = timedelta(hours=3)
+
+
+def last_night_shift(user_id, now):
+    """Yesterday's shift, if it ended less than OVERNIGHT_RETURN ago and
+    carrying it on to now still makes a day that can be true; else None."""
+    entry = TimeEntry.query.filter_by(user_id=user_id, date=now.date() - timedelta(days=1)).first()
+    if entry is None or entry.login_time is None or entry.logout_time is None:
+        return None
+    login_dt = logic.shift_login_dt(entry)
+    logout_dt = logic.place_on_shift(entry.date, entry.logout_time, login_dt)
+    if not timedelta(0) <= now - logout_dt <= OVERNIGHT_RETURN:
+        return None
+    if (now - login_dt).total_seconds() / 3600.0 > logic.MAX_LIVE_SHIFT_HOURS:
+        return None
+    return entry
 
 
 @main_bp.route("/punch/in", methods=["POST"])
@@ -567,15 +600,18 @@ def punch_in():
 
     typed = typed_punch_time()
     entry = TimeEntry.query.filter_by(user_id=user_id, date=today).first()
+    if entry is None or entry.login_time is None:
+        # Back soon after logging out past midnight: last night's shift.
+        entry = last_night_shift(user_id, now) or entry
 
     # Logged out already today: carry on with the same day, the time away
     # recorded as a break. This used to be refused because the day existed,
     # which left the dashboard's main button a dead end after every logout.
     if entry is not None and entry.login_time is not None and entry.logout_time is not None:
-        logout_dt = logic.place_on_shift(today, entry.logout_time, logic.shift_login_dt(entry))
+        logout_dt = logic.place_on_shift(entry.date, entry.logout_time, logic.shift_login_dt(entry))
         if typed:
             when, error = logic.check_typed_time(
-                today, typed, now, earliest=logout_dt, earliest_label="you logged out"
+                entry.date, typed, now, earliest=logout_dt, earliest_label="you logged out"
             )
             if error:
                 flash(error, "error")
@@ -590,6 +626,7 @@ def punch_in():
             )
             return redirect(url_for("main.dashboard"))
         gap = (when - logout_dt).total_seconds() / 3600.0
+        carried = "" if entry.date == today else f", carrying on {entry.date.strftime('%a %d %b')}'s shift"
         # Under a minute is an accidental logout being undone, not a break.
         if gap >= 1 / 60:
             entry.breaks.append(
@@ -597,11 +634,11 @@ def punch_in():
             )
             fit_line_to_break(entry, entry.logout_time)
             message = (
-                f"Logged in again at {logic.fmt_time(when.time())}. The "
+                f"Logged in again at {logic.fmt_time(when.time())}{carried}. The "
                 f"{logic.fmt_duration(gap)} since you logged out counts as a break."
             )
         else:
-            message = f"Logged in again at {logic.fmt_time(when.time())}."
+            message = f"Logged in again at {logic.fmt_time(when.time())}{carried}."
         entry.logout_time = None
         db.session.commit()
         flash(message, "success")
@@ -808,9 +845,10 @@ def timesheet_all():
         for block in found:
             if block.text.casefold() != "break":
                 by_day[block.date].append(block)
+        shifts = {e.date: e for e in TimeEntry.query.filter(
+            TimeEntry.user_id == current_user.id, TimeEntry.date.in_(list(by_day)))} if by_day else {}
         for d in sorted(by_day, reverse=True):
-            lines = [line_view(d, logic.clock_minutes(b.start_time), logic.clock_minutes(b.end_time, ending=True), b)
-                     for b in by_day[d]]
+            lines = [line_view(d, *logic.block_span(b, shifts.get(d), d, now), b) for b in by_day[d]]
             groups.append(SimpleNamespace(date=d, label=day_label(d, today), lines=lines,
                                           written=sum(x.minutes for x in lines), worked=None, empty=0))
         total = sum(len(g.lines) for g in groups)
@@ -826,7 +864,7 @@ def timesheet_all():
         for b in WorkBlock.query.filter(WorkBlock.user_id == current_user.id, WorkBlock.date >= first,
                                         WorkBlock.date <= last):
             saved[b.date].append(b)
-        minute = now.hour * 60 + now.minute
+        minute = logic.day_minute(today, now)
         d = last
         while d >= first:
             entry = entries.get(d)
@@ -1098,7 +1136,8 @@ def reports():
         d += timedelta(days=1)
     worked_days = [x for x in days if x.worked > 0]
     starts = [logic.clock_minutes(x.entry.login_time) for x in worked_days]
-    ends = [logic.clock_minutes(x.entry.logout_time, ending=True) for x in worked_days if x.entry.logout_time]
+    # A logout after midnight is late, not early: 12:30 AM counts as 24:30.
+    ends = [logic.timesheet_span(x.entry, x.date, now)[1] for x in worked_days if x.entry.logout_time]
     tasks = defaultdict(int)
     for _, a, b, block in lines:
         tasks[block.text] += b - a
@@ -1123,9 +1162,10 @@ def reports():
 def reports_csv():
     """The range's written lines, one a row, for a spreadsheet."""
     now = datetime.now()
+    today = work_day(current_user.id, now)
     name = request.args.get("range", "week")
-    first, last = report_range(name if name in REPORT_RANGES else "week", now.date())
-    lines, _ = written_lines(current_user.id, first, min(last, now.date()), now)
+    first, last = report_range(name if name in REPORT_RANGES else "week", today)
+    lines, _ = written_lines(current_user.id, first, min(last, today), now)
     out = io.StringIO()
     sheet = csv.writer(out)
     sheet.writerow(["Date", "From", "To", "Hours", "What you worked on", "Copied"])
@@ -1143,16 +1183,16 @@ def clean_text(text):
     return " ".join((text or "").split())[:WorkBlock.MAX_LENGTH].rstrip()
 
 
-def move_line(block, a, b, blocks):
+def move_line(block, a, b, blocks, span):
     """Give a saved line new times, a to b in minutes, with the lines beside
     it following: one that met an edge moves with it, one it now runs into
-    starts (or ends) where it does. Returns why it can't, or None."""
-    old_a = logic.clock_minutes(block.start_time)
-    old_b = logic.clock_minutes(block.end_time, ending=True)
+    starts (or ends) where it does. span gives a line's own minutes
+    (logic.block_span). Returns why it can't, or None."""
+    old_a, old_b = span(block)
     for other in blocks:
         if other is block:
             continue
-        s, e = logic.clock_minutes(other.start_time), logic.clock_minutes(other.end_time, ending=True)
+        s, e = span(other)
         if s == old_b or (b > old_b and old_b <= s < b):
             if b >= e:
                 return "That would run over the whole of the next line. Change it on the Timesheet."
@@ -1202,8 +1242,8 @@ def calendar_columns(user_id, days, now):
             low, high = min(low, a), max(high, b)
         worked = logic.entry_total_hours(entry, now=now) if entry is not None and entry.login_time else 0
         columns.append(SimpleNamespace(date=d, blocks=blocks, is_today=d == today, worked=worked,
-                                       now_at=minute if d == today and minute < 1440 else None))
-    low, high = low // 60 * 60, min(1440, -(-high // 60) * 60)
+                                       now_at=minute if d == today else None))
+    low, high = low // 60 * 60, min(2880, -(-high // 60) * 60)
     return columns, low, high
 
 
@@ -1277,7 +1317,10 @@ def calendar_line():
     if start is None or end is None:
         flash("Give the line a start and an end time.", "error")
         return redirect(back)
-    a, b = logic.clock_minutes(start), logic.clock_minutes(end, ending=True)
+    now = datetime.now()
+    entry = TimeEntry.query.filter_by(user_id=current_user.id, date=day).first()
+    a = logic.shift_minutes(start, entry, day, now)
+    b = logic.shift_minutes(end, entry, day, now, ending=True)
     if b <= a:
         flash("The end has to be after the start.", "error")
         return redirect(back)
@@ -1294,7 +1337,7 @@ def calendar_line():
             db.session.commit()
             flash(f"Deleted {logic.fmt_span(a, b)}.", "success")
             return redirect(back)
-        error = move_line(block, a, b, blocks)
+        error = move_line(block, a, b, blocks, lambda blk: logic.block_span(blk, entry, day, now))
         if error:
             db.session.rollback()
             flash(error, "error")
@@ -1304,7 +1347,7 @@ def calendar_line():
         if not text:
             flash("Write what you worked on, to keep this line.", "error")
             return redirect(back)
-        place_timed_line(current_user.id, day, a, b, text)
+        place_timed_line(current_user.id, day, a, b, text, now=now)
     db.session.commit()
     flash(f"Saved {logic.fmt_span(a, b)}.", "success")
     return redirect(back)
@@ -1446,11 +1489,16 @@ def timesheet(date_str=None):
     day_args = {} if day == today else {"date_str": day.isoformat()}
     entry = TimeEntry.query.filter_by(user_id=current_user.id, date=day).first()
     blocks = WorkBlock.query.filter_by(user_id=current_user.id, date=day).all()
-    # The logout, in minutes, once the day has one on its own date: what
-    # "End at logout" brings a line's end to.
+    # The logout, in minutes -- past 1,440 the morning after an overnight
+    # shift: what "End at logout" brings a line's end to.
     logout_at = None
-    if entry is not None and entry.login_time and entry.logout_time and entry.logout_time > entry.login_time:
-        logout_at = logic.clock_minutes(entry.logout_time)
+    if entry is not None and entry.login_time and entry.logout_time and entry.logout_time != entry.login_time:
+        logout_at = logic.timesheet_span(entry, day, now)[1]
+    # On a shift that runs past midnight, a time before the login is after it.
+    night = logic.night_reach(entry, day, now)
+
+    def minutes(t, ending=False):
+        return logic.shift_minutes(t, entry, day, now, ending=ending)
 
     def clean(text):
         return " ".join((text or "").split())[:WorkBlock.MAX_LENGTH].rstrip()
@@ -1484,7 +1532,7 @@ def timesheet(date_str=None):
         views = [line_view(hhmm(start), hhmm(end), block) for start, end, block in lines]
         for view, (start, end, _) in zip(views, lines):
             view.length = logic.fmt_length(end - start)
-        minute = now.hour * 60 + now.minute
+        minute = logic.day_minute(day, now)
         current = next((v for v, (start, end, _) in zip(views, lines)
                         if day == today and start <= minute < end), None)
         if current is not None:
@@ -1540,6 +1588,8 @@ def timesheet(date_str=None):
             recent=recent_texts(current_user.id, day),
             timer=timer_view(current_user, now) if day == today else None,
             can_time=day == today and can_time,
+            night=night,
+            login_at=logic.clock_minutes(entry.login_time) if entry is not None and entry.login_time else None,
         )
 
     if request.method == "POST":
@@ -1620,7 +1670,7 @@ def timesheet(date_str=None):
                     block.text = ""
                 elif not block_id:
                     start, end = clock(was_start) or start, clock(was_end) or end
-                    if start and end and logic.clock_minutes(end, ending=True) > logic.clock_minutes(start):
+                    if start and end and minutes(end, ending=True) > minutes(start):
                         db.session.add(WorkBlock(user_id=current_user.id, date=day, start_time=start,
                                                  end_time=end, text=""))
                         changed.append((start, end, "Deleted"))
@@ -1653,7 +1703,7 @@ def timesheet(date_str=None):
             if start is None or end is None:
                 draft.error, draft.error_on = "Give this line a start and an end time.", "times"
                 continue
-            if logic.clock_minutes(end, ending=True) <= logic.clock_minutes(start):
+            if minutes(end, ending=True) <= minutes(start):
                 draft.error, draft.error_on = "The end has to be after the start.", "times"
                 continue
             if block is None:
@@ -1684,7 +1734,7 @@ def timesheet(date_str=None):
             begin = clock(fields[1][index])
             for b in list(blocks):
                 if b is keep or not b.text or b in db.session.deleted or begin is None \
-                        or logic.clock_minutes(b.start_time) < logic.clock_minutes(begin):
+                        or minutes(b.start_time) < minutes(begin):
                     continue
                 if b in db.session.new:
                     db.session.expunge(b)
@@ -1720,7 +1770,7 @@ def timesheet(date_str=None):
         db.session.commit()
 
         def span(start, end):
-            return logic.fmt_span(logic.clock_minutes(start), logic.clock_minutes(end, ending=True))
+            return logic.fmt_span(minutes(start), minutes(end, ending=True))
 
         def count(n):
             return f"{n} line" + ("" if n == 1 else "s")
@@ -1750,18 +1800,21 @@ def timesheet(date_str=None):
                        default=logic.timesheet_span(entry, day, now)[0])
             waiting = sum(1 for block_id, text, was_start in zip(fields[0], fields[3], fields[4])
                           if not block_id and not clean(text) and clock(was_start)
-                          and logic.clock_minutes(clock(was_start)) >= last)
+                          and minutes(clock(was_start)) >= last)
             day_args["add"] = min(24, waiting + 1)
         return redirect(url_for("main.timesheet", **day_args))
 
     lines = logic.timesheet_lines(entry, day, now, blocks)
+    # Past midnight on a shift that runs on past it, lines can be added as
+    # far as its morning reaches.
+    limit = 1440 + (night or 0)
     for _ in range(min(24, request.args.get("add", default=0, type=int))):
         # "Add a line": an hour straight after the last line -- or, once the
         # day runs to midnight, the hour just before the first.
         last = max((end for _, end, _ in lines), default=logic.timesheet_span(entry, day, now)[0])
         first = min((start for start, _, _ in lines), default=0)
-        if last < 1440:
-            lines.append((last, min(1440, last + 60), None))
+        if last < limit:
+            lines.append((last, min(limit, last + 60), None))
         elif first > 0:
             lines.insert(0, (max(0, first - 60), first, None))
         else:

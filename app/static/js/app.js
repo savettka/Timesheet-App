@@ -498,11 +498,16 @@
   }
 
   // Minutes after midnight from "13:00"; an end of 00:00 is the midnight
-  // that ends the day.
+  // that ends the day. On a shift that runs past midnight (the form's
+  // data-night), a time before the login, up to there, is after it: 00:30
+  // on a 3 PM to 1 AM day is 1470, as the server reads it.
   function clockMinutes(value, name) {
     if (!/^\d\d:\d\d/.test(value || "")) return null;
     var m = parseInt(value.slice(0, 2), 10) * 60 + parseInt(value.slice(3, 5), 10);
-    return m === 0 && name === "end" ? 1440 : m;
+    if (m === 0 && name === "end") return 1440;
+    var form = document.querySelector(".ts-form[data-night]");
+    if (form && m < parseInt(form.dataset.login, 10) && m <= parseInt(form.dataset.night, 10)) m += 1440;
+    return m;
   }
 
   // How long a line is: 1h, 30m, 1h 13m (as the server says it).
@@ -1292,7 +1297,6 @@
     var from = parseInt(grid.dataset.from, 10), to = parseInt(grid.dataset.to, 10);
     var ppm = function () { return grid.querySelector(".cg-body").getBoundingClientRect().height / (to - from); };
     function hhmm(m) { m = ((m % 1440) + 1440) % 1440; return String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0"); }
-    function minutes(v, isEnd) { var m = parseInt(v.slice(0, 2), 10) * 60 + parseInt(v.slice(3, 5), 10); return m === 0 && isEnd ? 1440 : m; }
     function set(f, name, value) { f.querySelector('[name="' + name + '"]').value = value; }
 
     function open(date, block, start, end) {
@@ -1332,12 +1336,13 @@
       if (!grip) return;
       e.preventDefault();
       var block = grip.closest(".cg-block"), col = block.closest(".cg-col");
-      var start = minutes(block.dataset.start), end = minutes(block.dataset.end, true), was = end;
+      // Its own minutes from the server: past 1440 after midnight.
+      var start = parseInt(block.dataset.a, 10), end = parseInt(block.dataset.b, 10), was = end;
       var y0 = e.clientY, scale = ppm(), label = block.querySelector(".cg-time");
       block.classList.add("is-dragging");
       grip.setPointerCapture(e.pointerId);
       function move(ev) {
-        end = Math.max(start + 5, Math.min(1440, Math.round((was + (ev.clientY - y0) / scale) / 5) * 5));
+        end = Math.max(start + 5, Math.min(to, Math.round((was + (ev.clientY - y0) / scale) / 5) * 5));
         block.style.setProperty("--l", end - start);
         if (label) label.textContent = hhmm(start) + " – " + hhmm(end);
       }

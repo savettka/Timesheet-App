@@ -62,6 +62,7 @@
         data-png-name="STM timesheet {{ day.isoformat() }}.png" data-png-day="{{ day.strftime('%A %d %B %Y') }}"
         data-png-who="{{ who }}" data-png-summary="{{ summary }}" data-png-stamp="{{ stamp }}"
         data-mark-url="{{ url_for('main.timesheet_mark') }}"
+        {%- if night is not none %} data-night="{{ night }}" data-login="{{ login_at }}"{% endif %}
         {#- Firefox otherwise refills every box on a reload -- hidden ones
             too -- by position, from a page whose lines may have moved since:
             wrong times in the wrong lines, which autosave would then save. #}

@@ -503,10 +503,46 @@ def minutes_clock(minutes):
     return time((minutes // 60) % 24, minutes % 60)
 
 
+def night_reach(entry, day, now):
+    """How far into the morning after a day's shift runs, in minutes from
+    that midnight -- to the end of the hour of its logout, or, still being
+    worked, a little past the hour in progress -- or None for a day that
+    doesn't cross midnight. Lines are kept as times of day, so on such a day
+    a time before the login, up to here, is after midnight: the same way the
+    logout itself is read."""
+    if entry is None or getattr(entry, "login_time", None) is None:
+        return None
+    login = clock_minutes(entry.login_time)
+    if entry.logout_time is not None:
+        out = clock_minutes(entry.logout_time)
+        return (out // 60 + 1) * 60 if out < login else None
+    if now.date() > day and not is_stale_shift(entry, now):
+        return ((day_minute(day, now) - 1440) // 60 + 2) * 60
+    return None
+
+
+def shift_minutes(t, entry, day, now, ending=False):
+    """A line's time of day as minutes from its own day's midnight: past 1,440
+    for a time after midnight on a shift that runs on past it (night_reach).
+    12:30 AM on Friday's 3 PM to 1 AM shift is 1,470."""
+    minutes = clock_minutes(t, ending=ending)
+    night = night_reach(entry, day, now)
+    if night is not None and minutes < clock_minutes(entry.login_time) and minutes <= night:
+        minutes += 1440
+    return minutes
+
+
+def block_span(block, entry, day, now):
+    """A saved line's (start, end) in minutes, by shift_minutes."""
+    return (shift_minutes(block.start_time, entry, day, now),
+            shift_minutes(block.end_time, entry, day, now, ending=True))
+
+
 def timesheet_span(entry, day, now):
     """Where a day's Timesheet lines begin and end, in minutes from midnight:
-    from the login to the logout or -- today -- to the end of the hour in
-    progress. A day with no login gets an ordinary 1 PM to 10 PM."""
+    from the login to the logout or -- still being worked -- to the end of
+    the hour in progress, past midnight on a shift that runs on past it
+    (12:30 AM is 1,470). A day with no login gets an ordinary 1 PM to 10 PM."""
     start, end = TIMESHEET_DAY
     login = entry.login_time if entry else None
     logout = entry.logout_time if entry else None
@@ -515,20 +551,18 @@ def timesheet_span(entry, day, now):
         if logout is not None:
             end = clock_minutes(logout)
             if end < start:
-                end = 1440  # past midnight: to the end of its own date
-        elif day == now.date():
-            end = (now.hour + 1) * 60
+                end += 1440  # past midnight: on to the logout the morning after
+        elif day == now.date() or now - datetime.combine(day, login) <= timedelta(hours=STALE_SHIFT_HOURS):
+            end = (day_minute(day, now) // 60 + 1) * 60
             if end - start <= TIMESHEET_SHORT_PIECE:
                 # 12:47 at 12:52: the first line is already 12:47-2:00 PM, as
                 # it will be once 1 PM comes, not a 13-minute 12:47-1:00 PM.
                 end += 60
-        elif now - datetime.combine(day, login) <= timedelta(hours=STALE_SHIFT_HOURS):
-            end = 1440  # still being worked past midnight: to the end of its own date
         else:
             end = TIMESHEET_DAY[1]  # a forgotten logout
         if end <= start:
             end = start + 60
-    return start, min(end, 1440)
+    return start, min(end, 2880)
 
 
 def hour_pieces(start, end):
@@ -553,20 +587,25 @@ def timesheet_lines(entry, day, now, blocks=()):
     with that break.
     """
     start, end = timesheet_span(entry, day, now)
-    minute = now.hour * 60 + now.minute
+    minute = day_minute(day, now)
     login = getattr(entry, "login_time", None)
+    night = night_reach(entry, day, now)
+    # Being worked right now: today's open shift, or last night's still going.
+    live = is_open_shift(entry) and (day == now.date() or night is not None)
     breaks = []
     for segment in getattr(entry, "breaks", None) or ():
         if segment.break_start is None:
             continue
         a = clock_minutes(segment.break_start)
         if login is not None and a < start:
-            continue  # taken after midnight: past the end of this date's lines
+            if night is None:
+                continue
+            a += 1440  # taken after midnight
         if segment.break_end is not None:
             b = clock_minutes(segment.break_end, ending=True)
             if b < a:
-                b = 1440  # past midnight: to the end of its own date
-        elif day == now.date():
+                b += 1440  # over midnight
+        elif live:
             b = max(a + 1, minute)
             end = min(end, max(b, start + 1))
         else:
@@ -577,13 +616,12 @@ def timesheet_lines(entry, day, now, blocks=()):
     # progress already runs to the next o'clock (2:55 to 4:00 PM), as it will
     # once 3 PM comes, not a 5-minute 2:55-3:00 PM.
     back = max((b for _, b in breaks), default=end)
-    if back < end and end - back <= TIMESHEET_SHORT_PIECE and day == now.date() and entry.logout_time is None:
-        end = min(end + 60, 1440)
+    if back < end and end - back <= TIMESHEET_SHORT_PIECE and live:
+        end = min(end + 60, 2880)
 
     # A block with no words is a deleted line: not shown, but its time is
     # taken, so it isn't offered again.
-    taken = sorted(((clock_minutes(b.start_time), clock_minutes(b.end_time, ending=True), b) for b in blocks),
-                   key=lambda line: line[:2])
+    taken = sorted(((*block_span(b, entry, day, now), b) for b in blocks), key=lambda line: line[:2])
     lines = [line for line in taken if line[2].text]
     gaps, cursor = [], start
     for a, b, _ in taken:
@@ -630,9 +668,9 @@ def fmt_clock(value):
 
 def fmt_span(start, end):
     """A Timesheet line's time, from minutes after midnight: 12:47–2:00 PM,
-    11:30 AM–12:30 PM, 11:00 PM–12:00 AM."""
+    11:30 AM–12:30 PM, 11:00 PM–12:00 AM, and after it 12:00–12:30 AM."""
     a, b = fmt_clock(minutes_clock(start)), fmt_clock(minutes_clock(end))
-    if a[-2:] == b[-2:] and end < 1440:
+    if a[-2:] == b[-2:] and (end < 1440 or start >= 1440):
         return f"{a[:-3]}–{b}"
     return f"{a}–{b}"
 

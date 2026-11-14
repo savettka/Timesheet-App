@@ -45,6 +45,7 @@
            href="{{ url_for('main.timesheet', date_str=col.date.isoformat()) }}"
            style="--s: {{ b.start - grid_from }}; --l: {{ b.end - b.start }}"
            data-id="{{ b.id }}" data-start="{{ b.start_hhmm }}" data-end="{{ b.end_hhmm }}" data-text="{{ b.text }}"
+           data-a="{{ b.start }}" data-b="{{ b.end }}"
            aria-label="{{ b.span }}, {{ b.text or 'nothing written yet' }}">
           <span class="cg-text">{{ b.text or 'Empty' }}</span>
           <span class="cg-time">{{ b.span }} · {{ b.length }}</span>

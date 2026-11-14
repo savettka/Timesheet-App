@@ -29,6 +29,12 @@ This mirrors the logic in the original spreadsheet:
 - **Login again** after logging out carries on the same day, with the time away counted
   as a break. A shift left open overnight by mistake is spotted, and Home takes you to that
   day's Edit screen to put in when it really ended, rather than recording a 24-hour day.
+- **Working past midnight** — a shift begun the day before and still open keeps STM on
+  that day until the logout: Home, the Timesheet, Calendar and the rest stay on Friday at
+  12:30 AM. Its lines carry on past 12 AM to the logout (a 3 PM to 12:30 AM day ends with
+  12:00–12:30 AM), times typed across midnight work, the Timer writes after-midnight lines
+  on that day, and a break taken after midnight counts as minutes. Logging in again within
+  three hours of a logout around midnight carries that shift on, the time away a break.
 - **Balances that make sense mid-day** — today only owes the hours it has reached so far,
   so the month's balance shows your real overtime at any moment.
 - **History** — a full month view of every day, with an **Add/Edit** screen to enter or
