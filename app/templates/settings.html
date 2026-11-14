@@ -226,6 +226,16 @@
     </form>
   </section>
 
+  <section class="card" id="holidays" aria-labelledby="holidays-heading">
+    <div class="card-head">
+      <h2 id="holidays-heading" class="card-title">Holidays</h2>
+      <span class="card-sub">{{ holidays_this_year }} saved for {{ today.year }}</span>
+    </div>
+    <div class="form-actions">
+      <a class="btn btn-secondary" href="{{ url_for('main.holidays_page') }}">{{ icon('calendar') }}Holidays and leave calendar</a>
+    </div>
+  </section>
+
   <section class="card" aria-labelledby="profile-heading">
     <div class="card-head">
       <h2 id="profile-heading" class="card-title">Profile</h2>

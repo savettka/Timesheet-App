@@ -2203,6 +2203,41 @@ a.hm-day:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
   .days tr.adj-row .c-x { grid-area: x; display: block; }
 }
 
+/* Holidays: the year's saved ones, the built-in list, your own, and the feed. */
+.hol-list { list-style: none; display: flex; flex-direction: column; margin-top: var(--s2); }
+.hol-item {
+  display: grid; grid-template-columns: 8rem minmax(0, 1fr) auto auto; gap: var(--s3); align-items: center;
+  min-height: 52px; border-bottom: 1px solid var(--line);
+}
+.hol-item:last-child { border-bottom: 0; }
+.hol-item.is-past { color: var(--text-3); }
+.hol-date { font-variant-numeric: tabular-nums; color: var(--text-2); white-space: nowrap; }
+.hol-name { font-weight: 600; overflow-wrap: anywhere; }
+.hol-del { width: 44px; height: 44px; min-height: 44px; background: transparent; border-color: transparent; color: var(--text-3); }
+.hol-del:hover { background: var(--error-bg); color: var(--stop-text); }
+.hol-none { color: var(--text-3); padding: var(--s3) 0; text-align: center; }
+.hol-grid { display: grid; gap: var(--s4); grid-template-columns: minmax(0, 1fr); margin-top: var(--s4); align-items: start; }
+@media (min-width: 1040px) { .hol-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.hol-source { margin: var(--s2) 0 var(--s3); font-size: 14px; color: var(--text-3); }
+.hol-pick { list-style: none; display: flex; flex-direction: column; margin-bottom: var(--s3); }
+.hol-pick li { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); min-height: 46px; border-bottom: 1px solid var(--line); }
+.hol-pick .goal-on { font-weight: 500; gap: var(--s3); }
+.hol-pick .hol-date { display: inline-block; width: 6.5rem; }
+.hol-one { display: grid; grid-template-columns: 11rem minmax(0, 1fr) auto; gap: var(--s3); align-items: end; margin-top: var(--s3); }
+.hol-one .field, .hol-paste .field { margin: 0; }
+.hol-one .btn, .hol-paste .btn { min-height: 44px; }
+.hol-paste { margin-top: var(--s4); padding-top: var(--s4); border-top: 1px solid var(--line); }
+.hol-paste textarea { width: 100%; font-size: 16px; font-variant-numeric: tabular-nums; }
+.hol-paste .btn { margin-top: var(--s2); }
+.hol-feed { margin-top: var(--s4); }
+.hol-feed-row { display: flex; gap: var(--s2); margin: var(--s3) 0; }
+.hol-feed-url { flex: 1; min-width: 0; min-height: 44px; font-size: 14px; color: var(--text-2); background: var(--surface-2); }
+@media (max-width: 640px) {
+  .hol-item { grid-template-columns: minmax(0, 1fr) auto auto; }
+  .hol-item .hol-date { grid-column: 1 / -1; padding-top: var(--s2); }
+  .hol-one { grid-template-columns: minmax(0, 1fr); }
+}
+
 /* The weekly email: its switch in Settings, and Preview / Send now on Reports. */
 .mail-to { display: flex; align-items: center; gap: 6px; margin-top: var(--s2); font-size: 15px; color: var(--text-2); }
 .mail-to .icon { color: var(--text-3); }

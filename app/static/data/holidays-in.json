@@ -1,0 +1,31 @@
+{
+  "about": "Public holidays in India, by year, for Settings -> Holidays. Only Republic Day (26 January), Independence Day (15 August) and Gandhi Jayanti (2 October) are fixed and the same everywhere; STM offers those for any year. The rest move each year and vary by state, so a year here lists them from a published list for that year, never worked out or recalled. Nothing is applied until it's ticked and saved.",
+  "national": [
+    {"month": 1, "day": 26, "name": "Republic Day"},
+    {"month": 8, "day": 15, "name": "Independence Day"},
+    {"month": 10, "day": 2, "name": "Gandhi Jayanti"}
+  ],
+  "years": {
+    "2026": {
+      "source": "Office holiday list 2026",
+      "checked": "2026-11-14",
+      "region": "Karnataka",
+      "office": true,
+      "holidays": [
+        {"date": "2026-01-26", "name": "Republic Day"},
+        {"date": "2026-03-04", "name": "Holi"},
+        {"date": "2026-03-19", "name": "Ugadi"},
+        {"date": "2026-03-20", "name": "Eid al-Fitr"},
+        {"date": "2026-04-03", "name": "Good Friday"},
+        {"date": "2026-08-15", "name": "Independence Day"},
+        {"date": "2026-08-28", "name": "Raksha Bandhan"},
+        {"date": "2026-09-14", "name": "Ganesh Chaturthi"},
+        {"date": "2026-10-02", "name": "Gandhi Jayanti"},
+        {"date": "2026-10-20", "name": "Dussehra"},
+        {"date": "2026-11-01", "name": "Karnataka Rajyotsava"},
+        {"date": "2026-11-08", "name": "Diwali"},
+        {"date": "2026-12-25", "name": "Christmas"}
+      ]
+    }
+  }
+}

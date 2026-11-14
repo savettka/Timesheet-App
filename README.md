@@ -157,6 +157,13 @@ This mirrors the logic in the original spreadsheet:
   minus, takes them off) a month's balance on a date, with a reason: time off in lieu, a
   correction. Each shows as its own row under its day and counts in the month's balance on
   History, Home, Calendar, Pay and the Excel/PDF month; the days' own figures don't change.
+- **Holidays** — **Settings → Holidays**: tick the year's holidays from the built-in Indian
+  list (for 2026 my office's own list; any other year offers only the three
+  national holidays until its list is added to `app/static/data/holidays-in.json`), add one,
+  or paste a list (`2026-12-25, Christmas` a line). A holiday makes that day a day off -- its
+  target 0, shown on History and Calendar by name -- unless the day already has hours of its
+  own. The same page makes a **leave calendar** link (leave days and holidays) for Outlook or
+  Google Calendar to subscribe to; **New link** stops the old one.
 - **Settings** — change daily/weekly targets, workdays and your salary.
 - **More room** — the button at the top left hides the side menu entirely (the logo in the
   top bar still goes home); press it again to bring the menu back. The browser remembers.

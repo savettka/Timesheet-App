@@ -45,6 +45,10 @@ def _run_light_migrations():
             statements.append("ALTER TABLE user ADD COLUMN weekly_report BOOLEAN NOT NULL DEFAULT 1")
         if "reminder_settings" not in user_columns:
             statements.append("ALTER TABLE user ADD COLUMN reminder_settings TEXT")
+        if "ics_token" not in user_columns:
+            # SQLite can't add a UNIQUE column: the index makes it one.
+            statements.append("ALTER TABLE user ADD COLUMN ics_token VARCHAR(64)")
+            statements.append("CREATE UNIQUE INDEX IF NOT EXISTS ix_user_ics_token ON user (ics_token)")
         if "saturday_login_hint" not in user_columns:
             statements.append("ALTER TABLE user ADD COLUMN saturday_login_hint TIME")
         if "is_admin" not in user_columns:

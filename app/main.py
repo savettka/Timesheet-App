@@ -30,10 +30,11 @@ from sqlalchemy.orm import joinedload
 from app import db
 from app import logic
 from app import changes
+from app import holidays
 from app import mailer
 from app import reminders
 from app import weekly_report
-from app.models import BalanceAdjustment, BreakSegment, Goal, PayRecord, Salary, TimeEntry, User, WeekTemplate, WorkBlock
+from app.models import BalanceAdjustment, BreakSegment, Goal, Holiday, PayRecord, Salary, TimeEntry, User, WeekTemplate, WorkBlock
 
 main_bp = Blueprint("main", __name__)
 
@@ -2094,6 +2095,110 @@ def delete_adjustment(adjustment_id):
     return redirect(url_for("main.history", year=day.year, month=day.month))
 
 
+# ------------------------------------------------------------ holidays
+
+def holidays_back(year):
+    return redirect(url_for("main.holidays_page", year=year))
+
+
+def form_year(today):
+    try:
+        year = int(request.values.get("year", today.year))
+    except ValueError:
+        year = today.year
+    return year if 2000 <= year <= 2100 else today.year
+
+
+@main_bp.route("/holidays")
+@login_required
+def holidays_page():
+    """A year's public holidays: those saved, the built-in list to pick
+    from, one to add, or a list to paste; and the leave calendar's link."""
+    today = work_day(current_user.id, datetime.now())
+    year = form_year(today)
+    saved = (Holiday.query.filter(Holiday.user_id == current_user.id, Holiday.date >= date(year, 1, 1),
+                                  Holiday.date <= date(year, 12, 31)).order_by(Holiday.date).all())
+    offered, about = holidays.builtin(year)
+    have = {h.date for h in saved}
+    return render_template(
+        "holidays.html", year=year, saved=saved, offered=offered, about=about, have=have, today=today,
+        feed=url_for("main.leave_ics", key=current_user.ics_token, _external=True) if current_user.ics_token else None,
+    )
+
+
+@main_bp.route("/holidays/add", methods=["POST"])
+@login_required
+def holidays_add():
+    """One holiday, a list pasted in, or the ticked ones from the built-in
+    list -- saved, each day's target set to 0 unless it has its own."""
+    today = work_day(current_user.id, datetime.now())
+    year = form_year(today)
+    how = request.form.get("how")
+    if how == "one":
+        day = holidays.parse_date(request.form.get("date"))
+        name = " ".join(request.form.get("name", "").split())[:Holiday.MAX_NAME]
+        if day is None or not name:
+            flash("Give the holiday a date and a name.", "error")
+            return holidays_back(year)
+        chosen, bad = [(day, name)], []
+    elif how == "paste":
+        chosen, bad = holidays.parse_lines(request.form.get("lines"))
+    elif how == "builtin":
+        offered = {d.isoformat(): name for d, name, _ in holidays.builtin(year)[0]}
+        chosen = [(date.fromisoformat(v), offered[v]) for v in request.form.getlist("pick") if v in offered]
+        bad = []
+    else:
+        abort(400)
+    new = holidays.save(current_user, chosen)
+    db.session.commit()
+    if chosen:
+        kept = len(chosen) - new
+        flash(f"Saved {new} holiday{'s' if new != 1 else ''}" + (f" ({kept} already saved)" if kept else "") + ".",
+              "success")
+    if bad:
+        flash(f"Couldn't read {len(bad)} line{'s' if len(bad) != 1 else ''}: {'; '.join(bad[:3])}"
+              f"{' …' if len(bad) > 3 else ''}. Write each as 2026-12-25, Christmas.", "error")
+    elif not chosen:
+        flash("Nothing chosen to save.", "warning")
+    year = chosen[0][0].year if how != "builtin" and chosen else year
+    return holidays_back(year)
+
+
+@main_bp.route("/holidays/<int:holiday_id>/delete", methods=["POST"])
+@login_required
+def holidays_delete(holiday_id):
+    holiday = Holiday.query.filter_by(id=holiday_id, user_id=current_user.id).first_or_404()
+    year, name = holiday.date.year, holiday.name
+    holidays.remove(current_user, holiday)
+    db.session.commit()
+    flash(f"Removed {name}.", "success")
+    return holidays_back(year)
+
+
+@main_bp.route("/holidays/feed", methods=["POST"])
+@login_required
+def holidays_feed():
+    """A new address for the leave calendar; the old one stops working."""
+    current_user.ics_token = secrets.token_urlsafe(24)
+    db.session.commit()
+    flash("New calendar link made. Anywhere still using the old one stops updating.", "success")
+    return holidays_back(form_year(work_day(current_user.id, datetime.now())))
+
+
+@main_bp.route("/calendar/leave.ics")
+def leave_ics():
+    """Leave days and holidays as a calendar to subscribe to -- no sign-in,
+    so the secret in its address is the key."""
+    key = request.args.get("key", "")
+    user = User.query.filter_by(ics_token=key).first() if 20 <= len(key) <= 64 else None
+    if user is None:
+        abort(404)
+    response = current_app.response_class(holidays.ics(user, datetime.now().date()), mimetype="text/calendar")
+    response.headers["Content-Disposition"] = 'inline; filename="stm-leave.ics"'
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 EXPORTS = {
     "xlsx": ("Excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
     "pdf": ("PDF", "application/pdf"),
@@ -3090,5 +3195,6 @@ def settings():
         goal_rows=goal_rows(user),
         mail_ready=mailer.is_configured(),
         reminder=reminders.settings_for(user), reminder_names=reminders.NAMES,
+        holidays_this_year=sum(1 for h in user.holidays if h.date.year == today.year),
         fmt_clock_minutes=lambda m: logic.minutes_clock(int(m)).strftime("%H:%M"),
     )

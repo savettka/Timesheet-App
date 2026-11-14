@@ -62,6 +62,10 @@ class User(UserMixin, db.Model):
     # in app/reminders.py. None is every default.
     reminder_settings = db.Column(db.Text, nullable=True)
 
+    # The secret in the leave calendar's address (/calendar/leave.ics), for
+    # Outlook or Google Calendar to subscribe to. None until one is made.
+    ics_token = db.Column(db.String(64), nullable=True, unique=True)
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     entries = db.relationship(
@@ -89,6 +93,8 @@ class User(UserMixin, db.Model):
     entry_changes = db.relationship("EntryChange", backref="user", lazy=True, cascade="all, delete-orphan")
     balance_adjustments = db.relationship("BalanceAdjustment", backref="user", lazy=True,
                                           cascade="all, delete-orphan")
+    holidays = db.relationship("Holiday", backref="user", lazy=True, cascade="all, delete-orphan",
+                               order_by="Holiday.date")
 
     PAY_CURRENCIES = {"₹": "₹ Rupee", "£": "£ Pound", "$": "$ Dollar", "€": "€ Euro"}
 
@@ -296,6 +302,23 @@ class Goal(db.Model):
     active = db.Column(db.Boolean, nullable=False, default=True)
 
     __table_args__ = (db.UniqueConstraint("user_id", "kind", name="uq_goal_user_kind"),)
+
+
+class Holiday(db.Model):
+    """A public holiday the office keeps (Settings -> Holidays). Saving one
+    sets that day's target to 0 -- as a day of leave named for it -- unless
+    the day already had its own; applied says STM did, so taking the
+    holiday away can undo it."""
+
+    MAX_NAME = 60
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    date = db.Column(db.Date, nullable=False)
+    name = db.Column(db.String(MAX_NAME), nullable=False)
+    applied = db.Column(db.Boolean, nullable=False, default=False)
+
+    __table_args__ = (db.UniqueConstraint("user_id", "date", name="uq_holiday_user_date"),)
 
 
 class BalanceAdjustment(db.Model):

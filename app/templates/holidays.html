@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% block title %}Holidays{% endblock %}
+{% block page_title %}Holidays{% endblock %}
+
+{% block content %}
+<section class="card hol-card" aria-labelledby="hol-title">
+  <div class="month-nav">
+    <a class="btn btn-icon" href="{{ url_for('main.holidays_page', year=year - 1) }}" aria-label="{{ year - 1 }}">{{ icon('chevron-left') }}</a>
+    <h2 id="hol-title" class="month-title">{{ year }}</h2>
+    <a class="btn btn-icon" href="{{ url_for('main.holidays_page', year=year + 1) }}" aria-label="{{ year + 1 }}">{{ icon('chevron-right') }}</a>
+  </div>
+  {% if saved %}
+  <ul class="hol-list">
+    {% for h in saved %}
+    <li class="hol-item{{ ' is-past' if h.date < today }}">
+      <span class="hol-date">{{ h.date.strftime('%a %d %b') }}</span>
+      <span class="hol-name">{{ h.name }}</span>
+      {% if not h.applied %}<span class="badge badge-quiet" title="The day already had its own hours">Own hours</span>{% endif %}
+      <form method="post" action="{{ url_for('main.holidays_delete', holiday_id=h.id) }}" data-confirm="Remove {{ h.name }}?">
+        <button type="submit" class="btn btn-icon hol-del" aria-label="Remove {{ h.name }}" title="Remove">{{ icon('x') }}</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="hol-none">No holidays saved for {{ year }}.</p>
+  {% endif %}
+</section>
+
+<div class="hol-grid">
+  <section class="card" aria-labelledby="hol-in-title">
+    <div class="card-head">
+      <h2 id="hol-in-title" class="card-title">India {{ year }}</h2>
+      {% if about and about.region %}<span class="card-sub">{{ about.region }}</span>{% endif %}
+    </div>
+    {% if about %}
+    <p class="hol-source">{{ about.source }}{% if about.checked %} · checked {{ about.checked }}{% endif %}</p>
+    {% else %}
+    <p class="hol-source">No list for {{ year }} yet: only the three national holidays.</p>
+    {% endif %}
+    <form method="post" action="{{ url_for('main.holidays_add') }}" class="js-once" autocomplete="off">
+      <input type="hidden" name="how" value="builtin">
+      <input type="hidden" name="year" value="{{ year }}">
+      <ul class="hol-pick">
+        {% for d, name, ticked in offered %}
+        <li>
+          <label class="goal-on">
+            <input type="checkbox" name="pick" value="{{ d.isoformat() }}" {{ 'checked' if ticked or d in have }}>
+            <span class="hol-date">{{ d.strftime('%a %d %b') }}</span><span>{{ name }}</span>
+          </label>
+          {% if d in have %}<span class="badge badge-hand">Saved</span>{% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      <div class="form-actions"><button type="submit" class="btn btn-primary">{{ icon('check') }}Save ticked</button></div>
+    </form>
+  </section>
+
+  <section class="card" aria-labelledby="hol-add-title">
+    <h2 id="hol-add-title" class="card-title">Add your own</h2>
+    <form method="post" action="{{ url_for('main.holidays_add') }}" class="form hol-one js-once" autocomplete="off">
+      <input type="hidden" name="how" value="one">
+      <input type="hidden" name="year" value="{{ year }}">
+      <div class="field">
+        <label for="hol-date">Date</label>
+        <input type="date" id="hol-date" name="date" required>
+      </div>
+      <div class="field">
+        <label for="hol-name">Name</label>
+        <input type="text" id="hol-name" name="name" maxlength="60" required placeholder="Office foundation day">
+      </div>
+      <button type="submit" class="btn btn-secondary">{{ icon('plus') }}Add</button>
+    </form>
+    <form method="post" action="{{ url_for('main.holidays_add') }}" class="form hol-paste js-once" autocomplete="off">
+      <input type="hidden" name="how" value="paste">
+      <input type="hidden" name="year" value="{{ year }}">
+      <div class="field">
+        <label for="hol-lines">Or paste a list, one a line</label>
+        <textarea id="hol-lines" name="lines" rows="5" placeholder="{{ year }}-12-25, Christmas&#10;{{ year }}-01-26, Republic Day"></textarea>
+      </div>
+      <button type="submit" class="btn btn-secondary">{{ icon('clipboard') }}Save the list</button>
+    </form>
+  </section>
+</div>
+
+<section class="card hol-feed" aria-labelledby="hol-feed-title">
+  <div class="card-head">
+    <h2 id="hol-feed-title" class="card-title">Leave calendar</h2>
+    <span class="card-sub">Outlook or Google Calendar</span>
+  </div>
+  {% if feed %}
+  <div class="hol-feed-row">
+    <input type="text" class="hol-feed-url" value="{{ feed }}" readonly aria-label="Calendar link" id="hol-feed-url">
+    <button type="button" class="btn btn-secondary tw-copy" data-copy="{{ feed }}" hidden>{{ icon('copy') }}<span>Copy</span></button>
+  </div>
+  <form method="post" action="{{ url_for('main.holidays_feed') }}" data-confirm="Make a new link? Anywhere using this one stops updating.">
+    <input type="hidden" name="year" value="{{ year }}">
+    <button type="submit" class="btn btn-ghost btn-sm">{{ icon('undo') }}New link</button>
+  </form>
+  {% else %}
+  <form method="post" action="{{ url_for('main.holidays_feed') }}">
+    <input type="hidden" name="year" value="{{ year }}">
+    <button type="submit" class="btn btn-secondary">{{ icon('calendar') }}Make a calendar link</button>
+  </form>
+  {% endif %}
+  <p class="visually-hidden" aria-live="polite" id="tw-status"></p>
+</section>
+{% endblock %}

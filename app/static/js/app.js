@@ -1369,13 +1369,14 @@
     if (!button) return;
     var status = document.getElementById("tw-status");
     var word = button.querySelector("span");
+    var said = word.textContent;  // "Copy week", or the calendar link's "Copy"
     button.hidden = false;
     button.addEventListener("click", function () {
       copyText(button.dataset.copy).then(function () {
         button.classList.add("is-copied");
         word.textContent = "Copied";
-        if (status) status.textContent = "Copied the week.";
-        setTimeout(function () { button.classList.remove("is-copied"); word.textContent = "Copy week"; }, 1800);
+        if (status) status.textContent = "Copied.";
+        setTimeout(function () { button.classList.remove("is-copied"); word.textContent = said; }, 1800);
       }, function () {
         if (status) status.textContent = "Couldn't copy here.";
         word.textContent = "Couldn't copy";
