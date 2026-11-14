@@ -1607,7 +1607,9 @@ select {
 .pay-form.is-live .paid.is-editing .paid-show { display: none; }
 .pay-form.is-live .paid.is-editing .paid-edit { display: flex; }
 .paid-show {
-  align-items: center; gap: 6px; min-height: 40px; padding: 0 var(--s2);
+  /* Its hover padding hangs out past the cell, so the figure itself ends
+     under the heading, level with Month end's and the total's. */
+  align-items: center; gap: 6px; min-height: 40px; padding: 0 var(--s2); margin-right: calc(var(--s2) * -1);
   border: none; border-radius: var(--r-md); background: transparent;
   color: var(--text); font: inherit; font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums;
   cursor: pointer; transition: background-color .15s ease, transform .16s var(--ease-out);
@@ -1621,7 +1623,7 @@ select {
   background: var(--accent-soft); color: var(--accent-text); font-size: 14px; font-weight: 600;
 }
 .paid-add .icon { width: 15px; height: 15px; }
-.paid.is-empty .paid-show { padding: 0; }
+.paid.is-empty .paid-show { padding: 0; margin-right: 0; }
 .paid.is-empty .paid-show:hover { background: transparent; }
 .paid.is-empty .paid-show:hover .paid-add { background: color-mix(in srgb, var(--accent-soft) 70%, var(--accent)); }
 .paid.is-empty .paid-amount, .paid.is-empty .paid-pen, .paid:not(.is-empty) .paid-add { display: none; }
@@ -1648,7 +1650,7 @@ select {
 .pay-diff.is-over { background: var(--success-bg); color: var(--success-text); }
 .pay-diff.is-under { background: var(--error-bg); color: var(--error-text); }
 .pay-table tfoot tr { border-top: 2px solid var(--line); }
-.pay-table tfoot .c-paid { padding-right: calc(var(--s3) + var(--s2)); font-weight: 650; }
+.pay-table tfoot .c-paid { font-weight: 650; }
 .pay-save { display: flex; justify-content: flex-end; padding: var(--s3) 0 var(--s4); }
 
 @media (max-width: 899px) {
@@ -1674,6 +1676,7 @@ select {
   .pay-table .c-paid { grid-area: paid; width: auto; display: flex; align-items: center; gap: var(--s2); text-align: left; }
   .pay-table .c-paid::before { content: "Paid"; font-size: 13px; color: var(--text-3); }
   .paid { flex: 1; justify-content: flex-start; }
+  .paid-show { margin-right: 0; }
   .paid-tick { order: 1; }
   .paid-edit { max-width: 220px; }
   .pay-table .paid-edit input { text-align: left; }

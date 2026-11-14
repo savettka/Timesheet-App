@@ -71,8 +71,9 @@
               <span class="paid-tick" aria-hidden="true">{{ icon('check') }}</span>
               <button type="button" class="paid-show" aria-label="Paid for {{ month_label }}: {{ m.paid|money if m.paid is not none else 'not added' }}. Change">
                 <span class="paid-add">{{ icon('plus') }}Add amount</span>
-                <span class="paid-amount">{{ m.paid|money if m.paid is not none }}</span>
+                {#- The pencil on the left, so the amount ends under its heading. #}
                 {{- icon('pencil', 'icon paid-pen') }}
+                <span class="paid-amount">{{ m.paid|money if m.paid is not none }}</span>
               </button>
               <label class="paid-edit">
                 <span class="paid-sym" aria-hidden="true">{{ current_user.pay_symbol }}</span>
