@@ -15,12 +15,12 @@
       <div class="field-row">
         <div class="field">
           <label for="daily_target_hours">Daily target (hours)</label>
-          <input type="number" id="daily_target_hours" name="daily_target_hours" step="0.25" min="0"
+          <input type="number" id="daily_target_hours" name="daily_target_hours" step="0.25" min="0" data-options="6,7,7.5,8,8.5,9,9.5,10" data-unit="h"
                  inputmode="decimal" value="{{ '%g'|format(user.daily_target_hours) }}">
         </div>
         <div class="field">
           <label for="weekly_target_hours">Weekly target (hours)</label>
-          <input type="number" id="weekly_target_hours" name="weekly_target_hours" step="0.5" min="0"
+          <input type="number" id="weekly_target_hours" name="weekly_target_hours" step="0.5" min="0" data-options="36,40,42,44,45,48,50,54" data-unit="h"
                  inputmode="decimal" value="{{ '%g'|format(user.weekly_target_hours) }}">
         </div>
       </div>
@@ -51,12 +51,12 @@
       <div class="field-row">
         <div class="field">
           <label for="weekday_break_minutes">Usual break, Mon&ndash;Fri (minutes)</label>
-          <input type="number" id="weekday_break_minutes" name="weekday_break_minutes" step="5" min="0" max="1440"
+          <input type="number" id="weekday_break_minutes" name="weekday_break_minutes" step="5" min="0" max="1440" data-options="0,15,30,45,60,75,90" data-unit="m"
                  inputmode="numeric" aria-describedby="break-hint" value="{{ user.weekday_break_minutes }}">
         </div>
         <div class="field">
           <label for="saturday_break_minutes">Usual break, Saturday (minutes)</label>
-          <input type="number" id="saturday_break_minutes" name="saturday_break_minutes" step="5" min="0" max="1440"
+          <input type="number" id="saturday_break_minutes" name="saturday_break_minutes" step="5" min="0" max="1440" data-options="0,15,30,45,60,75,90" data-unit="m"
                  inputmode="numeric" aria-describedby="break-hint" value="{{ user.saturday_break_minutes }}">
         </div>
       </div>
@@ -146,7 +146,7 @@
             <input type="time" name="{{ g.kind }}" value="{{ g.value }}" aria-label="{{ g.name }}, the time">
             <span class="goal-unit" aria-hidden="true"></span>
             {% else %}
-            <input type="number" name="{{ g.kind }}" value="{{ g.value }}" inputmode="decimal" min="0"
+            <input type="number" name="{{ g.kind }}" value="{{ g.value }}" inputmode="decimal" min="0" data-unit="{{ g.unit }}" data-options="{{ {'daily_hours': '6,7,7.5,8,8.5,9,9.5,10,11,12', 'weekly_hours': '36,40,44,45,48,50,54,60', 'timesheet_written': '50,60,70,75,80,90,95,100'}[g.kind] }}"
                    step="{{ '1' if g.kind == 'timesheet_written' else '0.25' }}"
                    max="{{ {'daily_hours': 24, 'weekly_hours': 168, 'timesheet_written': 100}[g.kind] }}"
                    aria-label="{{ g.name }}, {{ 'per cent' if g.unit == '%' else 'hours' }}">
@@ -181,13 +181,13 @@
             <input type="time" name="no_login_at" value="{{ fmt_clock_minutes(reminder.no_login.at) }}" aria-label="{{ reminder_names[key] }}, the time">
             <span class="goal-unit" aria-hidden="true"></span>
             {% elif key == 'long_day' %}
-            <input type="number" name="long_day_hours" value="{{ '%g'|format(reminder.long_day.hours) }}" min="1" max="24" step="0.5"
+            <input type="number" name="long_day_hours" value="{{ '%g'|format(reminder.long_day.hours) }}" min="1" max="24" step="0.5" data-options="8,8.5,9,9.5,10,10.5,11,12" data-unit="h"
                    inputmode="decimal" aria-label="{{ reminder_names[key] }}, hours">
             <span class="goal-unit" aria-hidden="true">h</span>
             {% elif key == 'long_break' %}
             <span class="goal-fixed">{{ user.weekday_break_minutes }}m · Sat {{ user.saturday_break_minutes }}m</span>
             {% elif key == 'idle' %}
-            <input type="number" name="idle_minutes" value="{{ reminder.idle.minutes }}" min="5" max="240" step="5"
+            <input type="number" name="idle_minutes" value="{{ reminder.idle.minutes }}" min="5" max="240" step="5" data-options="5,10,15,20,30,45,60" data-unit="m"
                    inputmode="numeric" aria-label="{{ reminder_names[key] }}, minutes" aria-describedby="idle-hint">
             <span class="goal-unit" aria-hidden="true">m</span>
             {% endif %}

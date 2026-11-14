@@ -1622,6 +1622,390 @@
     });
   }
 
+  // ------------------------------------------------------------ pickers
+  // STM's own pop-up for every time, date and dropdown box -- and the
+  // number boxes given choices (data-options) -- in place of the browser's
+  // or the phone's: a list of choices a step apart under the box, with a
+  // Custom box to type any other into; a month for a date; and each
+  // dropdown as a button. The boxes still take typing on a computer; on a
+  // phone the time and date boxes open only this, never the phone's own.
+  // Opened by a click or tap, or Alt+Down (F4) from the keyboard.
+  var PK_CHEVRON = SVG + '<path d="m6 9 6 6 6-6"/></svg>';
+  var PK_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September",
+                   "October", "November", "December"];
+
+  function pkPad(n) { return (n < 10 ? "0" : "") + n; }
+  function pkClock(m) {  // 1080 -> "6:00 PM"
+    var h = Math.floor(m / 60) % 24, mm = m % 60;
+    return ((h % 12) || 12) + ":" + pkPad(mm) + (h < 12 ? " AM" : " PM");
+  }
+  // A time as typed in the Custom box: 18:05, 6:05 pm, 6pm, 605p, 1805.
+  function pkParseTime(text) {
+    var t = (text || "").toLowerCase().replace(/\s+/g, "").replace(".", ":");
+    var m = /^(\d{1,2})(?::?(\d{2}))?(am|pm|a|p)?$/.exec(t);
+    if (!m) return null;
+    var h = parseInt(m[1], 10), mm = m[2] ? parseInt(m[2], 10) : 0, half = m[3];
+    if (mm > 59) return null;
+    if (half) {
+      if (h < 1 || h > 12) return null;
+      h = h % 12 + (half.charAt(0) === "p" ? 12 : 0);
+    } else if (h > 23) {
+      return null;
+    }
+    return pkPad(h) + ":" + pkPad(mm);
+  }
+  function pkIso(d) { return d.getFullYear() + "-" + pkPad(d.getMonth() + 1) + "-" + pkPad(d.getDate()); }
+  function pkDate(value) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value || "");
+    return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null;
+  }
+
+  function initPickers() {
+    var coarse = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
+    var pop = document.createElement("div");
+    pop.className = "pk-pop";
+    pop.id = "pk-pop";
+    pop.hidden = true;
+    document.body.appendChild(pop);
+    var field = null, kind = null, month = null, uid = 0;
+
+    function isTime(el) { return el.matches && el.matches('input[type="time"]'); }
+    function isDate(el) { return el.matches && el.matches('input[type="date"]'); }
+    function hasList(el) { return el.matches && el.matches("input[data-options]"); }
+    function pickable(el) { return el && !el.disabled && (isTime(el) || isDate(el) || hasList(el)); }
+
+    // A box's choices: [value, words].
+    function choices(el) {
+      if (el.tagName === "SELECT") {
+        return [].map.call(el.options, function (o) { return [o.value, o.textContent]; });
+      }
+      if (isTime(el)) {
+        var step = parseInt(el.dataset.step || "15", 10) || 15, out = [];
+        for (var m = 0; m < 1440; m += step) out.push([pkPad(Math.floor(m / 60)) + ":" + pkPad(m % 60), pkClock(m)]);
+        return out;
+      }
+      var unit = el.dataset.unit || "";
+      return el.dataset.options.split(",").map(function (v) { v = v.trim(); return [v, v + unit]; });
+    }
+    // Where the list starts: the box's value, or the nearest time to it.
+    function nearest(el, list) {
+      var at = list.map(function (c) { return c[0]; }).indexOf(el.value);
+      if (at >= 0 || !isTime(el)) return at;
+      var want = /^\d\d:\d\d/.test(el.value) ? +el.value.slice(0, 2) * 60 + +el.value.slice(3, 5) : 9 * 60;
+      var best = 0;
+      list.forEach(function (c, i) {
+        var m = +c[0].slice(0, 2) * 60 + +c[0].slice(3, 5);
+        if (Math.abs(m - want) < Math.abs(+list[best][0].slice(0, 2) * 60 + +list[best][0].slice(3, 5) - want)) best = i;
+      });
+      return best;
+    }
+
+    function place() {
+      if (!field) return;
+      var r = field.getBoundingClientRect();
+      if (r.bottom < 0 || r.top > window.innerHeight) { close(false); return; }
+      var w = Math.min(window.innerWidth - 16, Math.max(r.width, kind === "date" ? 296 : 200));
+      pop.style.width = w + "px";
+      pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + "px";
+      var below = window.innerHeight - r.bottom, h = pop.offsetHeight;
+      var up = below < h + 12 && r.top > below;
+      pop.style.top = (up ? Math.max(8, r.top - h - 6) : r.bottom + 6) + "px";
+    }
+    function setValue(value) {
+      if (field.tagName === "SELECT" || field.pkSelect) {
+        var sel = field.pkSelect || field;
+        sel.value = value;
+        sel.dispatchEvent(new Event("change", { bubbles: true }));
+        return;
+      }
+      field.value = value;
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+      field.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    function close(refocus) {
+      if (!field) return;
+      var was = field;
+      field.setAttribute("aria-expanded", "false");
+      pop.hidden = true;
+      pop.innerHTML = "";
+      field = kind = null;
+      if (refocus) was.focus();
+    }
+
+    // -- a list, with a Custom box for times and numbers
+    function openList(el, focusList) {
+      var list = choices(el.pkSelect || el), at = nearest(el.pkSelect || el, list);
+      kind = "list";
+      pop.classList.remove("is-date");
+      pop.innerHTML = "";
+      pop.setAttribute("role", "dialog");
+      pop.setAttribute("aria-label", el.pkLabel || el.getAttribute("aria-label") || "Choose");
+      if (!el.pkSelect) {
+        var custom = document.createElement("div");
+        custom.className = "pk-custom";
+        custom.innerHTML = '<label for="pk-type">Custom</label><input id="pk-type" type="text" autocomplete="off" ' +
+          'enterkeyhint="done"><p class="pk-err" role="alert"></p>';
+        var box = custom.querySelector("input");
+        box.placeholder = isTime(el) ? "6:05 PM" : "Type it";
+        box.inputMode = isTime(el) ? "text" : "decimal";
+        pop.appendChild(custom);
+      }
+      var ul = document.createElement("ul");
+      ul.className = "pk-list";
+      ul.setAttribute("role", "listbox");
+      ul.id = "pk-list";
+      list.forEach(function (c, i) {
+        var li = document.createElement("li");
+        li.setAttribute("role", "option");
+        li.id = "pk-o" + (++uid);
+        li.tabIndex = -1;
+        li.dataset.value = c[0];
+        li.textContent = c[1];
+        if (i === at) { li.setAttribute("aria-selected", "true"); li.classList.add("is-on"); }
+        ul.appendChild(li);
+      });
+      pop.appendChild(ul);
+      pop.hidden = false;
+      place();
+      var on = ul.children[Math.max(0, at)];
+      if (on) ul.scrollTop = on.offsetTop - ul.clientHeight / 2 + on.offsetHeight / 2;
+      if (focusList && on) on.focus();
+    }
+    function chooseOption(li) {
+      setValue(li.dataset.value);
+      close(true);
+    }
+    function applyCustom() {
+      var box = pop.querySelector("#pk-type"), err = pop.querySelector(".pk-err");
+      var text = box.value.trim(), value = null;
+      if (isTime(field)) {
+        value = pkParseTime(text);
+      } else if (text !== "") {
+        var n = field.type === "number" ? parseFloat(text) : null;
+        if (field.type !== "number") value = text;
+        else if (isFinite(n) && !(field.min !== "" && n < +field.min) && !(field.max !== "" && n > +field.max)) {
+          value = String(n);
+        }
+      }
+      if (value === null) {
+        err.textContent = isTime(field) ? "Not a time: try 6:05 PM or 18:05." : "Not a number that fits here.";
+        box.setAttribute("aria-invalid", "true");
+        return;
+      }
+      setValue(value);
+      close(true);
+    }
+
+    // -- a month, for a date
+    function openDate(el, focusDay) {
+      kind = "date";
+      pop.classList.add("is-date");
+      var chosen = pkDate(el.value);
+      month = month || chosen || new Date();
+      month = new Date(month.getFullYear(), month.getMonth(), 1);
+      drawMonth(chosen);
+      pop.hidden = false;
+      place();
+      if (focusDay) (pop.querySelector('.pk-day[tabindex="0"]') || pop.querySelector(".pk-day")).focus();
+    }
+    function drawMonth(chosen, focusIso) {
+      var el = field, min = pkDate(el.min), max = pkDate(el.max), today = pkIso(new Date());
+      chosen = chosen || pkDate(el.value);
+      pop.setAttribute("role", "dialog");
+      pop.setAttribute("aria-label", "Choose a date");
+      var y = month.getFullYear(), m = month.getMonth();
+      var html = '<div class="pk-month"><button type="button" class="pk-nav" data-step="-1" aria-label="Previous month">' +
+        SVG + '<path d="m15 5-7 7 7 7"/></svg></button><p class="pk-title" aria-live="polite">' + PK_MONTHS[m] + " " + y +
+        '</p><button type="button" class="pk-nav" data-step="1" aria-label="Next month">' + SVG +
+        '<path d="m9 5 7 7-7 7"/></svg></button></div><div class="pk-week" aria-hidden="true">' +
+        "<span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span><span>Su</span></div>" +
+        '<div class="pk-days">';
+      var first = new Date(y, m, 1), lead = (first.getDay() + 6) % 7, days = new Date(y, m + 1, 0).getDate();
+      var focusOn = focusIso || (chosen && chosen.getMonth() === m && chosen.getFullYear() === y ? pkIso(chosen) : null);
+      if (!focusOn) focusOn = pkIso(new Date(y, m, Math.min(new Date().getDate(), days)));
+      for (var i = 0; i < lead; i++) html += '<span class="pk-blank"></span>';
+      for (var d = 1; d <= days; d++) {
+        var day = new Date(y, m, d), iso = pkIso(day);
+        var off = (min && day < min) || (max && day > max);
+        html += '<button type="button" class="pk-day' + (iso === today ? " is-today" : "") +
+          (chosen && iso === pkIso(chosen) ? " is-on" : "") + '" data-date="' + iso + '" tabindex="' +
+          (iso === focusOn ? "0" : "-1") + '"' + (off ? " disabled" : "") + ' aria-label="' +
+          day.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) + '"' +
+          (chosen && iso === pkIso(chosen) ? ' aria-pressed="true"' : "") + ">" + d + "</button>";
+      }
+      html += '</div><div class="pk-foot"><button type="button" class="btn btn-ghost btn-sm pk-today">Today</button></div>';
+      pop.innerHTML = html;
+    }
+    function moveDay(from, by) {
+      var d = pkDate(from.dataset.date);
+      d.setDate(d.getDate() + by);
+      if (d.getMonth() !== month.getMonth() || d.getFullYear() !== month.getFullYear()) {
+        month = new Date(d.getFullYear(), d.getMonth(), 1);
+        drawMonth(null, pkIso(d));
+        place();
+      }
+      var to = pop.querySelector('[data-date="' + pkIso(d) + '"]');
+      if (to) {
+        pop.querySelectorAll(".pk-day").forEach(function (b) { b.tabIndex = -1; });
+        to.tabIndex = 0;
+        to.focus();
+      }
+    }
+
+    function open(el, byKeys) {
+      if (field === el) return;
+      close(false);
+      field = el;
+      month = null;
+      el.setAttribute("aria-expanded", "true");
+      (el.closest("dialog[open]") || document.body).appendChild(pop);
+      if (isDate(el)) openDate(el, byKeys); else openList(el, byKeys || !!el.pkSelect);
+    }
+
+    // Phones: the time and date boxes open only STM's picker.
+    function readyBox(el) {
+      if (el.pkReady || !pickable(el)) return;
+      el.pkReady = true;
+      el.setAttribute("aria-haspopup", "dialog");
+      el.setAttribute("aria-expanded", "false");
+      if (coarse && (isTime(el) || isDate(el))) el.readOnly = true;
+    }
+    // Each dropdown: a button in its place, showing its choice; the
+    // dropdown itself stays, hidden, for the form to send.
+    function readySelect(sel) {
+      if (sel.pkButton || sel.multiple) return;
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "pk-select";
+      btn.id = (sel.id || "pk-s" + (++uid)) + "-pick";
+      btn.setAttribute("aria-haspopup", "listbox");
+      btn.setAttribute("aria-expanded", "false");
+      btn.innerHTML = '<span class="pk-select-text"></span>' + PK_CHEVRON;
+      var text = btn.querySelector(".pk-select-text");
+      text.id = btn.id + "-text";
+      var label = sel.id && document.querySelector('label[for="' + sel.id + '"]');
+      if (label) {
+        label.id = label.id || sel.id + "-label";
+        btn.setAttribute("aria-labelledby", label.id + " " + text.id);
+        btn.pkLabel = label.textContent.trim();
+        label.addEventListener("click", function (e) { e.preventDefault(); btn.focus(); });
+      } else {
+        btn.pkLabel = sel.getAttribute("aria-label") || "Choose";
+        btn.setAttribute("aria-label", btn.pkLabel + ": " + (sel.selectedOptions[0] || {}).textContent);
+      }
+      function sync() {
+        var o = sel.selectedOptions[0];
+        text.textContent = o ? o.textContent : "";
+        if (!label) btn.setAttribute("aria-label", btn.pkLabel + ": " + text.textContent);
+      }
+      sel.addEventListener("change", sync);
+      sel.pkButton = btn;
+      btn.pkSelect = sel;
+      sel.hidden = true;
+      sel.parentNode.insertBefore(btn, sel.nextSibling);
+      sync();
+    }
+    document.querySelectorAll("select").forEach(readySelect);
+    document.querySelectorAll('input[type="time"], input[type="date"], input[data-options]').forEach(readyBox);
+    document.addEventListener("focusin", function (e) { if (pickable(e.target)) readyBox(e.target); });
+
+    document.addEventListener("click", function (e) {
+      var el = e.target.closest && e.target.closest('input[type="time"], input[type="date"], input[data-options], .pk-select');
+      if (el && (el.pkSelect || pickable(el))) {
+        readyBox(el);
+        if (el.pkSelect && field === el) { close(true); return; }
+        open(el, false);
+      }
+    });
+    document.addEventListener("pointerdown", function (e) {
+      if (field && !pop.contains(e.target) && e.target !== field) close(false);
+    }, true);
+    document.addEventListener("keydown", function (e) {
+      var el = e.target;
+      // From a box: Alt+Down or F4 opens; Down opens a dropdown too.
+      if (!pop.contains(el)) {
+        var openKey = (e.altKey && e.key === "ArrowDown") || e.key === "F4" ||
+          (el.pkSelect && (e.key === "ArrowDown" || e.key === "ArrowUp"));
+        if (openKey && (el.pkSelect || pickable(el))) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          readyBox(el);
+          open(el, true);
+        } else if (field === el && e.key === "ArrowDown") {
+          // Open already, from a click: Down goes into it.
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          var into = pop.querySelector('.pk-list .is-on, .pk-day[tabindex="0"]') ||
+            pop.querySelector('.pk-list li, .pk-day');
+          if (into) into.focus();
+        } else if (field === el && (e.key === "Escape" || e.key === "Tab")) {
+          if (e.key === "Escape") e.preventDefault();
+          close(false);
+        }
+        return;
+      }
+      if (e.key === "Escape" || e.key === "Tab") { e.preventDefault(); close(true); return; }
+      if (el.id === "pk-type") {
+        if (e.key === "Enter") { e.preventDefault(); applyCustom(); }
+        else if (e.key === "ArrowDown") {
+          e.preventDefault();
+          (pop.querySelector(".pk-list .is-on") || pop.querySelector(".pk-list li")).focus();
+        }
+        return;
+      }
+      if (el.getAttribute("role") === "option") {
+        var opts = [].slice.call(pop.querySelectorAll('[role="option"]')), i = opts.indexOf(el), to = null;
+        if (e.key === "ArrowDown") to = opts[i + 1];
+        else if (e.key === "ArrowUp") to = opts[i - 1] || pop.querySelector("#pk-type");
+        else if (e.key === "Home") to = opts[0];
+        else if (e.key === "End") to = opts[opts.length - 1];
+        else if (e.key === "PageDown") to = opts[Math.min(opts.length - 1, i + 8)];
+        else if (e.key === "PageUp") to = opts[Math.max(0, i - 8)];
+        else if (e.key === "Enter" || e.key === " ") { e.preventDefault(); chooseOption(el); return; }
+        else return;
+        e.preventDefault();
+        if (to) to.focus();
+        return;
+      }
+      if (el.classList.contains("pk-day")) {
+        var by = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[e.key];
+        if (by) { e.preventDefault(); moveDay(el, by); return; }
+        if (e.key === "PageUp" || e.key === "PageDown") {
+          e.preventDefault();
+          var d = pkDate(el.dataset.date);
+          d.setMonth(d.getMonth() + (e.key === "PageUp" ? -1 : 1));
+          moveDay({ dataset: { date: pkIso(d) } }, 0);
+        }
+      }
+    }, true);
+    pop.addEventListener("click", function (e) {
+      var opt = e.target.closest('[role="option"]');
+      if (opt) { chooseOption(opt); return; }
+      var day = e.target.closest(".pk-day");
+      if (day && !day.disabled) { setValue(day.dataset.date); close(true); return; }
+      var nav = e.target.closest(".pk-nav");
+      if (nav) {
+        month = new Date(month.getFullYear(), month.getMonth() + parseInt(nav.dataset.step, 10), 1);
+        drawMonth();
+        place();
+        pop.querySelector('.pk-nav[data-step="' + nav.dataset.step + '"]').focus();
+        return;
+      }
+      if (e.target.closest(".pk-today")) {
+        var today = new Date();
+        if (!pop.querySelector('[data-date="' + pkIso(today) + '"][disabled]')) { setValue(pkIso(today)); close(true); }
+      }
+    });
+    pop.addEventListener("input", function (e) {
+      if (e.target.id === "pk-type") {
+        e.target.removeAttribute("aria-invalid");
+        pop.querySelector(".pk-err").textContent = "";
+      }
+    });
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+  }
+
   // ------------------------------------------------------------ idle
   // While the timer runs, a stretch with no pointer or key activity on any
   // STM page is noticed when activity comes back; past the wait set in
@@ -2607,6 +2991,7 @@
     initReminders();
     initNotifySetting();
     initIdle();
+    initPickers();
     initBoards();
     initAutosave();
     initSlideOrder();

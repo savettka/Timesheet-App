@@ -168,6 +168,12 @@ This mirrors the logic in the original spreadsheet:
   Break or Logout, or Back -- one tap away. Opening it never logs you in or out by itself, and
   it needs you signed in, so it's harmless written to an NFC tag, printed as a QR code or saved
   to a home screen. Installed as an app, STM's icon also offers Login, Break and Logout.
+- **STM's own pickers** — every time, date and dropdown box opens STM's own pop-up, in light
+  and dark, never the browser's or the phone's: times as a list 15 minutes apart, the hours,
+  minutes and percentages in Settings as a list of usual choices, and a **Custom** box above
+  each list for anything else (`6:05 PM`, `18:05`, `9.75`); dates as a month with Today;
+  dropdowns as a list. On a computer the boxes still take typing; Alt+Down opens the list
+  from the keyboard, the arrows move through it, Enter chooses and Esc closes.
 - **Settings** — change daily/weekly targets, workdays and your salary.
 - **More room** — the button at the top left hides the side menu entirely (the logo in the
   top bar still goes home); press it again to bring the menu back. The browser remembers.
