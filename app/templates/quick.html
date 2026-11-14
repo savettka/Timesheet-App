@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% block title %}Clock in and out{% endblock %}
+{% block page_title %}Clock in and out{% endblock %}
+
+{% block content %}
+{# /q: for a tag, a QR code or a home-screen shortcut. Opening it never
+   punches; the button sends the same form as Home's. #}
+<section class="card quick-card state-{{ state }}" aria-labelledby="quick-title">
+  <p class="quick-time">{{ now.strftime('%a %d %b') }} · {{ fmt_time(now.time()) }}</p>
+  <h2 id="quick-title" class="quick-state">{{ word }}</h2>
+  {% if entry and state in ('working', 'break') %}
+  <p class="quick-sub">Since {{ fmt_time(entry.open_break().break_start if state == 'break' else entry.login_time) }}</p>
+  {% endif %}
+  {% if missed %}<p class="quick-sub">That isn't the next step right now.</p>{% endif %}
+  <div class="quick-acts">
+    {% for name, words, endpoint, style in actions %}
+    <form method="post" action="{{ url_for(endpoint) }}" class="js-once">
+      <button type="submit" class="btn btn-action {{ style }}">
+        {{ icon({'login': 'login', 'break': 'coffee', 'logout': 'logout', 'back': 'play'}[name]) }}{{ words }}</button>
+    </form>
+    {% endfor %}
+    {% if state == 'stale' %}
+    <a class="btn btn-action btn-go" href="{{ url_for('main.edit_entry', date_str=entry.date.isoformat()) }}">
+      {{ icon('pencil') }}Fix {{ entry.date.strftime('%a %d %b') }}</a>
+    {% endif %}
+  </div>
+  <p class="quick-home"><a class="link" href="{{ url_for('main.dashboard') }}">Home</a></p>
+</section>
+{% endblock %}

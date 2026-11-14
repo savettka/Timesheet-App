@@ -821,6 +821,37 @@ def punch_state(user_id, now):
     return "out", None
 
 
+# What /q offers in each state: (wanted name, words, punch endpoint, style).
+QUICK_ACTIONS = {
+    "out": [("login", "Login", "main.punch_in", "btn-go")],
+    "done": [("login", "Login again", "main.punch_in", "btn-go")],
+    "working": [("break", "Break", "main.punch_break_start", "btn-pause"),
+                ("logout", "Logout", "main.punch_out", "btn-stop")],
+    "break": [("back", "Back", "main.punch_break_end", "btn-go")],
+    "stale": [],
+}
+
+
+@main_bp.route("/q")
+@login_required
+def quick_punch():
+    """One plain address for a tag, a QR code or a home-screen shortcut: the
+    next punch for whoever is signed in, one tap away. A visit never punches
+    by itself -- the tap sends the usual punch form. ?want= (the app's
+    shortcuts) puts that one forward when it's possible now."""
+    now = datetime.now()
+    state, entry = punch_state(current_user.id, now)
+    actions = QUICK_ACTIONS[state]
+    wanted = request.args.get("want", "")
+    first = [a for a in actions if a[0] == wanted]
+    if first:
+        actions = first + [a for a in actions if a[0] != wanted]
+    return render_template(
+        "quick.html", state=state, word=PUNCH_WORDS[state], entry=entry, actions=actions,
+        missed=bool(wanted) and not first, now=now, fmt_time=logic.fmt_time,
+    )
+
+
 @main_bp.route("/api/palette")
 @login_required
 def api_palette():

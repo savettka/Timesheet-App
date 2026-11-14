@@ -2203,6 +2203,18 @@ a.hm-day:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
   .days tr.adj-row .c-x { grid-area: x; display: block; }
 }
 
+/* Quick punch (/q): one big next step, for a tag or a home-screen shortcut. */
+.quick-card { max-width: 520px; margin: var(--s5) auto 0; text-align: center; padding: var(--s6) var(--s5); }
+.quick-card.state-working { background: var(--success-bg); }
+.quick-card.state-break { background: var(--tint-break); }
+.quick-card.state-stale { background: var(--tint-stale); }
+.quick-time { color: var(--text-3); font-size: 15px; font-variant-numeric: tabular-nums; }
+.quick-state { margin-top: var(--s2); font-size: 30px; font-weight: 800; letter-spacing: -0.02em; }
+.quick-sub { margin-top: var(--s1); color: var(--text-2); }
+.quick-acts { display: flex; flex-direction: column; gap: var(--s3); margin-top: var(--s5); }
+.quick-acts .btn { width: 100%; }
+.quick-home { margin-top: var(--s5); }
+
 /* Holidays: the year's saved ones, the built-in list, your own, and the feed. */
 .hol-list { list-style: none; display: flex; flex-direction: column; margin-top: var(--s2); }
 .hol-item {

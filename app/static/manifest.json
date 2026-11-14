@@ -24,5 +24,22 @@
       "type": "image/png",
       "purpose": "any maskable"
     }
+  ],
+  "shortcuts": [
+    {
+      "name": "Login",
+      "url": "/q?want=login",
+      "icons": [{"src": "/static/img/icon-192.png", "sizes": "192x192", "type": "image/png"}]
+    },
+    {
+      "name": "Break",
+      "url": "/q?want=break",
+      "icons": [{"src": "/static/img/icon-192.png", "sizes": "192x192", "type": "image/png"}]
+    },
+    {
+      "name": "Logout",
+      "url": "/q?want=logout",
+      "icons": [{"src": "/static/img/icon-192.png", "sizes": "192x192", "type": "image/png"}]
+    }
   ]
 }

@@ -164,6 +164,10 @@ This mirrors the logic in the original spreadsheet:
   target 0, shown on History and Calendar by name -- unless the day already has hours of its
   own. The same page makes a **leave calendar** link (leave days and holidays) for Outlook or
   Google Calendar to subscribe to; **New link** stops the old one.
+- **Quick link** — `/q` (`<your-site>/q`) shows your next step -- Login,
+  Break or Logout, or Back -- one tap away. Opening it never logs you in or out by itself, and
+  it needs you signed in, so it's harmless written to an NFC tag, printed as a QR code or saved
+  to a home screen. Installed as an app, STM's icon also offers Login, Break and Logout.
 - **Settings** — change daily/weekly targets, workdays and your salary.
 - **More room** — the button at the top left hides the side menu entirely (the logo in the
   top bar still goes home); press it again to bring the menu back. The browser remembers.
