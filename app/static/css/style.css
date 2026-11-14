@@ -1044,7 +1044,7 @@ a.ds-day:active { transform: scale(0.97); }
 :root[data-cal-zoom="5"] .cg { --ppm: 7.2px; --slot: 5; }
 .cg-zoom { display: flex; gap: 4px; width: fit-content; margin: 0 auto var(--s4); padding: 4px; border-radius: 999px; background: var(--surface-2); }
 .cg-zoom-btn {
-  min-width: 52px; min-height: 40px; padding: 0 var(--s3);
+  min-width: 52px; min-height: 44px; padding: 0 var(--s3);
   border: none; border-radius: 999px; background: transparent; color: var(--text-2);
   font: inherit; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; cursor: pointer;
 }
