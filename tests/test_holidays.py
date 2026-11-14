@@ -127,6 +127,18 @@ def test_the_leave_calendar(app, client, user_id, days):
     assert app.test_client().get(f"/calendar/leave.ics?key={token}").status_code == 404
 
 
+def test_custom_hours_say_so(app, client, user_id):
+    with app.app_context():
+        db.session.add(TimeEntry(user_id=user_id, date=D(2026, 11, 20), target_override=6.0, leave_type="custom"))
+        db.session.add(TimeEntry(user_id=user_id, date=D(2026, 11, 23), target_override=5.5, leave_type="custom",
+                                 leave_label="Dentist"))
+        db.session.add(TimeEntry(user_id=user_id, date=D(2026, 11, 24), target_override=0.0, leave_type="full"))
+        db.session.commit()
+        body = holidays.ics(db.session.get(User, user_id), D(2026, 11, 12))
+    assert "SUMMARY:Custom hours (6h)" in body and "SUMMARY:Dentist" in body
+    assert "SUMMARY:Full day leave" in body and "SUMMARY:Leave\r\n" not in body
+
+
 def test_long_lines_fold():
     line = "SUMMARY:" + "Ganesh Chaturthi " * 8
     folded = holidays._fold(line)

@@ -149,7 +149,9 @@ def ics(user, today):
     days = {}
     for e in TimeEntry.query.filter(TimeEntry.user_id == user.id, TimeEntry.date >= first, TimeEntry.date <= last,
                                     TimeEntry.target_override.isnot(None)):
-        days[e.date] = e.leave_label or TimeEntry.LEAVE_TYPES.get(e.leave_type) or "Leave"
+        kind = e.effective_leave_type
+        days[e.date] = (e.leave_label or TimeEntry.LEAVE_TYPES.get(kind)
+                        or (f"Custom hours ({e.target_override:g}h)" if kind == "custom" else "Leave"))
     for h in Holiday.query.filter(Holiday.user_id == user.id, Holiday.date >= first, Holiday.date <= last):
         days[h.date] = h.name
     stamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
