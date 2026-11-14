@@ -111,6 +111,11 @@ This mirrors the logic in the original spreadsheet:
 - **Last 12 months** — on Home and Reports, a square a day: darker for more of the day's
   target worked, striped for leave, outlined for today. Point at (or tab to) a square for its
   hours in words; click it to open the day. The arrow keys move a day or a week.
+- **Goals** — switch them on in **Settings → Goals**: hours a day, hours a week, the
+  Timesheet written (a share of the time worked), or logging out by a time. Home shows each
+  with today's (or this week's) progress, the current streak and the best in the last year.
+  Leave and rest days don't break a streak, and today can't until it's over; leave takes its
+  hours off a week's goal.
 - **Pay** — put your monthly salary in **Settings → Pay**, with the month it starts from
   (a rise gets its own line, so earlier months keep their old salary). Each month's
   hourly rate is the salary over its working hours (its workdays in Settings × the daily

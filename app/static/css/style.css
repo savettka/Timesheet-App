@@ -2087,3 +2087,34 @@ select {
 a.hm-day:hover { outline: 2px solid var(--text-2); outline-offset: 1px; }
 a.hm-day:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 .hm-read { margin-top: var(--s2); min-height: 1.5em; font-size: 15px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+
+/* ==========================================================================
+   Goals: a tile each on Home, coloured by how today (or the week) stands.
+   ========================================================================== */
+.dash-grid > .goals-card { grid-column: 1 / -1; }
+.goals { list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: var(--s3); margin-top: var(--s3); }
+.goal {
+  display: flex; flex-direction: column; gap: var(--s2);
+  padding: var(--s3) var(--s4); border-radius: var(--r-md); background: var(--surface-2);
+}
+.goal.is-met { background: var(--success-bg); }
+.goal.is-missed { background: var(--error-bg); }
+.goal.is-skip { background: var(--surface-2); }
+.goal-title { display: flex; align-items: center; gap: 6px; font-weight: 700; }
+.goal.is-met .goal-title .icon { color: var(--go); }
+.goal .progress { height: 8px; }
+.goal.is-met .progress-fill { background: var(--go); }
+.goal.is-missed .progress-fill { background: var(--behind); }
+.goal-label { font-size: 15px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.goal-streak { display: flex; align-items: center; gap: 6px; font-size: 15px; color: var(--text-2); }
+.goal-streak .icon { width: 16px; height: 16px; color: var(--text-3); }
+.goal-streak b { color: var(--text); }
+
+/* Settings: a goal a row -- on or off, and its value. */
+.goal-rows { list-style: none; display: flex; flex-direction: column; gap: var(--s2); }
+.goal-row { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); min-height: 48px; }
+.goal-on { display: flex; align-items: center; gap: var(--s2); min-height: 44px; font-weight: 600; cursor: pointer; }
+.goal-on input { width: 20px; height: 20px; accent-color: var(--accent); }
+.goal-value { display: flex; align-items: center; gap: 6px; }
+.goal-value input { width: 7.5rem; min-height: 44px; font-size: 16px; }
+.goal-unit { width: 1.2em; color: var(--text-3); font-weight: 600; }

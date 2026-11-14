@@ -72,6 +72,7 @@ class User(UserMixin, db.Model):
         "WeekTemplate", backref="user", lazy=True, cascade="all, delete-orphan",
         order_by="WeekTemplate.name",
     )
+    goals = db.relationship("Goal", backref="user", lazy=True, cascade="all, delete-orphan")
 
     PAY_CURRENCIES = {"₹": "₹ Rupee", "£": "£ Pound", "$": "$ Dollar", "€": "€ Euro"}
 
@@ -256,6 +257,29 @@ class WeekTemplate(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     __table_args__ = (db.UniqueConstraint("user_id", "name", name="uq_week_template_user_name"),)
+
+
+class Goal(db.Model):
+    """A goal kept to day by day (or week by week), with a streak, on Home:
+    hours a day or a week, the Timesheet written, or logging out by a time.
+    value is hours, a percentage, or -- log out by -- minutes after the
+    day's midnight (past 1,440 after it). One of each kind; switched off
+    rather than deleted, so its value is kept."""
+
+    KINDS = {
+        "daily_hours": "Hours a day",
+        "weekly_hours": "Hours a week",
+        "timesheet_written": "Timesheet written",
+        "logout_by": "Log out by",
+    }
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    kind = db.Column(db.String(20), nullable=False)
+    value = db.Column(db.Float, nullable=False)
+    active = db.Column(db.Boolean, nullable=False, default=True)
+
+    __table_args__ = (db.UniqueConstraint("user_id", "kind", name="uq_goal_user_kind"),)
 
 
 class LoginCode(db.Model):

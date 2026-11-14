@@ -29,7 +29,7 @@ from sqlalchemy.orm import joinedload
 
 from app import db
 from app import logic
-from app.models import BreakSegment, PayRecord, Salary, TimeEntry, User, WeekTemplate, WorkBlock
+from app.models import BreakSegment, Goal, PayRecord, Salary, TimeEntry, User, WeekTemplate, WorkBlock
 
 main_bp = Blueprint("main", __name__)
 
@@ -88,6 +88,66 @@ def heat_label(day):
     else:
         what = "nothing yet"
     return f"{day['date']:%a %d %b %Y}: {what}"
+
+
+def written_minutes(user_id, first, last, entries, now):
+    """Each day's Timesheet minutes with words (breaks aside), first to last,
+    in one query: what a Timesheet-written goal is measured by."""
+    out = defaultdict(int)
+    for block in WorkBlock.query.filter(WorkBlock.user_id == user_id, WorkBlock.date >= first,
+                                        WorkBlock.date <= last, WorkBlock.text != ""):
+        if block.text.casefold() != "break":
+            a, b = logic.block_span(block, entries.get(block.date), block.date, now)
+            out[block.date] += max(0, b - a)
+    return out
+
+
+def goals_view(user, today, now, entries):
+    """The active goals for Home (logic.goal_progress), over the year the
+    heatmap shows. entries: year_entries."""
+    goals = [g for g in user.goals if g.active and g.kind in Goal.KINDS]
+    goals.sort(key=lambda g: list(Goal.KINDS).index(g.kind))
+    first = logic.heatmap_first(today)
+    written = (written_minutes(user.id, first, today, entries, now)
+               if any(g.kind == "timesheet_written" for g in goals) else {})
+    return [logic.goal_progress(g.kind, g.value, user, entries, written, first, today, now) for g in goals]
+
+
+GOAL_DEFAULT_LOGOUT = 18 * 60
+
+
+def goal_rows(user):
+    """Each kind of goal for its row in Settings: on or off, and its value
+    as the box shows it."""
+    saved = {g.kind: g for g in user.goals}
+    rows = []
+    for kind, name in Goal.KINDS.items():
+        goal = saved.get(kind)
+        value = goal.value if goal is not None else {
+            "daily_hours": user.daily_target_hours, "weekly_hours": user.weekly_target_hours,
+            "timesheet_written": 100, "logout_by": GOAL_DEFAULT_LOGOUT}[kind]
+        shown = (logic.minutes_clock(int(value)).strftime("%H:%M") if kind == "logout_by" else f"{value:g}")
+        rows.append(SimpleNamespace(kind=kind, name=name, active=goal is not None and goal.active, value=shown,
+                                    unit={"daily_hours": "h", "weekly_hours": "h", "timesheet_written": "%"}.get(kind, "")))
+    return rows
+
+
+def goal_value(kind, raw):
+    """A goal's value from its box, or None when it isn't one. Log out by
+    before 6 AM is the morning after."""
+    raw = (raw or "").strip()
+    if kind == "logout_by":
+        t = parse_time_field(raw)
+        if t is None:
+            return None
+        minutes = t.hour * 60 + t.minute
+        return float(minutes + 1440 if minutes < 6 * 60 else minutes)
+    try:
+        value = float(raw)
+    except ValueError:
+        return None
+    most = {"daily_hours": 24, "weekly_hours": 168, "timesheet_written": 100}[kind]
+    return value if math.isfinite(value) and 0 < value <= most else None
 
 
 def heatmap_view(user, today, now, entries=None):
@@ -397,7 +457,9 @@ def dashboard():
     ctx["can_time"] = ctx["day_state"] == "working"
     ctx["recent"] = recent_texts(current_user.id, today)
     ctx["pay"] = pay_for(current_user, today.year, today.month, ctx["month"]["balance_hours"])
-    ctx["heatmap"] = heatmap_view(current_user, today, ctx["now"])
+    year = year_entries(current_user.id, today)
+    ctx["heatmap"] = heatmap_view(current_user, today, ctx["now"], entries=year)
+    ctx["goals"] = goals_view(current_user, today, ctx["now"], year)
     return render_template("dashboard.html", **ctx)
 
 
@@ -2667,6 +2729,28 @@ def settings():
             flash(f"Salary saved: {logic.fmt_money(amount, user.pay_symbol)} from {starts:%B %Y}.", "success")
             return redirect(url_for("main.settings") + "#pay")
 
+        elif form_type == "goals":
+            on = set(request.form.getlist("on"))
+            saved = {g.kind: g for g in user.goals}
+            values = {kind: goal_value(kind, request.form.get(kind)) for kind in Goal.KINDS}
+            bad = [Goal.KINDS[kind] for kind in Goal.KINDS if kind in on and values[kind] is None]
+            if bad:
+                flash(f"Check the value for {' and '.join(bad)}.", "error")
+                return redirect(url_for("main.settings") + "#goals")
+            for kind in Goal.KINDS:
+                goal = saved.get(kind)
+                if goal is None and kind not in on:
+                    continue
+                if goal is None:
+                    goal = Goal(user_id=user.id, kind=kind)
+                    db.session.add(goal)
+                if values[kind] is not None:
+                    goal.value = values[kind]
+                goal.active = kind in on
+            db.session.commit()
+            flash("Goals saved.", "success")
+            return redirect(url_for("main.settings") + "#goals")
+
         elif form_type == "salary_remove":
             salary = Salary.query.filter_by(
                 id=request.form.get("salary_id", type=int), user_id=user.id
@@ -2759,4 +2843,5 @@ def settings():
         "settings.html", user=user, all_users=all_users,
         month_names=list(calendar.month_name)[1:],
         years=range(today.year + 1, today.year - 6, -1),
+        goal_rows=goal_rows(user),
     )

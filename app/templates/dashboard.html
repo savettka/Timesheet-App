@@ -306,6 +306,29 @@
   </section>
   {% endif %}
 
+  {# ------------------------------------------------------------- goals #}
+  <section class="card goals-card" aria-labelledby="goals-heading">
+    <div class="card-head">
+      <h2 id="goals-heading" class="card-title">Goals</h2>
+      <a class="link" href="{{ url_for('main.settings') }}#goals">{{ 'Change' if goals else 'Set a goal' }} {{ icon('chevron-right', 'icon icon-inline') }}</a>
+    </div>
+    {% if goals %}
+    <ul class="goals">
+      {% for g in goals %}
+      <li class="goal is-{{ g.state }}">
+        <p class="goal-title">{{ g.title }}{% if g.state == 'met' %}{{ icon('check', 'icon icon-inline') }}<span class="visually-hidden">, done</span>{% endif %}</p>
+        <div class="progress" role="progressbar" aria-label="{{ g.title }}" aria-valuemin="0" aria-valuemax="100"
+             aria-valuenow="{{ g.pct }}" aria-valuetext="{{ g.label }}">
+          <div class="progress-fill" style="width: {{ g.pct }}%"></div>
+        </div>
+        <p class="goal-label">{{ g.label }}</p>
+        <p class="goal-streak">{{ icon('flag') }}<span><b>{{ g.current }}</b> {{ g.unit }}{{ 's' if g.current != 1 }} in a row · best {{ g.best }}</span></p>
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </section>
+
   {{ heatmap_card(heatmap) }}
 </div>
 {% endblock %}

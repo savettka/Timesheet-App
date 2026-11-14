@@ -988,3 +988,141 @@ def year_heatmap(user, entries_by_date, today, now=None, weeks=HEATMAP_WEEKS):
         months.pop(0)  # the first week's month, when the next name would crowd it
     return {"first": first, "columns": columns, "months": months,
             "worked_hours": worked_total, "days_worked": days_worked}
+
+
+# ------------------------------------------------------------- goals
+
+GOAL_SLACK = 1 / 120  # hours: half a minute short still counts
+
+
+def logout_minute(entry):
+    """A logout in minutes from its day's midnight, past 1,440 after it."""
+    out = clock_minutes(entry.logout_time)
+    return out + 1440 if out < clock_minutes(entry.login_time) else out
+
+
+def goal_day(kind, value, user, d, entry, written, today, now):
+    """How a day went for a daily goal: "met", "missed", "skip" -- it counts
+    neither way: leave, a rest day, a day not worked for a goal about work
+    done, a shift whose logout was never put in -- or "open": today, not
+    met yet, which can't break a streak until it's over. written is the
+    day's Timesheet minutes with words."""
+    if entry is not None and (entry.target_override is not None or is_stale_shift(entry, now)):
+        return "skip"
+    logged = entry is not None and entry.login_time is not None
+    worked = entry_total_hours(entry, now=now) if logged else 0.0
+    ended = logged and entry.logout_time is not None
+    if kind == "daily_hours":
+        if entry_target_hours(user, d) <= 0:
+            return "skip"
+        if worked >= value - GOAL_SLACK:
+            return "met"
+        return "open" if d >= today else "missed"
+    if kind == "timesheet_written":
+        if worked <= 0 or not ended:
+            return "open" if d >= today and logged else "skip"
+        if written >= worked * 60 * value / 100 - 0.5:
+            return "met"
+        return "open" if d >= today else "missed"
+    if kind == "logout_by":
+        if not logged:
+            return "skip"
+        if not ended:
+            return "missed" if day_minute(d, now) > value else "open"
+        return "met" if logout_minute(entry) <= value else "missed"
+    raise ValueError(kind)
+
+
+def goal_week(value, user, days, entries_by_date, today, now):
+    """How a week (Monday to Sunday) went for an hours-a-week goal. Leave
+    takes its usual hours off what the goal asks, so a week of leave asks
+    nothing and is skipped. Returns (outcome, worked, asked)."""
+    asked, worked = value, 0.0
+    for d in days:
+        entry = entries_by_date.get(d)
+        if entry is not None and entry.target_override is not None:
+            asked -= max(0.0, entry_target_hours(user, d) - entry.target_override)
+        if entry is not None and entry.login_time is not None and not is_stale_shift(entry, now):
+            worked += entry_total_hours(entry, now=now)
+    if asked <= 0:
+        return "skip", worked, 0.0
+    if worked >= asked - GOAL_SLACK:
+        return "met", worked, asked
+    return ("open" if days[-1] >= today else "missed"), worked, asked
+
+
+def streaks(outcomes):
+    """The current and the best run of "met", in time order: a "missed"
+    ends a run; "skip" and "open" don't count either way."""
+    run = best = 0
+    for outcome in outcomes:
+        if outcome == "met":
+            run += 1
+            best = max(best, run)
+        elif outcome == "missed":
+            run = 0
+    return run, best
+
+
+def goal_title(kind, value):
+    if kind == "daily_hours":
+        return f"{fmt_target_hours(value)} a day"
+    if kind == "weekly_hours":
+        return f"{fmt_target_hours(value)} a week"
+    if kind == "timesheet_written":
+        return "Timesheet written" if value >= 100 else f"Timesheet {value:g}% written"
+    return f"Out by {fmt_clock(minutes_clock(int(value)))}"
+
+
+def goal_progress(kind, value, user, entries_by_date, written_by_date, first, today, now):
+    """A goal on Home: its title, today's (or this week's) progress -- a
+    share for its bar and in words -- and its current and best streak in
+    days (weeks, for hours a week), from first to today. Days before the
+    first one recorded don't count."""
+    recorded = [d for d in entries_by_date if first <= d <= today]
+    began = min(recorded) if recorded else today
+    entry = entries_by_date.get(today)
+    if kind == "weekly_hours":
+        weeks, monday = [], week_bounds(began)[0]
+        while monday <= today:
+            weeks.append(goal_week(value, user, week_dates(monday), entries_by_date, today, now))
+            monday += timedelta(days=7)
+        state, worked, asked = weeks[-1]
+        current, best = streaks(w[0] for w in weeks)
+        label = (f"{fmt_duration(worked)} of {fmt_duration(asked)} this week" if asked
+                 else "On leave this week")
+        share = worked / asked if asked else 0.0
+        unit = "week"
+    else:
+        outcomes, d = [], began
+        while d <= today:
+            outcomes.append(goal_day(kind, value, user, d, entries_by_date.get(d), written_by_date.get(d, 0),
+                                     today, now))
+            d += timedelta(days=1)
+        state = outcomes[-1]
+        current, best = streaks(outcomes)
+        unit = "day"
+        logged = entry is not None and entry.login_time is not None
+        worked = entry_total_hours(entry, now=now) if logged else 0.0
+        if kind == "daily_hours":
+            share = worked / value if value else 0.0
+            label = (f"{fmt_duration(worked)} of {fmt_duration(value)} today" if state != "skip"
+                     else ("Leave today" if entry is not None and entry.target_override is not None
+                           else "Rest day"))
+        elif kind == "timesheet_written":
+            written = written_by_date.get(today, 0)
+            share = written / (worked * 60) * 100 / value if worked and value else 0.0
+            label = (f"{min(100, round(written / (worked * 60) * 100))}% of today written" if worked
+                     else "Nothing worked yet today")
+        else:
+            if not logged:
+                share, label = 0.0, "Not logged in today"
+            elif entry.logout_time is not None:
+                share, label = 1.0, f"Out at {fmt_time(entry.logout_time)}"
+            else:
+                start, at = clock_minutes(entry.login_time), day_minute(today, now)
+                share = (at - start) / (value - start) if value > start else 1.0
+                label = (f"{fmt_duration((value - at) / 60)} to go" if at < value
+                         else f"{fmt_duration((at - value) / 60)} past it")
+    return {"kind": kind, "title": goal_title(kind, value), "state": state, "label": label,
+            "pct": round(max(0.0, min(1.0, share)) * 100), "current": current, "best": best, "unit": unit}
