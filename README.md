@@ -64,6 +64,9 @@ This mirrors the logic in the original spreadsheet:
   Stop leaves you on the page you were on.
   Stop, Break or Logout writes the Timesheet line with the exact times; starting another
   task writes the running one first. The latest tasks are a tap from starting again.
+- **Arrow keys on times** — in any time box (Timesheet, Calendar, a day's Edit screen), Up
+  and Down move the time 5 minutes, with Shift an hour; the next line follows, and the
+  Timesheet saves once you stop.
 - **Command palette** — Ctrl+K (or `/` when you're not in a box), or the search button
   at the top: type to go to any page or a day ("12 nov", "yesterday", "last friday"),
   Login, Break, Back or Logout as the day stands, start or stop the timer, start one of

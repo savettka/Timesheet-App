@@ -1642,6 +1642,29 @@
     });
   }
 
+  // ----------------------------------------------------------- time nudge
+  // In any time box -- the Timesheet, the Calendar's box, a day's Edit
+  // screen -- Up and Down move the time 5 minutes (on to the next five:
+  // 7:02 goes to 7:05), with Shift an hour. It goes through as typing would,
+  // so the line beside it follows and the Timesheet saves once the nudging
+  // stops.
+  function initTimeNudge() {
+    document.addEventListener("keydown", function (e) {
+      var box = e.target;
+      if (!box || box.tagName !== "INPUT" || box.type !== "time") return;
+      if ((e.key !== "ArrowUp" && e.key !== "ArrowDown") || e.altKey || e.ctrlKey || e.metaKey) return;
+      if (!/^\d\d:\d\d/.test(box.value)) return;
+      e.preventDefault();
+      var m = parseInt(box.value.slice(0, 2), 10) * 60 + parseInt(box.value.slice(3, 5), 10);
+      var up = e.key === "ArrowUp";
+      if (e.shiftKey) m += up ? 60 : -60;
+      else m = up ? Math.floor(m / 5) * 5 + 5 : Math.ceil(m / 5) * 5 - 5;
+      m = ((m % 1440) + 1440) % 1440;
+      box.value = String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0");
+      box.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  }
+
   // ------------------------------------------------------------ timer bar
   // On a phone the bar lives in a sheet, opened from the pill above the
   // tabs. Back on a tab left open a while: if the timer or the day has moved
@@ -1749,6 +1772,7 @@
     initTimerClock();
     initTimerBar();
     initPalette();
+    initTimeNudge();
     initCalendarGrid();
     initWeekCopy();
     initBoards();
