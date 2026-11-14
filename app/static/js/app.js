@@ -1400,6 +1400,59 @@
       setTimeout(function () { if (!e.defaultPrevented) dialog.close(); }, 0);
     });
 
+    // Zoom: how fine the grid is -- a slot of an hour, half an hour, 15 or 5
+    // minutes -- and the step a drag snaps to and the arrows move by. Kept
+    // in the browser; the page's head puts it on before the grid is drawn.
+    var root = document.documentElement;
+    var zooms = document.querySelectorAll(".cg-zoom-btn");
+    var status = document.getElementById("cg-status");
+    function step() { return parseInt(root.getAttribute("data-cal-zoom") || "60", 10); }
+    function say(words) { if (status) status.textContent = words; }
+    function showZoom() {
+      zooms.forEach(function (b) { b.setAttribute("aria-pressed", String(parseInt(b.dataset.zoom, 10) === step())); });
+    }
+    zooms.forEach(function (b) {
+      b.addEventListener("click", function () {
+        if (b.dataset.zoom === "60") root.removeAttribute("data-cal-zoom");
+        else root.setAttribute("data-cal-zoom", b.dataset.zoom);
+        try { localStorage.setItem("stm-cal-zoom", b.dataset.zoom); } catch (e) { /* not kept - still applied */ }
+        showZoom();
+        if (nowLine && !nowLine.hidden) nowLine.scrollIntoView({ block: "center" });
+      });
+    });
+    showZoom();
+
+    // Now: a line across today's column, moved on as the minutes pass.
+    var nowLine = grid.querySelector(".cg-now[data-now]");
+    var loaded = Date.now();
+    function placeNow() {
+      var at = parseInt(nowLine.dataset.now, 10) + Math.floor((Date.now() - loaded) / 60000);
+      nowLine.style.setProperty("--s", at - from);
+      nowLine.hidden = !(at >= from && at < to);
+    }
+    if (nowLine) {
+      placeNow();
+      setInterval(placeNow, 30000);
+    }
+
+    // A written line's times, shown as they change and then saved: the
+    // lines either side follow, as on the Timesheet (POST /calendar/line).
+    function show(block, a, b) {
+      block.style.setProperty("--s", a - from);
+      block.style.setProperty("--l", b - a);
+      var label = block.querySelector(".cg-time");
+      if (label) label.textContent = clock12(hhmm(a)) + " \u2013 " + clock12(hhmm(b));
+    }
+    function save(block, a, b) {
+      set(resize, "date", block.closest(".cg-col").dataset.date);
+      set(resize, "id", block.dataset.id);
+      set(resize, "start", hhmm(a));
+      set(resize, "end", hhmm(b));
+      set(resize, "text", block.dataset.text);
+      try { sessionStorage.setItem("stm-cal-focus", block.dataset.id); } catch (e) { /* focus not kept */ }
+      if (resize.requestSubmit) resize.requestSubmit(); else resize.submit();
+    }
+
     var dragged = false;
     grid.addEventListener("click", function (e) {
       if (dragged) { e.preventDefault(); dragged = false; return; }
@@ -1408,46 +1461,101 @@
       var block = e.target.closest(".cg-block");
       e.preventDefault();
       if (block) return open(col.dataset.date, block, block.dataset.start, block.dataset.end);
-      // An empty part of the day: an hour from the o'clock clicked.
+      // An empty part of the day: an hour from the slot clicked.
       var y = e.clientY - col.getBoundingClientRect().top;
-      var at = Math.max(from, Math.min(to - 60, Math.floor((from + y / ppm()) / 60) * 60));
+      var at = Math.max(from, Math.min(to - 60, Math.floor((from + y / ppm()) / step()) * step()));
       open(col.dataset.date, null, hhmm(at), hhmm(at + 60));
     });
 
+    // Dragging: the bottom edge moves the end, the top edge the start, and
+    // the line itself (with a mouse or pen) moves the whole of it, snapping
+    // to the zoom. A press that hardly moves is a click: the line's box opens.
     grid.addEventListener("pointerdown", function (e) {
+      if (e.button !== 0) return;
+      var block = e.target.closest('.cg-block[aria-describedby="cg-keys"]');
+      if (!block) return;
       var grip = e.target.closest(".cg-grip");
-      if (!grip) return;
-      e.preventDefault();
-      var block = grip.closest(".cg-block"), col = block.closest(".cg-col");
-      // Its own minutes from the server: past 1440 after midnight.
-      var start = parseInt(block.dataset.a, 10), end = parseInt(block.dataset.b, 10), was = end;
-      var y0 = e.clientY, scale = ppm(), label = block.querySelector(".cg-time");
-      block.classList.add("is-dragging");
-      grip.setPointerCapture(e.pointerId);
+      var mode = grip ? (grip.classList.contains("cg-grip-start") ? "start" : "end") : "move";
+      if (mode === "move" && e.pointerType === "touch") return;
+      if (grip) e.preventDefault();
+      var a0 = parseInt(block.dataset.a, 10), b0 = parseInt(block.dataset.b, 10), a = a0, b = b0;
+      var y0 = e.clientY, scale = ppm(), slot = step(), moved = false;
+      var held = grip || block;
+      held.setPointerCapture(e.pointerId);
+      function snap(m) { return Math.round(m / slot) * slot; }
       function move(ev) {
-        end = Math.max(start + 5, Math.min(to, Math.round((was + (ev.clientY - y0) / scale) / 5) * 5));
-        block.style.setProperty("--l", end - start);
-        if (label) label.textContent = hhmm(start) + " – " + hhmm(end);
+        if (!moved && Math.abs(ev.clientY - y0) < 4) return;
+        if (!moved) {
+          moved = true;
+          block.classList.add("is-dragging");
+        }
+        var d = (ev.clientY - y0) / scale;
+        if (mode === "end") b = Math.max(a + slot, Math.min(to, snap(b0 + d)));
+        else if (mode === "start") a = Math.min(b - slot, Math.max(from, snap(a0 + d)));
+        else {
+          a = Math.max(from, Math.min(to - (b0 - a0), snap(a0 + d)));
+          b = a + (b0 - a0);
+        }
+        show(block, a, b);
       }
       function up() {
-        grip.removeEventListener("pointermove", move);
-        grip.removeEventListener("pointerup", up);
-        grip.removeEventListener("pointercancel", up);
+        held.removeEventListener("pointermove", move);
+        held.removeEventListener("pointerup", up);
+        held.removeEventListener("pointercancel", up);
         block.classList.remove("is-dragging");
+        if (!moved) return;
         dragged = true;
         setTimeout(function () { dragged = false; }, 0);
-        if (end === was) return;
-        set(resize, "date", col.dataset.date);
-        set(resize, "id", block.dataset.id);
-        set(resize, "start", block.dataset.start);
-        set(resize, "end", hhmm(end));
-        set(resize, "text", block.dataset.text);
-        if (resize.requestSubmit) resize.requestSubmit(); else resize.submit();
+        if (a !== a0 || b !== b0) save(block, a, b);
       }
-      grip.addEventListener("pointermove", move);
-      grip.addEventListener("pointerup", up);
-      grip.addEventListener("pointercancel", up);
+      held.addEventListener("pointermove", move);
+      held.addEventListener("pointerup", up);
+      held.addEventListener("pointercancel", up);
     });
+
+    // The keyboard's drag: Up and Down move a written line by the zoom
+    // step, with Shift its end; it saves once the keys stop, and Esc puts it
+    // back. After the save the page comes back on the same line.
+    var keyed = null, keyA, keyB, keyA0, keyB0, waiting = null;
+    grid.addEventListener("keydown", function (e) {
+      var block = e.target.closest && e.target.closest('.cg-block[aria-describedby="cg-keys"]');
+      if (!block) return;
+      if (e.key === "Escape" && keyed === block) {
+        e.preventDefault();
+        clearTimeout(waiting);
+        show(block, keyA0, keyB0);
+        keyed = null;
+        say("Put back.");
+        return;
+      }
+      if ((e.key !== "ArrowUp" && e.key !== "ArrowDown") || e.altKey || e.ctrlKey || e.metaKey) return;
+      e.preventDefault();
+      if (keyed !== block) {
+        keyed = block;
+        keyA = keyA0 = parseInt(block.dataset.a, 10);
+        keyB = keyB0 = parseInt(block.dataset.b, 10);
+      }
+      var by = step() * (e.key === "ArrowUp" ? -1 : 1);
+      if (e.shiftKey) keyB = Math.max(keyA + step(), Math.min(to, keyB + by));
+      else {
+        var length = keyB - keyA;
+        keyA = Math.max(from, Math.min(to - length, keyA + by));
+        keyB = keyA + length;
+      }
+      show(block, keyA, keyB);
+      say(clock12(hhmm(keyA)) + " to " + clock12(hhmm(keyB)));
+      clearTimeout(waiting);
+      waiting = setTimeout(function () {
+        if (keyed === block && (keyA !== keyA0 || keyB !== keyB0)) save(block, keyA, keyB);
+        keyed = null;
+      }, 900);
+    });
+    try {
+      var back = sessionStorage.getItem("stm-cal-focus");
+      sessionStorage.removeItem("stm-cal-focus");
+      var again = back && grid.querySelector('.cg-block[data-id="' + back + '"]');
+      if (again) again.focus();
+    } catch (e) { /* no storage: the page starts at the top */ }
   }
 
   // ------------------------------------------------------------ timer

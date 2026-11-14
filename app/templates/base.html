@@ -23,6 +23,11 @@
         if (localStorage.getItem("stm-menu") === "hidden") {
           document.documentElement.setAttribute("data-menu", "hidden");
         }
+        // The Calendar's zoom, so its grid is drawn at it straight away.
+        var zoom = localStorage.getItem("stm-cal-zoom");
+        if (zoom === "30" || zoom === "15" || zoom === "5") {
+          document.documentElement.setAttribute("data-cal-zoom", zoom);
+        }
       } catch (e) { /* storage blocked - follow the device */ }
       // Which way the page slides in: back for the browser's Back button,
       // or a link to an earlier day, week or month.

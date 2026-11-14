@@ -16,6 +16,14 @@
     <a class="btn btn-icon" href="{{ next_url }}" aria-label="Next {{ view }}">{{ icon('chevron-right') }}</a>
   </div>
   {% if not is_current %}<p class="month-jump"><a class="link" href="{{ today_url }}">Jump to today</a></p>{% endif %}
+  {# How fine the grid is: a slot an hour, half an hour, 15 or 5 minutes.
+     Kept in the browser (app.js); a drag snaps to it. #}
+  <div class="cg-zoom" role="group" aria-label="Zoom">
+    {% for step, label in [(60, '1h'), (30, '30m'), (15, '15m'), (5, '5m')] %}
+    <button type="button" class="cg-zoom-btn" data-zoom="{{ step }}" aria-pressed="{{ 'true' if step == 60 else 'false' }}"
+            aria-label="{{ label }} slots">{{ label }}</button>
+    {% endfor %}
+  </div>
 
   {# Each day a column of its Timesheet lines on one time grid. A block is a
      link to that day's Timesheet; app.js opens it in a box here instead, and
@@ -46,19 +54,26 @@
            style="--s: {{ b.start - grid_from }}; --l: {{ b.end - b.start }}"
            data-id="{{ b.id }}" data-start="{{ b.start_hhmm }}" data-end="{{ b.end_hhmm }}" data-text="{{ b.text }}"
            data-a="{{ b.start }}" data-b="{{ b.end }}"{% if b.copy %} data-copy="{{ b.copy }}"{% endif %}
-           aria-label="{{ b.span }}, {{ b.text or 'nothing written yet' }}">
+           aria-label="{{ b.span }}, {{ b.text or 'nothing written yet' }}"
+           {%- if b.id and b.kind != 'break' %} aria-describedby="cg-keys"{% endif %}>
           <span class="cg-text">{{ b.text or 'Empty' }}</span>
           <span class="cg-time">{{ b.span }} · {{ b.length }}</span>
-          {% if b.id and b.kind != 'break' %}<span class="cg-grip" aria-hidden="true"></span>{% endif %}
+          {% if b.id and b.kind != 'break' %}
+          <span class="cg-grip cg-grip-start" aria-hidden="true"></span><span class="cg-grip cg-grip-end" aria-hidden="true"></span>
+          {% endif %}
         </a>
         {% endfor %}
-        {% if col.now_at is not none and grid_from <= col.now_at < grid_to %}
-        <span class="cg-now" style="--s: {{ col.now_at - grid_from }}" aria-hidden="true"></span>
+        {% if col.now_at is not none %}
+        {# Moved on every minute by app.js. #}
+        <span class="cg-now" data-now="{{ col.now_at }}" style="--s: {{ col.now_at - grid_from }}" aria-hidden="true"
+              {%- if not (grid_from <= col.now_at < grid_to) %} hidden{% endif %}></span>
         {% endif %}
       </div>
       {% endfor %}
     </div>
   </div>
+  <p class="visually-hidden" id="cg-keys">Up and Down move the line by the zoom step; with Shift, its end.</p>
+  <p class="visually-hidden" id="cg-status" aria-live="polite"></p>
 </section>
 
 <dialog class="cg-dialog" id="cg-dialog" aria-labelledby="cg-dialog-title">

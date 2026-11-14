@@ -87,8 +87,11 @@ This mirrors the logic in the original spreadsheet:
   hours against the weekly target, "Not written yet" for hours with no words, **Copy
   week** (every line, day by day, ready to paste) and **Mark week posted**.
 - **Calendar day and week** — the Timesheet's lines as blocks on a time grid: click to
-  write or change a line, drag a block's bottom edge to change its end (the next line
-  follows). The month grid is the third tab.
+  write or change a line; drag a block's bottom edge to change its end, its top edge to
+  change its start, or the block itself to move it, snapping to the zoom (1h, 30m, 15m or
+  5m slots, remembered); the lines either side follow. With the keyboard, Up and Down move
+  a block and Shift with them its end, saved once you stop (Esc puts it back). A red line
+  marks now on today's column. The month grid is the third tab.
 - **Reports** — this or last week or month: worked, due, overtime, breaks, days worked,
   usual hours, a bar per day against its target, where the time went, attendance, and
   the lines as a CSV.
