@@ -139,6 +139,11 @@ This mirrors the logic in the original spreadsheet:
   Once a week; **Reports** has Preview and Send now, and **Settings → Weekly email** switches
   it off. It uses the same Gmail settings as the sign-in codes, and goes to your profile's
   email address.
+- **Reminders** — while STM is open, a bar at the top of any page when you haven't logged in
+  by a set time on a workday, are still logged in after so many hours, have taken more break
+  than your usual allowance, or the last day worked has lines to fill in. Put one away with
+  its x (it stays away that day); set each in **Settings → Reminders**, where browser
+  notifications can be turned on too -- asked for only when you press the button.
 - **Settings** — change daily/weekly targets, workdays and your salary.
 - **More room** — the button at the top left hides the side menu entirely (the logo in the
   top bar still goes home); press it again to bring the menu back. The browser remembers.

@@ -2148,6 +2148,22 @@ a.hm-day:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 .rp-mail-text { flex: 1 1 12rem; }
 .rp-mail-text .card-title { margin: 0; }
 
+/* Reminders: a bar at the top of any page, one line each. */
+.rm-bar { list-style: none; display: flex; flex-direction: column; gap: var(--s2); margin-bottom: var(--s4); }
+.rm-item {
+  display: flex; align-items: center; gap: var(--s3); padding: 6px 6px 6px var(--s4);
+  border-radius: var(--r-md); background: var(--warn-bg); color: var(--warn-text);
+  animation: stm-slide-down .3s var(--ease-out);
+}
+.rm-item .icon { flex: none; }
+.rm-item a { flex: 1; min-width: 0; min-height: 44px; display: flex; align-items: center; color: inherit; font-weight: 600; text-decoration: none; }
+.rm-item a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.rm-item button { flex: none; width: 44px; height: 44px; min-height: 44px; padding: 0; border: 0; border-radius: var(--r-sm); background: transparent; color: inherit; cursor: pointer; }
+.rm-item button:hover { background: color-mix(in srgb, var(--warn-text) 12%, transparent); }
+.notify-row { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); min-height: 48px; margin-top: var(--s2); padding-top: var(--s2); border-top: 1px solid var(--line); }
+.notify-state { font-weight: 600; }
+.goal-fixed { color: var(--text-3); font-size: 15px; font-variant-numeric: tabular-nums; }
+
 /* Settings: a goal a row -- on or off, and its value. */
 .goal-rows { list-style: none; display: flex; flex-direction: column; gap: var(--s2); }
 .goal-row { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); min-height: 48px; }

@@ -162,6 +162,45 @@
     </form>
   </section>
 
+  <section class="card" id="reminders" aria-labelledby="reminders-heading">
+    <div class="card-head">
+      <h2 id="reminders-heading" class="card-title">Reminders</h2>
+      <span class="card-sub">In STM while it's open</span>
+    </div>
+    <form method="post" class="form" autocomplete="off">
+      <input type="hidden" name="form_type" value="reminders">
+      <ul class="goal-rows">
+        {% for key in ('no_login', 'long_day', 'long_break', 'unwritten') %}
+        <li class="goal-row">
+          <label class="goal-on">
+            <input type="checkbox" name="{{ key }}_on" value="1" {{ 'checked' if reminder[key].on }}>
+            <span>{{ reminder_names[key] }}</span>
+          </label>
+          <span class="goal-value">
+            {% if key == 'no_login' %}
+            <input type="time" name="no_login_at" value="{{ fmt_clock_minutes(reminder.no_login.at) }}" aria-label="{{ reminder_names[key] }}, the time">
+            <span class="goal-unit" aria-hidden="true"></span>
+            {% elif key == 'long_day' %}
+            <input type="number" name="long_day_hours" value="{{ '%g'|format(reminder.long_day.hours) }}" min="1" max="24" step="0.5"
+                   inputmode="decimal" aria-label="{{ reminder_names[key] }}, hours">
+            <span class="goal-unit" aria-hidden="true">h</span>
+            {% elif key == 'long_break' %}
+            <span class="goal-fixed">{{ user.weekday_break_minutes }}m · Sat {{ user.saturday_break_minutes }}m</span>
+            {% endif %}
+          </span>
+        </li>
+        {% endfor %}
+      </ul>
+      <p class="notify-row" hidden>
+        <span class="notify-state">Browser notifications</span>
+        <button type="button" class="btn btn-secondary btn-sm" data-notify>Turn on</button>
+      </p>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Save reminders</button>
+      </div>
+    </form>
+  </section>
+
   <section class="card" id="emails" aria-labelledby="emails-heading">
     <h2 id="emails-heading" class="card-title">Weekly email</h2>
     <form method="post" class="form" autocomplete="off">

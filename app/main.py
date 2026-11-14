@@ -30,6 +30,7 @@ from sqlalchemy.orm import joinedload
 from app import db
 from app import logic
 from app import mailer
+from app import reminders
 from app import weekly_report
 from app.models import BreakSegment, Goal, PayRecord, Salary, TimeEntry, User, WeekTemplate, WorkBlock
 
@@ -521,11 +522,14 @@ def dashboard():
 @main_bp.route("/api/reminders")
 @login_required
 def api_reminders():
-    """Asked by every open page (app.js, initReminders): sends the weekly
-    report once it's due, and says how many seconds until it will be, for
-    the page to ask again then."""
-    due = weekly_report.run(current_user, datetime.now())
-    return jsonify(report_in=round(due) if due is not None else None)
+    """Asked by every open page (app.js, initReminders): the reminders that
+    apply now, for the bar at the top; and it sends the weekly report once
+    it's due, saying how many seconds until it will be, for the page to ask
+    again then."""
+    now = datetime.now()
+    due = weekly_report.run(current_user, now)
+    return jsonify(report_in=round(due) if due is not None else None,
+                   reminders=reminders.due(current_user, now, get_open_entry(current_user.id)))
 
 
 def report_week(value, today):
@@ -2835,6 +2839,26 @@ def settings():
             flash(f"Salary saved: {logic.fmt_money(amount, user.pay_symbol)} from {starts:%B %Y}.", "success")
             return redirect(url_for("main.settings") + "#pay")
 
+        elif form_type == "reminders":
+            saved = reminders.settings_for(user)
+            for key in reminders.DEFAULTS:
+                saved[key]["on"] = request.form.get(f"{key}_on") == "1"
+            at = parse_time_field(request.form.get("no_login_at"))
+            if at is not None:
+                saved["no_login"]["at"] = at.hour * 60 + at.minute
+            for key, field, kind in (("long_day", "hours", float), ("idle", "minutes", int)):
+                try:
+                    value = kind(request.form.get(f"{key}_{field}", ""))
+                except ValueError:
+                    continue
+                low, high = reminders.LIMITS[field]
+                if math.isfinite(value) and low <= value <= high:
+                    saved[key][field] = value
+            user.reminder_settings = json.dumps(saved)
+            db.session.commit()
+            flash("Reminders saved.", "success")
+            return redirect(url_for("main.settings") + "#reminders")
+
         elif form_type == "emails":
             user.weekly_report = request.form.get("weekly_report") == "1"
             db.session.commit()
@@ -2957,4 +2981,6 @@ def settings():
         years=range(today.year + 1, today.year - 6, -1),
         goal_rows=goal_rows(user),
         mail_ready=mailer.is_configured(),
+        reminder=reminders.settings_for(user), reminder_names=reminders.NAMES,
+        fmt_clock_minutes=lambda m: logic.minutes_clock(int(m)).strftime("%H:%M"),
     )

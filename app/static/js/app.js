@@ -1530,11 +1530,71 @@
   // weekly report once it's due, and says how long until it will be: the
   // page asks again then, even from a tab in the background -- there's no
   // scheduler on the server to do it.
+  //
+  // The reminders that apply come back too: a bar at the top of the page,
+  // each one put away (for its day) with its x; and a browser notification
+  // for each new one, where Settings has turned them on.
+  var SVG = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+    'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">';
+  function stored(name) {
+    try { return JSON.parse(localStorage.getItem(name) || "{}") || {}; } catch (e) { return {}; }
+  }
+  function store(name, value) {
+    try { localStorage.setItem(name, JSON.stringify(value)); } catch (e) { /* storage blocked */ }
+  }
+  function notifying() {
+    try {
+      return "Notification" in window && Notification.permission === "granted" && localStorage.getItem("stm-notify") === "1";
+    } catch (e) { return false; }
+  }
+
   function initReminders() {
     var url = document.body.dataset.remindersUrl;
     if (!url || !window.fetch) return;
+    var bar = document.getElementById("rm-bar");
     var due = null, asked = 0, MIN_GAP = 60000;
 
+    function show(list) {
+      if (!bar) return;
+      var off = stored("stm-rm-off"), keep = {};
+      bar.innerHTML = "";
+      list.forEach(function (r) {
+        if (off[r.key]) { keep[r.key] = true; return; }
+        var li = document.createElement("li");
+        li.className = "rm-item";
+        li.innerHTML = SVG + '<path d="M12 4 2.5 20h19z"/><path d="M12 10v4M12 17h.01"/></svg><a></a>' +
+          '<button type="button" aria-label="Put this reminder away" title="Put away">' + SVG +
+          '<path d="M6 6l12 12M18 6 6 18"/></svg></button>';
+        var link = li.querySelector("a");
+        link.href = r.href;
+        link.textContent = r.text;
+        li.querySelector("button").addEventListener("click", function () {
+          var now = stored("stm-rm-off");
+          now[r.key] = true;
+          store("stm-rm-off", now);
+          var next = li.nextElementSibling || li.previousElementSibling;
+          li.remove();
+          bar.hidden = !bar.children.length;
+          if (next) next.querySelector("button").focus();
+        });
+        bar.appendChild(li);
+      });
+      store("stm-rm-off", keep);  // only today's: the rest can go
+      bar.hidden = !bar.children.length;
+    }
+    function tell(list) {
+      if (!notifying()) return;
+      var told = stored("stm-rm-told"), keep = {};
+      list.forEach(function (r) {
+        keep[r.key] = true;
+        if (told[r.key]) return;
+        try {
+          var note = new Notification("STM", { body: r.text, tag: r.key });
+          note.onclick = function () { window.focus(); window.location.href = r.href; };
+        } catch (e) { /* not allowed from this page */ }
+      });
+      store("stm-rm-told", keep);
+    }
     function ask() {
       asked = Date.now();
       fetch(url, { headers: { Accept: "application/json" }, credentials: "same-origin" })
@@ -1545,13 +1605,53 @@
           if (data.report_in !== null && data.report_in !== undefined) {
             due = setTimeout(ask, (Math.max(0, data.report_in) + 5) * 1000);
           }
+          show(data.reminders || []);
+          tell(data.reminders || []);
         })
         .catch(function () { /* offline for a moment: the next page asks */ });
     }
     ask();  // every page: the one after a logout has to start the wait
+    // Every two minutes while looked at; while hidden, only to notify.
+    setInterval(function () {
+      var gap = document.hidden ? 5 * 60000 : 2 * 60000;
+      if ((!document.hidden || notifying()) && Date.now() - asked >= gap - 1000) ask();
+    }, 60000);
     document.addEventListener("visibilitychange", function () {
       if (!document.hidden && Date.now() - asked >= MIN_GAP) ask();
     });
+  }
+
+  // Settings: browser notifications, asked for only when this is pressed.
+  function initNotifySetting() {
+    var row = document.querySelector(".notify-row");
+    if (!row || !("Notification" in window)) return;
+    var state = row.querySelector(".notify-state");
+    var button = row.querySelector("[data-notify]");
+    row.hidden = false;
+    function draw() {
+      var on = notifying();
+      if (Notification.permission === "denied") {
+        state.textContent = "Notifications blocked in this browser";
+        button.hidden = true;
+        return;
+      }
+      state.textContent = on ? "Browser notifications on" : "Browser notifications";
+      button.textContent = on ? "Turn off" : "Turn on";
+    }
+    button.addEventListener("click", function () {
+      if (notifying()) {
+        try { localStorage.setItem("stm-notify", "0"); } catch (e) { /* storage blocked */ }
+        draw();
+        return;
+      }
+      Promise.resolve(Notification.requestPermission()).then(function (answer) {
+        if (answer === "granted") {
+          try { localStorage.setItem("stm-notify", "1"); } catch (e) { /* storage blocked */ }
+        }
+        draw();
+      });
+    });
+    draw();
   }
 
   // ------------------------------------------------------------ the year
@@ -2436,6 +2536,7 @@
     initHeatmap();
     initArrange();
     initReminders();
+    initNotifySetting();
     initBoards();
     initAutosave();
     initSlideOrder();

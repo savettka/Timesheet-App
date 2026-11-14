@@ -111,10 +111,10 @@ def test_when_its_due(app, user_id, week, clock):
 
 def test_sent_once_15_minutes_after_the_last_logout(app, client, user_id, week, mail, clock):
     clock.set(2026, 11, 14, 13, 40)
-    assert client.get("/api/reminders").get_json() == {"report_in": 320}
+    assert client.get("/api/reminders").get_json()["report_in"] == (320)
     assert mail == []
     clock.set(2026, 11, 14, 13, 46)
-    assert client.get("/api/reminders").get_json() == {"report_in": None}
+    assert client.get("/api/reminders").get_json()["report_in"] == (None)
     assert len(mail) == 1 and mail[0]["to"] == "me@example.com"
     assert mail[0]["subject"] == "Weekly work summary · 09 Nov – 15 Nov 2026"
     # Asked again, by this tab or another: nothing more.
@@ -130,9 +130,9 @@ def test_sent_once_15_minutes_after_the_last_logout(app, client, user_id, week, 
 def test_a_failed_send_is_tried_again(app, client, user_id, week, mail, clock):
     mail.ok = False
     clock.set(2026, 11, 14, 14, 0)
-    assert client.get("/api/reminders").get_json() == {"report_in": 900}
+    assert client.get("/api/reminders").get_json()["report_in"] == (900)
     clock.set(2026, 11, 14, 14, 5)
-    assert client.get("/api/reminders").get_json() == {"report_in": 600}
+    assert client.get("/api/reminders").get_json()["report_in"] == (600)
     assert len(mail) == 1
     mail.ok = True
     clock.set(2026, 11, 14, 14, 16)
@@ -183,7 +183,7 @@ def test_switched_off_or_no_address(app, client, user_id, week, mail, clock):
 
 def test_not_set_up(app, client, user_id, week, clock):
     clock.set(2026, 11, 14, 16, 0)
-    assert client.get("/api/reminders").get_json() == {"report_in": None}
+    assert client.get("/api/reminders").get_json()["report_in"] == (None)
     page = client.get("/settings").get_data(as_text=True)
     assert "Email isn't set up on this server" in page
 

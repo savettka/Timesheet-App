@@ -58,6 +58,10 @@ class User(UserMixin, db.Model):
     # (app/weekly_report.py). On unless switched off in Settings.
     weekly_report = db.Column(db.Boolean, nullable=False, default=True)
 
+    # The in-app reminders, as switched in Settings: JSON over the defaults
+    # in app/reminders.py. None is every default.
+    reminder_settings = db.Column(db.Text, nullable=True)
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     entries = db.relationship(

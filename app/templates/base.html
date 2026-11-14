@@ -190,6 +190,8 @@
 
       <main id="main" class="content" tabindex="-1">
         {{ flashes() }}
+        {# Reminders that apply now (app.js, initReminders). #}
+        <ul class="rm-bar" id="rm-bar" aria-label="Reminders" aria-live="polite" hidden></ul>
         {% block content %}{% endblock %}
       </main>
     </div>
