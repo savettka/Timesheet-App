@@ -64,6 +64,10 @@ This mirrors the logic in the original spreadsheet:
   Stop leaves you on the page you were on.
   Stop, Break or Logout writes the Timesheet line with the exact times; starting another
   task writes the running one first. The latest tasks are a tap from starting again.
+- **Command palette** — Ctrl+K (or `/` when you're not in a box), or the search button
+  at the top: type to go to any page or a day ("12 nov", "yesterday", "last friday"),
+  Login, Break, Back or Logout as the day stands, start or stop the timer, start one of
+  your last ten tasks again, or switch dark mode -- all from the keyboard.
 - **Saves as you type** — the Timesheet saves a moment after typing stops (or when a box is
   left), and says when: "Saved · 2:41 PM". Enter saves there and then; anything still
   waiting is sent on the way out. A line with a problem waits, marked, while the rest save.

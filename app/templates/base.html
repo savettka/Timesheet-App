@@ -171,6 +171,9 @@
           {{ stm_logo('logo-mark') }}
         </a>
         <h1 class="page-title">{% block page_title %}STM{% endblock %}</h1>
+        <button type="button" class="cp-open" aria-haspopup="dialog" aria-controls="palette"
+                aria-keyshortcuts="Control+K" title="Go to or do (Ctrl+K)">
+          {{ icon('search') }}<span class="cp-open-word">Search</span><kbd class="cp-kbd">Ctrl K</kbd></button>
         {{ timer_controls('bar') }}
         {{ theme_toggle('theme-toggle-icon') }}
         <a class="topbar-user" href="{{ url_for('main.settings') }}" data-profile-open=""
@@ -197,6 +200,23 @@
       {% endfor %}
     </nav>
   </div>
+
+  {# The command palette (Ctrl+K, or / outside a box): go to any page or a
+     date, punch, start or stop the timer, start a recent task again, dark
+     mode. app.js fills the list as you type. #}
+  <dialog class="cp" id="palette" aria-labelledby="cp-title">
+    <div class="cp-inner">
+      <h2 class="visually-hidden" id="cp-title">Go to or do</h2>
+      <div class="cp-search">
+        {{ icon('search') }}
+        <input type="text" id="cp-input" role="combobox" aria-expanded="true" aria-controls="cp-list"
+               aria-autocomplete="list" autocomplete="off" spellcheck="false"
+               placeholder="Go to a page, a date like 12 nov, or start a task" aria-label="Go to or do">
+      </div>
+      <ul class="cp-list" id="cp-list" role="listbox" aria-label="Results"></ul>
+      <p class="visually-hidden" id="cp-status" aria-live="polite"></p>
+    </div>
+  </dialog>
 
   {# On a phone: the timer as a pill above the tabs -- its clock while one
      runs -- opening the whole bar in a sheet. #}

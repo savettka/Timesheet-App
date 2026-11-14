@@ -527,6 +527,36 @@ def punch_state(user_id, now):
     return "out", None
 
 
+@main_bp.route("/api/palette")
+@login_required
+def api_palette():
+    """What the command palette offers beyond the pages: the day's next
+    punches, the timer, and the last ten tasks to start again."""
+    now = datetime.now()
+    state, entry = punch_state(current_user.id, now)
+    punches = {
+        "out": [("Login", "main.punch_in")],
+        "done": [("Login again", "main.punch_in")],
+        "working": [("Break", "main.punch_break_start"), ("Logout", "main.punch_out")],
+        "break": [("Back from break", "main.punch_break_end")],
+        "stale": [],
+    }[state]
+    timer = timer_view(current_user, now)
+    day = logic.work_day(entry if state != "done" else None, now)
+    return jsonify(
+        state=state,
+        word=PUNCH_WORDS[state],
+        punches=[{"label": label, "url": url_for(endpoint)} for label, endpoint in punches],
+        fix_url=url_for("main.edit_entry", date_str=entry.date.isoformat()) if state == "stale" else None,
+        can_time=state == "working",
+        timer={"text": timer.text, "clock": timer.clock} if timer else None,
+        start_url=url_for("main.timer_start"),
+        stop_url=url_for("main.timer_stop"),
+        recent=recent_texts(current_user.id, day)[:10],
+        today=day.isoformat(),
+    )
+
+
 @main_bp.app_context_processor
 def inject_timer_bar():
     """The timer bar at the top of every signed-in page: what's being timed

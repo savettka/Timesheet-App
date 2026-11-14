@@ -1750,6 +1750,57 @@ select {
 }
 
 /* ==========================================================================
+   The command palette: Ctrl+K (or /) from anywhere -- a search box over a
+   list of places to go and things to do, chosen by keyboard or pointer.
+   ========================================================================== */
+
+.cp-open {
+  display: inline-flex; align-items: center; gap: var(--s2); flex-shrink: 0;
+  min-height: 40px; padding: 0 6px 0 var(--s3);
+  border: 1px solid var(--line); border-radius: 999px; background: var(--surface);
+  color: var(--text-2); font: inherit; font-size: 15px; cursor: pointer;
+}
+.cp-open:hover { background: var(--surface-2); color: var(--text); }
+.cp-open .icon { width: 17px; height: 17px; }
+.cp-kbd {
+  padding: 2px 7px; border-radius: 999px; background: var(--surface-2);
+  color: var(--text-3); font: 600 13px/1.5 var(--font);
+}
+@media (max-width: 1279px) {
+  .cp-open { width: 40px; padding: 0; justify-content: center; }
+  .cp-open-word, .cp-kbd { display: none; }
+}
+
+.cp {
+  position: fixed; inset: 12vh 0 auto 0; margin: 0 auto; padding: 0;
+  width: min(640px, calc(100vw - 2 * var(--s4))); max-width: none; max-height: 72vh;
+  border: 1px solid var(--card-border); border-radius: 18px;
+  background: var(--surface); color: var(--text); box-shadow: var(--shadow-lg); overflow: hidden;
+}
+.cp::backdrop { background: rgba(10, 12, 18, 0.35); }
+.cp-inner { display: flex; flex-direction: column; max-height: 72vh; }
+.cp-search { display: flex; align-items: center; gap: var(--s3); padding: 0 var(--s4); border-bottom: 1px solid var(--line); }
+.cp-search .icon { flex-shrink: 0; color: var(--text-3); }
+.cp-search input {
+  min-height: 58px; padding: 0; border: none; border-radius: 0; background: transparent; font-size: 17px;
+}
+.cp-search input:focus { box-shadow: none; }
+.cp-list { list-style: none; overflow-y: auto; padding: var(--s2); }
+.cp-list:empty { display: none; }
+.cp-item {
+  display: flex; align-items: center; gap: var(--s3); min-height: 44px; padding: 0 var(--s3);
+  border-radius: var(--r-md); cursor: pointer;
+}
+.cp-item[aria-selected="true"] { background: var(--accent-soft); color: var(--accent-text); }
+.cp-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; }
+.cp-kind { flex-shrink: 0; font-size: 13px; color: var(--text-3); }
+.cp-item[aria-selected="true"] .cp-kind { color: var(--accent-text); }
+@media (max-width: 899px) {
+  .cp { inset: max(var(--s4), env(safe-area-inset-top)) 0 auto 0; max-height: 80vh; }
+  .cp-inner { max-height: 80vh; }
+}
+
+/* ==========================================================================
    Your profile in a small window: from your name or photo at the top, or
    Settings' buttons. Under the name on a wide screen; on a phone, a sheet
    that slides up from the bottom.
@@ -1851,6 +1902,7 @@ select {
   .pay-table tbody tr { animation: stm-slide-in .5s var(--ease-out) backwards; animation-delay: calc(var(--i, 0) * 40ms); }
   .paid.is-saved:not(.is-editing) .paid-tick { animation: stm-pill-in .3s var(--ease-out); }
   .pf-pop[open] { animation: stm-drop-in .3s var(--ease-out); }
+  .cp[open] { animation: stm-drop-in .25s var(--ease-out); }
   .pf-sec[open] > .pf-form { animation: stm-drop-in .3s var(--ease-out); }
   .ts-line, .kb-card, .wb-card, .ta-line { transition: background-color .3s ease, box-shadow .3s ease, transform .16s var(--ease-out); }
 }

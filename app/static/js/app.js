@@ -1448,6 +1448,200 @@
     setInterval(tick, 1000);
   }
 
+  // -------------------------------------------------------------- palette
+  // Ctrl+K -- or / when no box has the cursor -- opens a search box over
+  // everything there is to do: go to a page or a day, Login, Break, Back or
+  // Logout as the day stands, start or stop the timer, start one of the last
+  // ten tasks again, dark mode. Arrows move, Enter chooses, Esc closes, and
+  // how many results there are is read out.
+  var MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+  var DAY_WORDS = /^(last )?(mon|monday|tue|tues|tuesday|wed|weds|wednesday|thu|thur|thurs|thursday|fri|friday|sat|saturday|sun|sunday)$/;
+
+  function isoDay(d) {
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+
+  // A day from what's typed: today, yesterday, friday, last friday, 12 nov,
+  // nov 12, 12 november 2026, 12/11 (the day first), 2026-11-12. Never a day
+  // still to come: a date with no year that hasn't come round yet is last
+  // year's. todayIso is the day being worked, as the server has it.
+  function paletteDay(text, todayIso) {
+    var q = text.trim().toLowerCase().replace(/[.,]/g, " ").replace(/\s+/g, " ");
+    var t = todayIso.split("-");
+    var today = new Date(+t[0], +t[1] - 1, +t[2]);
+    function back(n) { var d = new Date(today); d.setDate(d.getDate() - n); return d; }
+    if (q === "today") return today;
+    if (q === "yesterday") return back(1);
+    var m = q.match(DAY_WORDS), y = null, mo, d;
+    if (m) {
+      var gap = (today.getDay() - ["sun", "mon", "tue", "wed", "thu", "fri", "sat"].indexOf(m[2].slice(0, 3)) + 7) % 7;
+      return back(m[1] && !gap ? 7 : gap);  // last friday, on a Friday: a week ago
+    }
+    if ((m = q.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/))) { y = +m[1]; mo = +m[2] - 1; d = +m[3]; }
+    else if ((m = q.match(/^(\d{1,2})[\/-](\d{1,2})(?:[\/-](\d{2}|\d{4}))?$/))) { d = +m[1]; mo = +m[2] - 1; y = m[3] ? +m[3] : null; }
+    else if ((m = q.match(/^(\d{1,2})(?:st|nd|rd|th)? ([a-z]{3,})(?: (\d{4}))?$/))) { d = +m[1]; mo = MONTHS.indexOf(m[2].slice(0, 3)); y = m[3] ? +m[3] : null; }
+    else if ((m = q.match(/^([a-z]{3,}) (\d{1,2})(?:st|nd|rd|th)?(?: (\d{4}))?$/))) { mo = MONTHS.indexOf(m[1].slice(0, 3)); d = +m[2]; y = m[3] ? +m[3] : null; }
+    else return null;
+    if (mo < 0 || mo > 11 || d < 1 || d > 31) return null;
+    if (y !== null && y < 100) y += 2000;
+    var day = new Date(y === null ? today.getFullYear() : y, mo, d);
+    if (day.getMonth() !== mo) return null;  // 31 Feb
+    if (y === null && day > today) day.setFullYear(day.getFullYear() - 1);
+    return day > today ? null : day;
+  }
+
+  function initPalette() {
+    var dialog = document.getElementById("palette");
+    if (!dialog || typeof dialog.showModal !== "function") return;
+    var input = document.getElementById("cp-input");
+    var list = document.getElementById("cp-list");
+    var status = document.getElementById("cp-status");
+    var here = window.location.pathname + window.location.search;
+    var data = null, items = [], active = 0, spoken = null;
+
+    var pages = [].map.call(document.querySelectorAll(".side-nav a.nav-link"), function (a) {
+      return { label: a.textContent.trim(), url: a.getAttribute("href") };
+    });
+    [["Week timesheet", "/timesheet/week"], ["Every line written", "/timesheet/all"],
+     ["Calendar week", "/calendar/week"], ["Calendar day", "/calendar/day"]].forEach(function (p) {
+      pages.push({ label: p[0], url: p[1] });
+    });
+
+    function go(url) { return function () { window.location.href = url; }; }
+    function post(url, fields) {
+      return function () {
+        var form = document.createElement("form");
+        form.method = "post";
+        form.action = url;
+        Object.keys(fields).forEach(function (name) {
+          var box = document.createElement("input");
+          box.type = "hidden";
+          box.name = name;
+          box.value = fields[name];
+          form.appendChild(box);
+        });
+        document.body.appendChild(form);
+        if (form.requestSubmit) form.requestSubmit(); else form.submit();
+      };
+    }
+
+    function options(text) {
+      var q = text.trim(), out = [];
+      var words = q.toLowerCase().split(/\s+/).filter(Boolean);
+      function add(kind, label, run, also) {
+        var hay = (label + " " + kind + " " + (also || "")).toLowerCase();
+        if (words.every(function (w) { return hay.indexOf(w) >= 0; })) out.push({ kind: kind, label: label, run: run });
+      }
+      if (data && q) {
+        var day = paletteDay(q, data.today);
+        if (day) {
+          var name = day.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+          var iso = isoDay(day);
+          out.push({ kind: "Day", label: "Timesheet for " + name, run: go(iso === data.today ? "/timesheet" : "/timesheet/" + iso) });
+          out.push({ kind: "Day", label: "Calendar for " + name, run: go("/calendar/day/" + iso) });
+        }
+      }
+      if (data) {
+        data.punches.forEach(function (p) { add("Punch", p.label, post(p.url, {})); });
+        if (data.fix_url) add("Punch", "Put in the missing logout", go(data.fix_url));
+        if (data.timer) add("Timer", "Stop the timer: " + data.timer.text, post(data.stop_url, { back: here }));
+        if (data.can_time) {
+          data.recent.forEach(function (task) {
+            if (!data.timer || task !== data.timer.text) add("Task", "Start again: " + task, post(data.start_url, { text: task, back: here }));
+          });
+        }
+      }
+      pages.forEach(function (p) { add("Page", p.label, go(p.url)); });
+      add("Setting", currentTheme() === "dark" ? "Light mode" : "Dark mode", function () {
+        var toggle = document.querySelector(".js-theme-toggle");
+        if (toggle) toggle.click();
+      }, "dark light theme");
+      out = out.slice(0, 40);
+      // Words that aren't a place or a task yet: a new task to time, last.
+      if (data && data.can_time && q && data.recent.indexOf(q) < 0 && (!data.timer || data.timer.text !== q)) {
+        out.push({ kind: "Timer", label: "Start the timer: " + q, run: post(data.start_url, { text: q, back: here }) });
+      }
+      return out;
+    }
+
+    function select(i) {
+      var rows = list.querySelectorAll(".cp-item");
+      if (!rows.length) return;
+      active = (i + rows.length) % rows.length;
+      rows.forEach(function (row, n) { row.setAttribute("aria-selected", n === active ? "true" : "false"); });
+      input.setAttribute("aria-activedescendant", rows[active].id);
+      rows[active].scrollIntoView({ block: "nearest" });
+    }
+    function say(words) {
+      clearTimeout(spoken);
+      spoken = setTimeout(function () { status.textContent = words; }, 350);
+    }
+    function render() {
+      items = options(input.value);
+      list.innerHTML = "";
+      items.forEach(function (item, i) {
+        var row = document.createElement("li");
+        row.className = "cp-item";
+        row.id = "cp-opt-" + i;
+        row.setAttribute("role", "option");
+        var label = document.createElement("span");
+        label.className = "cp-label";
+        label.textContent = item.label;
+        var kind = document.createElement("span");
+        kind.className = "cp-kind";
+        kind.textContent = item.kind;
+        row.appendChild(label);
+        row.appendChild(kind);
+        row.addEventListener("pointermove", function () { if (active !== i) select(i); });
+        row.addEventListener("click", function () { choose(i); });
+        list.appendChild(row);
+      });
+      if (items.length) select(0); else input.removeAttribute("aria-activedescendant");
+      say(items.length ? items.length + (items.length === 1 ? " result" : " results") : "Nothing found");
+    }
+    function choose(i) {
+      var item = items[i];
+      if (!item) return;
+      dialog.close();
+      item.run();
+    }
+    function open() {
+      if (dialog.open || document.querySelector("dialog[open]")) return;
+      input.value = "";
+      render();
+      dialog.showModal();
+      input.focus();
+      fetch("/api/palette", { credentials: "same-origin", headers: { Accept: "application/json" } })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (got) { if (got) { data = got; if (dialog.open) render(); } })
+        .catch(function () { /* the pages are still there */ });
+    }
+
+    input.addEventListener("input", render);
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "ArrowDown") { e.preventDefault(); select(active + 1); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); select(active - 1); }
+      else if (e.key === "PageDown") { e.preventDefault(); select(Math.min(items.length - 1, active + 5)); }
+      else if (e.key === "PageUp") { e.preventDefault(); select(Math.max(0, active - 5)); }
+      else if (e.key === "Enter") { e.preventDefault(); choose(active); }
+    });
+    dialog.addEventListener("click", function (e) { if (e.target === dialog) dialog.close(); });
+    document.querySelectorAll(".cp-open").forEach(function (b) { b.addEventListener("click", open); });
+    document.addEventListener("keydown", function (e) {
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key === "k" || e.key === "K")) {
+        e.preventDefault();
+        if (dialog.open) dialog.close(); else open();
+        return;
+      }
+      var t = e.target;
+      var typing = t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
+      if (e.key === "/" && !typing && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        open();
+      }
+    });
+  }
+
   // ------------------------------------------------------------ timer bar
   // On a phone the bar lives in a sheet, opened from the pill above the
   // tabs. Back on a tab left open a while: if the timer or the day has moved
@@ -1554,6 +1748,7 @@
     initPageWait();
     initTimerClock();
     initTimerBar();
+    initPalette();
     initCalendarGrid();
     initWeekCopy();
     initBoards();
