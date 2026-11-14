@@ -82,6 +82,39 @@
     </button>
   {% endmacro %}
 
+  {# The timer bar: where the day is (a dot and a word), and what's being
+     timed with its clock and Stop -- or a box to start one. Across the top
+     on a wide screen; on a phone in a sheet from the pill above the tabs.
+     Start and Stop come back to this page. #}
+  {% macro timer_controls(where) %}
+    {% set back = request.full_path if request.query_string else request.path %}
+    <div class="tb tb-{{ where }}" data-state="{{ bar.state }}"{% if bar.timer %} data-elapsed="{{ bar.timer.elapsed }}"{% endif %}>
+      <a class="tb-state" href="{{ url_for('main.edit_entry', date_str=bar.stale_day.isoformat()) if bar.stale_day else url_for('main.dashboard') }}"
+         title="{{ bar.word }}"><span class="tb-dot" aria-hidden="true"></span><span class="tb-word">{{ bar.word }}</span></a>
+      {% if bar.timer %}
+      <div class="tb-run">
+        <span class="tb-text" title="{{ bar.timer.text }}">{{ bar.timer.text }}</span>
+        <span class="tb-clock timer-clock" aria-label="Running for">{{ bar.timer.clock }}</span>
+        <form method="post" action="{{ url_for('main.timer_stop') }}" class="js-once" autocomplete="off">
+          <input type="hidden" name="back" value="{{ back }}">
+          <button type="submit" class="btn btn-stop tb-btn" aria-label="Stop the timer: {{ bar.timer.text }}">{{ icon('stop') }}<span class="tb-btn-word">Stop</span></button>
+        </form>
+      </div>
+      {% endif %}
+      {% if bar.can_time and (where == 'sheet' or not bar.timer) %}
+      <form method="post" action="{{ url_for('main.timer_start') }}" class="tb-new js-once" autocomplete="off">
+        <input type="hidden" name="back" value="{{ back }}">
+        <input type="text" name="text" maxlength="300" required autocomplete="off"
+               {%- if bar.recent %} list="tb-recent-{{ where }}"{% endif %}
+               placeholder="{{ 'Switch to…' if bar.timer else 'What are you working on?' }}"
+               aria-label="{{ 'Switch the timer to' if bar.timer else 'Start the timer on' }}">
+        <button type="submit" class="btn btn-primary tb-btn">{{ icon('play') }}<span class="tb-btn-word">Start</span></button>
+        {% if bar.recent %}<datalist id="tb-recent-{{ where }}">{% for text in bar.recent %}<option value="{{ text }}">{% endfor %}</datalist>{% endif %}
+      </form>
+      {% endif %}
+    </div>
+  {% endmacro %}
+
   {% if current_user.is_authenticated %}
   {# The menu in three groups, as time trackers lay it out: what you track,
      what you look back on, and your own settings. Pay joins once there's a
@@ -138,6 +171,7 @@
           {{ stm_logo('logo-mark') }}
         </a>
         <h1 class="page-title">{% block page_title %}STM{% endblock %}</h1>
+        {{ timer_controls('bar') }}
         {{ theme_toggle('theme-toggle-icon') }}
         <a class="topbar-user" href="{{ url_for('main.settings') }}" data-profile-open=""
            aria-haspopup="dialog" aria-controls="profile-pop">
@@ -163,6 +197,36 @@
       {% endfor %}
     </nav>
   </div>
+
+  {# On a phone: the timer as a pill above the tabs -- its clock while one
+     runs -- opening the whole bar in a sheet. #}
+  <button type="button" class="tb-pill" data-state="{{ bar.state }}" aria-haspopup="dialog" aria-controls="tb-sheet"
+          aria-label="Timer{{ ': ' ~ bar.timer.text if bar.timer else '' }}, {{ bar.word }}">
+    <span class="tb-dot" aria-hidden="true"></span>
+    {%- if bar.timer %}<span class="timer-clock" aria-hidden="true">{{ bar.timer.clock }}</span>
+    {%- else %}{{ icon('play') }}{% endif %}
+  </button>
+  <dialog class="pf-pop tb-modal" id="tb-sheet" aria-labelledby="tb-sheet-title">
+    <div class="pf-inner">
+      <div class="pf-head">
+        <div class="pf-who"><p class="pf-name" id="tb-sheet-title">Timer</p></div>
+        <button type="button" class="btn btn-icon pf-close" data-sheet-close aria-label="Close">{{ icon('x') }}</button>
+      </div>
+      {{ timer_controls('sheet') }}
+      {% if bar.can_time and bar.recent %}
+      {% set back = request.full_path if request.query_string else request.path %}
+      <ul class="tb-again">
+        {% for text in bar.recent[:5] if not bar.timer or text != bar.timer.text %}
+        <li><form method="post" action="{{ url_for('main.timer_start') }}" class="js-once" autocomplete="off">
+          <input type="hidden" name="back" value="{{ back }}">
+          <input type="hidden" name="text" value="{{ text }}">
+          <button type="submit" class="pf-row" aria-label="Start {{ text }}">{{ icon('play') }}<span>{{ text }}</span></button>
+        </form></li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+    </div>
+  </dialog>
 
   {# Your own settings in a small window (app.js opens it from your name or
      photo, and from Settings): profile, password, dark mode, sign out. Each

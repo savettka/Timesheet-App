@@ -58,7 +58,10 @@ This mirrors the logic in the original spreadsheet:
   are copied. Lines can be added or deleted, and the day can be downloaded as a branded PNG
   with one button. Type and press Enter to save; a day with no login starts at 1 PM, and
   earlier days work the same way.
-- **Timer** — type what you're working on and press Start (Home or today's Timesheet).
+- **Timer** — type what you're working on and press Start: in the bar across the top of
+  every page (on a phone, the pill above the tabs), on Home or on today's Timesheet. The
+  bar also shows where the day is -- logged in, on a break, logged out -- and Start or
+  Stop leaves you on the page you were on.
   Stop, Break or Logout writes the Timesheet line with the exact times; starting another
   task writes the running one first. The latest tasks are a tap from starting again.
 - **Saves as you type** — the Timesheet saves a moment after typing stops (or when a box is

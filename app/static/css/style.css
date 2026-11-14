@@ -1685,6 +1685,71 @@ select {
 }
 
 /* ==========================================================================
+   The timer bar: across the top of every page -- where the day is, and the
+   timer with its clock -- and on a phone a pill above the tabs that opens
+   it in a sheet.
+   ========================================================================== */
+
+.tb { display: flex; align-items: center; gap: var(--s2); min-width: 0; }
+.tb-bar { flex: 0 1 auto; margin-left: auto; }
+.tb-state {
+  display: inline-flex; align-items: center; gap: 7px; flex-shrink: 0;
+  min-height: 40px; padding: 0 var(--s2); border-radius: 999px;
+  color: var(--text-2); font-size: 14px; font-weight: 600; text-decoration: none; white-space: nowrap;
+}
+.tb-state:hover { background: var(--surface-2); color: var(--text); }
+.tb-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; background: var(--text-3); }
+[data-state="working"] .tb-dot { background: var(--go); }
+[data-state="break"] .tb-dot { background: var(--pause); }
+[data-state="stale"] .tb-dot { background: var(--stop); }
+.tb-run {
+  display: flex; align-items: center; gap: var(--s2); min-width: 0;
+  padding: 3px 3px 3px var(--s3); border-radius: 999px; background: var(--success-bg);
+}
+.tb-text { min-width: 0; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 600; }
+.tb-clock { font-size: 15px; font-weight: 700; color: var(--success-text); font-variant-numeric: tabular-nums; }
+.tb-new { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.tb-bar .tb-new input { width: clamp(140px, 22vw, 280px); min-height: 40px; font-size: 15px; }
+.tb-btn { min-height: 40px; padding: 0 var(--s4); border-radius: 999px; font-size: 15px; }
+.tb-btn .icon { width: 17px; height: 17px; }
+@media (max-width: 1279px) {
+  .tb-bar .tb-word, .tb-bar .tb-btn-word {
+    position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+  }
+  .tb-bar .tb-btn { padding: 0; width: 40px; }
+  .tb-bar .tb-text { max-width: 160px; }
+}
+
+.tb-pill, .tb-modal { display: none; }
+.tb-modal .tb { flex-wrap: wrap; padding: var(--s1) var(--s1) var(--s3); }
+.tb-modal .tb-run { flex: 1 1 100%; }
+.tb-modal .tb-text { flex: 1; max-width: none; }
+.tb-modal .tb-new { flex: 1 1 100%; }
+.tb-modal .tb-new input { flex: 1; min-width: 0; font-size: 16px; }
+.tb-again { list-style: none; display: flex; flex-direction: column; gap: 2px; padding-top: var(--s2); border-top: 1px solid var(--line); }
+.tb-again .pf-row { width: 100%; border: none; background: transparent; font: inherit; text-align: left; }
+.tb-again .pf-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+@media (max-width: 899px) {
+  .tb-bar { display: none; }
+  .tb-pill {
+    position: fixed; z-index: 35;
+    right: max(var(--s4), env(safe-area-inset-right));
+    bottom: calc(var(--tab-h) + env(safe-area-inset-bottom) + var(--s3));
+    display: inline-flex; align-items: center; justify-content: center; gap: var(--s2);
+    min-width: 48px; min-height: 48px; padding: 0 var(--s4);
+    border: 1px solid var(--card-border); border-radius: 999px;
+    background: var(--surface); color: var(--text); box-shadow: var(--shadow-lg);
+    font: inherit; font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; cursor: pointer;
+  }
+  .tb-pill[data-state="working"] { border-color: color-mix(in srgb, var(--go) 45%, var(--card-border)); }
+  .tb-pill .icon { width: 18px; height: 18px; }
+  .tb-modal { display: revert; }
+  .tb-modal:not([open]) { display: none; }
+  .content { padding-bottom: calc(var(--tab-h) + 88px + env(safe-area-inset-bottom)); }
+}
+
+/* ==========================================================================
    Your profile in a small window: from your name or photo at the top, or
    Settings' buttons. Under the name on a wide screen; on a phone, a sheet
    that slides up from the bottom.
@@ -1740,7 +1805,7 @@ select {
 }
 
 @media print {
-  .sidebar, .tab-bar, .menu-toggle, .topbar .theme-toggle-icon, .topbar-user, .flash-stack,
+  .sidebar, .tab-bar, .menu-toggle, .tb-bar, .tb-pill, .topbar .theme-toggle-icon, .topbar-user, .flash-stack,
   .actions, .skip-link, .c-go, .month-actions { display: none !important; }
   body, .card { background: #fff; color: #000; box-shadow: none; }
   .content { padding: 0; }

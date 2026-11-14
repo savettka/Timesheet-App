@@ -1431,18 +1431,61 @@
   // ------------------------------------------------------------ timer
   // The running timer's clock, counting on from the seconds the page was
   // given, so it stays right however long the page is left open.
+  // One clock for every place the running timer shows -- the card on Home
+  // and the Timesheet, the bar at the top, the pill on a phone.
   function initTimerClock() {
-    var run = document.querySelector(".timer-run[data-elapsed]");
-    if (!run) return;
-    var clock = run.querySelector(".timer-clock");
-    var started = Date.now() - parseInt(run.dataset.elapsed, 10) * 1000;
+    var source = document.querySelector("[data-elapsed]");
+    var clocks = document.querySelectorAll(".timer-clock");
+    if (!source || !clocks.length) return;
+    var started = Date.now() - parseInt(source.dataset.elapsed, 10) * 1000;
     function pad(n) { return (n < 10 ? "0" : "") + n; }
     function tick() {
       var s = Math.max(0, Math.floor((Date.now() - started) / 1000));
-      clock.textContent = Math.floor(s / 3600) + ":" + pad(Math.floor(s / 60) % 60) + ":" + pad(s % 60);
+      var text = Math.floor(s / 3600) + ":" + pad(Math.floor(s / 60) % 60) + ":" + pad(s % 60);
+      clocks.forEach(function (clock) { clock.textContent = text; });
     }
     tick();
     setInterval(tick, 1000);
+  }
+
+  // ------------------------------------------------------------ timer bar
+  // On a phone the bar lives in a sheet, opened from the pill above the
+  // tabs. Back on a tab left open a while: if the timer or the day has moved
+  // on elsewhere since, the page is fetched afresh -- unless something's
+  // being typed.
+  function initTimerBar() {
+    var pill = document.querySelector(".tb-pill");
+    var sheet = document.getElementById("tb-sheet");
+    if (pill && sheet && typeof sheet.showModal === "function") {
+      pill.addEventListener("click", function () {
+        sheet.showModal();
+        var box = sheet.querySelector('.tb-new input[name="text"]');
+        if (box) box.focus();
+      });
+      sheet.addEventListener("click", function (e) {
+        if (e.target === sheet || (e.target.closest && e.target.closest("[data-sheet-close]"))) sheet.close();
+      });
+      sheet.addEventListener("submit", function () { sheet.close(); });
+    }
+    var bar = document.querySelector(".tb-bar");
+    if (!bar || !window.fetch) return;
+    var text = bar.querySelector(".tb-text");
+    var shown = { state: bar.dataset.state, timer: text ? text.textContent : "" };
+    document.addEventListener("visibilitychange", function () {
+      if (document.visibilityState !== "visible") return;
+      fetch("/api/status", { credentials: "same-origin", headers: { Accept: "application/json" } })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (now) {
+          if (!now) return;
+          var state = now.day_state === "ready" ? "out" : now.day_state;
+          var timer = now.timer ? now.timer.text : "";
+          var busy = document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
+          if ((timer !== shown.timer || state !== shown.state) && !busy && !document.querySelector("dialog[open]")) {
+            window.location.reload();
+          }
+        })
+        .catch(function () { /* offline: the bar stays as it was */ });
+    });
   }
 
   // ------------------------------------------------------------ page wait
@@ -1510,6 +1553,7 @@
     initForms();
     initPageWait();
     initTimerClock();
+    initTimerBar();
     initCalendarGrid();
     initWeekCopy();
     initBoards();

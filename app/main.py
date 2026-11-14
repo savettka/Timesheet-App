@@ -391,6 +391,10 @@ def api_status():
             * 3600
         ),
         "suggestion": ctx["suggestion"],
+        "timer": (
+            {"text": current_user.timer_text or "", "elapsed": timer_view(current_user, now).elapsed}
+            if current_user.timer_start is not None else None
+        ),
         "saturday": (
             {
                 **ctx["saturday"],
@@ -496,7 +500,46 @@ def stop_timer(user, entry, when):
 
 
 def timer_back():
-    return url_for("main.timesheet" if request.form.get("back") == "timesheet" else "main.dashboard")
+    """Where Start or Stop goes back to: the page it was pressed on -- the
+    timer bar sends its own address -- or Home."""
+    back = request.form.get("back", "")
+    if back == "timesheet":
+        return url_for("main.timesheet")
+    return local_path(back) or url_for("main.dashboard")
+
+
+# What the dot and word in the timer bar say for each moment of the day.
+PUNCH_WORDS = {"working": "Logged in", "break": "On break", "done": "Logged out",
+               "out": "Not logged in", "stale": "Logout missing"}
+
+
+def punch_state(user_id, now):
+    """Where the day is: working, on a break, done (logged out today), out
+    (not logged in yet) or stale (a logout forgotten) -- and the shift."""
+    entry = get_open_entry(user_id)
+    if entry is not None:
+        if logic.is_stale_shift(entry, now):
+            return "stale", entry
+        return ("break" if entry.open_break() else "working"), entry
+    today = TimeEntry.query.filter_by(user_id=user_id, date=now.date()).first()
+    if today is not None and today.login_time and today.logout_time:
+        return "done", today
+    return "out", None
+
+
+@main_bp.app_context_processor
+def inject_timer_bar():
+    """The timer bar at the top of every signed-in page: what's being timed
+    and for how long, or a box to start, and where the day is."""
+    if not current_user.is_authenticated:
+        return {}
+    now = datetime.now()
+    state, entry = punch_state(current_user.id, now)
+    return {"bar": SimpleNamespace(
+        state=state, word=PUNCH_WORDS[state], timer=timer_view(current_user, now),
+        can_time=state == "working", stale_day=entry.date if state == "stale" else None,
+        recent=recent_texts(current_user.id, logic.work_day(entry if state != "done" else None, now))[:10],
+    )}
 
 
 @main_bp.route("/timer/start", methods=["POST"])
