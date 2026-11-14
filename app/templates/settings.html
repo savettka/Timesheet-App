@@ -170,7 +170,7 @@
     <form method="post" class="form" autocomplete="off">
       <input type="hidden" name="form_type" value="reminders">
       <ul class="goal-rows">
-        {% for key in ('no_login', 'long_day', 'long_break', 'unwritten') %}
+        {% for key in ('no_login', 'long_day', 'long_break', 'unwritten', 'idle') %}
         <li class="goal-row">
           <label class="goal-on">
             <input type="checkbox" name="{{ key }}_on" value="1" {{ 'checked' if reminder[key].on }}>
@@ -186,11 +186,16 @@
             <span class="goal-unit" aria-hidden="true">h</span>
             {% elif key == 'long_break' %}
             <span class="goal-fixed">{{ user.weekday_break_minutes }}m · Sat {{ user.saturday_break_minutes }}m</span>
+            {% elif key == 'idle' %}
+            <input type="number" name="idle_minutes" value="{{ reminder.idle.minutes }}" min="5" max="240" step="5"
+                   inputmode="numeric" aria-label="{{ reminder_names[key] }}, minutes" aria-describedby="idle-hint">
+            <span class="goal-unit" aria-hidden="true">m</span>
             {% endif %}
           </span>
         </li>
         {% endfor %}
       </ul>
+      <p class="hint" id="idle-hint">Away counts only STM's pages in this browser, not other programs.</p>
       <p class="notify-row" hidden>
         <span class="notify-state">Browser notifications</span>
         <button type="button" class="btn btn-secondary btn-sm" data-notify>Turn on</button>

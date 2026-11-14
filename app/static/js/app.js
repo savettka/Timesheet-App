@@ -1621,6 +1621,74 @@
     });
   }
 
+  // ------------------------------------------------------------ idle
+  // While the timer runs, a stretch with no pointer or key activity on any
+  // STM page is noticed when activity comes back; past the wait set in
+  // Settings it asks what to do with it. It can't see work in other
+  // programs -- only this browser's STM pages.
+  function initIdle() {
+    var dialog = document.getElementById("idle-dialog");
+    if (!dialog || !dialog.showModal || !window.fetch) return;
+    var wait = parseInt(dialog.dataset.minutes, 10) * 60000;
+    var timerFrom = Date.now() - parseInt(dialog.dataset.elapsed, 10) * 1000;
+    var status = dialog.querySelector(".idle-status");
+    var KEY = "stm-active", last = 0, saved = 0, away = 0;
+
+    function shared() {
+      try { return parseInt(localStorage.getItem(KEY) || "0", 10) || 0; } catch (e) { return 0; }
+    }
+    function words(ms) {
+      var m = Math.round(ms / 60000), h = Math.floor(m / 60);
+      m %= 60;
+      return (h ? h + (h === 1 ? " hour" : " hours") : "") + (h && m ? " " : "") +
+        (m || !h ? m + (m === 1 ? " minute" : " minutes") : "");
+    }
+    function active() {
+      if (dialog.open) return;
+      var now = Date.now();
+      // The last activity on any STM page, and never before the timer began.
+      var since = Math.max(last, shared(), timerFrom);
+      if (since && now - since >= wait) {
+        away = now - since;
+        dialog.querySelector("[data-idle-away]").textContent = words(away);
+        status.textContent = "";
+        dialog.showModal();
+        dialog.querySelector('[data-idle-act="keep"]').focus();
+      }
+      last = now;
+      if (now - saved > 5000) {
+        saved = now;
+        try { localStorage.setItem(KEY, String(now)); } catch (e) { /* storage blocked */ }
+      }
+    }
+    // A page opened counts as coming back too.
+    last = shared() ? 0 : Date.now();
+    active();
+    ["pointerdown", "pointermove", "keydown", "wheel", "touchstart"].forEach(function (name) {
+      document.addEventListener(name, active, { passive: true, capture: true });
+    });
+    document.addEventListener("visibilitychange", function () { if (!document.hidden) active(); });
+
+    dialog.addEventListener("click", function (e) {
+      var button = e.target.closest("[data-idle-act]");
+      if (!button) return;
+      var act = button.dataset.idleAct;
+      if (act === "keep") { dialog.close(); last = Date.now(); return; }
+      var body = new FormData();
+      body.append("action", act);
+      body.append("away", String(Math.round(away / 1000)));
+      fetch(dialog.dataset.url, { method: "POST", body: body, credentials: "same-origin",
+                                  headers: { Accept: "application/json" } })
+        .then(function (r) { if (!r.ok) throw new Error("not saved"); return r.json(); })
+        .then(function (done) {
+          if (done.ok) { window.location.reload(); return; }
+          status.textContent = done.message;
+        })
+        .catch(function () { status.textContent = "Couldn't save that. Try again."; });
+    });
+    dialog.addEventListener("close", function () { last = Date.now(); });
+  }
+
   // Settings: browser notifications, asked for only when this is pressed.
   function initNotifySetting() {
     var row = document.querySelector(".notify-row");
@@ -2537,6 +2605,7 @@
     initArrange();
     initReminders();
     initNotifySetting();
+    initIdle();
     initBoards();
     initAutosave();
     initSlideOrder();

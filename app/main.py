@@ -849,11 +849,52 @@ def inject_timer_bar():
         return {}
     now = datetime.now()
     state, entry = punch_state(current_user.id, now)
+    timer = timer_view(current_user, now)
+    idle = reminders.settings_for(current_user)["idle"]
     return {"bar": SimpleNamespace(
-        state=state, word=PUNCH_WORDS[state], timer=timer_view(current_user, now),
+        state=state, word=PUNCH_WORDS[state], timer=timer,
         can_time=state == "working", stale_day=entry.date if state == "stale" else None,
         recent=recent_texts(current_user.id, logic.work_day(entry if state != "done" else None, now))[:10],
+        # The idle prompt's wait in minutes, while a timer runs on a shift.
+        idle=idle["minutes"] if idle["on"] and timer is not None and state == "working" else None,
     )}
+
+
+@main_bp.route("/timer/idle", methods=["POST"])
+@login_required
+def timer_idle():
+    """The idle prompt's answer (app.js, initIdle), for the `away` seconds up
+    to now with no activity on the page: keep them on the timer's line, make
+    them a break -- the line ends where the time away began and carries on
+    after it -- or drop them: the line ends there and the timer stops."""
+    action = request.form.get("action", "")
+    away = request.form.get("away", "")
+    if action not in ("keep", "break", "drop") or not (away.isascii() and away.isdigit() and len(away) < 9):
+        abort(400)
+    user, now = current_user, datetime.now()
+    if user.timer_start is None:
+        return jsonify(ok=False, message="The timer isn't running any more.")
+    if action == "keep":
+        return jsonify(ok=True, message="Kept on the timer.")
+    entry = get_open_entry(user.id)
+    if entry is None or logic.is_stale_shift(entry, now) or entry.open_break() is not None:
+        return jsonify(ok=False, message="You're not working on a shift right now.")
+    since = max(now - timedelta(seconds=int(away)), user.timer_start)
+    if action == "break":
+        since = max(since, logic.last_mark_dt(entry, now))
+    if now - since < timedelta(minutes=1):
+        return jsonify(ok=False, message="That was under a minute: nothing to change.")
+    text, length = user.timer_text, logic.fmt_duration((now - since).total_seconds() / 3600)
+    stop_timer(user, entry, since)
+    if action == "break":
+        db.session.add(BreakSegment(entry_id=entry.id, break_start=since.time(), break_end=now.time()))
+        user.timer_start, user.timer_text = now, text  # the line carries on after the break
+        message = f"Made the {length} away a break, {logic.fmt_time(since.time())} to {logic.fmt_time(now.time())}."
+    else:
+        message = f"Dropped the {length} away: {text} ends at {logic.fmt_time(since.time())}."
+    db.session.commit()
+    flash(message, "success")
+    return jsonify(ok=True, message=message)
 
 
 @main_bp.route("/timer/start", methods=["POST"])

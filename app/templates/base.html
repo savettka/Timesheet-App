@@ -208,6 +208,22 @@
     </nav>
   </div>
 
+  {% if bar and bar.idle %}
+  {# The idle prompt (app.js, initIdle): back after a while with no activity
+     here while the timer runs -- what to do with the time away. #}
+  <dialog class="cg-dialog idle-dialog" id="idle-dialog" aria-labelledby="idle-title" aria-describedby="idle-text"
+          data-url="{{ url_for('main.timer_idle') }}" data-minutes="{{ bar.idle }}" data-elapsed="{{ bar.timer.elapsed }}">
+    <h2 class="card-title" id="idle-title">You were away for <span data-idle-away></span></h2>
+    <p class="idle-text" id="idle-text">Keep it on {{ bar.timer.text }}, make it a break, or drop it from the task?</p>
+    <div class="idle-acts">
+      <button type="button" class="btn btn-secondary" data-idle-act="keep">{{ icon('check') }}Keep it</button>
+      <button type="button" class="btn btn-secondary" data-idle-act="break">{{ icon('coffee') }}Make it a break</button>
+      <button type="button" class="btn btn-danger-ghost" data-idle-act="drop">{{ icon('x') }}Drop it</button>
+    </div>
+    <p class="idle-status" role="status"></p>
+  </dialog>
+  {% endif %}
+
   {# The command palette (Ctrl+K, or / outside a box): go to any page or a
      date, punch, start or stop the timer, start a recent task again, dark
      mode. app.js fills the list as you type. #}

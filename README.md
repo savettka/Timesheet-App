@@ -144,6 +144,11 @@ This mirrors the logic in the original spreadsheet:
   than your usual allowance, or the last day worked has lines to fill in. Put one away with
   its x (it stays away that day); set each in **Settings → Reminders**, where browser
   notifications can be turned on too -- asked for only when you press the button.
+- **Idle prompt** (off unless switched on in **Settings → Reminders**) — while the timer runs,
+  coming back after the set minutes with no mouse or key activity on STM's pages asks what to
+  do with the time away: keep it on the task, make it a break (the line splits around it), or
+  drop it (the line ends where you went). It only sees STM's pages in this browser, so time
+  spent working in other programs looks like time away too.
 - **Settings** — change daily/weekly targets, workdays and your salary.
 - **More room** — the button at the top left hides the side menu entirely (the logo in the
   top bar still goes home); press it again to bring the menu back. The browser remembers.

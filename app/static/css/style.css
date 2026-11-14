@@ -2164,6 +2164,13 @@ a.hm-day:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 .notify-state { font-weight: 600; }
 .goal-fixed { color: var(--text-3); font-size: 15px; font-variant-numeric: tabular-nums; }
 
+/* The idle prompt: back after time away while the timer runs. */
+.idle-text { margin-top: var(--s2); color: var(--text-2); line-height: 1.5; overflow-wrap: anywhere; }
+.idle-acts { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s4); }
+.idle-acts .btn { flex: 1 1 auto; min-height: 44px; }
+.idle-status { margin-top: var(--s2); min-height: 1.4em; font-size: 15px; color: var(--error-text); }
+@media (prefers-reduced-motion: no-preference) { .idle-dialog[open] { animation: stm-sheet-up .36s var(--ease-out); } }
+
 /* Settings: a goal a row -- on or off, and its value. */
 .goal-rows { list-style: none; display: flex; flex-direction: column; gap: var(--s2); }
 .goal-row { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); min-height: 48px; }
