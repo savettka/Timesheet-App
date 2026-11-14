@@ -1,0 +1,30 @@
+{% from "partials/icons.html" import icon %}
+{#
+  Tick boxes on Timesheet lines, and the bar that acts on the ticked ones
+  (app.js, initBatch). Both need the script, so both start hidden.
+#}
+{% macro pick(label, ids="", lines=none, off=false) %}
+<label class="pick" hidden>
+  <input type="checkbox" class="js-pick"{% if ids %} data-ids="{{ ids }}"{% endif %}
+         {%- if lines %} data-lines='{{ lines|tojson }}'{% endif %}{% if off %} disabled{% endif %}>
+  <span class="visually-hidden">Choose {{ label }}</span>
+</label>
+{% endmacro %}
+
+{% macro batch_bar(back) %}
+<form id="bb" class="bb" method="post" action="{{ url_for('main.timesheet_batch') }}" autocomplete="off"
+      aria-label="Chosen lines" hidden>
+  <input type="hidden" name="back" value="{{ back }}">
+  <input type="hidden" name="ids" value="">
+  <input type="hidden" name="action" value="">
+  <p class="bb-count" aria-live="polite"><b>0</b> <span class="bb-chosen">chosen</span></p>
+  <button type="button" class="btn btn-ghost bb-all" aria-label="Choose all">All</button>
+  <span class="bb-gap"></span>
+  <button type="button" class="btn btn-secondary bb-act" data-action="copy" title="Copy">{{ icon('copy') }}<span class="bb-word">Copy</span></button>
+  <button type="button" class="btn btn-secondary bb-act" data-action="mark" aria-label="Mark posted" title="Mark posted">{{ icon('check') }}<span class="bb-word">Posted</span></button>
+  <button type="button" class="btn btn-secondary bb-act" data-action="unmark" aria-label="Mark not posted" title="Mark not posted">{{ icon('undo') }}<span class="bb-word">Not posted</span></button>
+  <button type="button" class="btn btn-danger-ghost bb-act" data-action="delete" title="Delete">{{ icon('trash') }}<span class="bb-word">Delete</span></button>
+  <button type="button" class="btn btn-icon bb-clear" aria-label="Clear the choice" title="Clear">{{ icon('x') }}</button>
+</form>
+<p class="visually-hidden" aria-live="polite" id="bb-status"></p>
+{% endmacro %}

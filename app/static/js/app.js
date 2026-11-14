@@ -580,6 +580,13 @@
 
   function lineWords(line) { return field(line, "text").value.trim().split(/\s+/).join(" "); }
 
+  // A line as Copy puts it on the clipboard: "Emails (13:00 to 14:00 PM)".
+  function lineCopy(line) {
+    var text = lineWords(line), from = field(line, "start").value, to = field(line, "end").value;
+    var half = parseInt(to, 10) >= 12 ? " PM" : " AM";
+    return from && to ? text + " (" + from + " to " + to + half + ")" : text;
+  }
+
   // What a copy of a line says, as the server keeps it: "13:00-14:00 Emails".
   function copyMark(line) {
     return field(line, "start").value + "-" + field(line, "end").value + " " + lineWords(line);
@@ -691,18 +698,14 @@
       var button = e.target.closest(".ts-copy");
       if (!button) return;
       var line = button.closest(".ts-line");
-      var text = lineWords(line);
-      var from = field(line, "start").value;
-      var to = field(line, "end").value;
       button.classList.remove("is-failed");
       if (note) note.hidden = true;
-      if (!text) {
+      if (!lineWords(line)) {
         say("Nothing to copy yet: this line is empty.");
         field(line, "text").focus();
         return;
       }
-      var half = parseInt(to, 10) >= 12 ? " PM" : " AM";
-      var copy = from && to ? text + " (" + from + " to " + to + half + ")" : text;
+      var copy = lineCopy(line);
       button.focus();  // Safari doesn't focus a clicked button by itself
       copyText(copy).then(function () {
         say("Copied: " + copy);
@@ -1176,6 +1179,7 @@
         .then(function () {
           busy = false;
           if (waiting && !timer) run();
+          else status.dispatchEvent(new CustomEvent("stm:saved"));
         });
     }
     function soon(ms) {
@@ -1198,6 +1202,22 @@
       e.stopPropagation();
       run();
     });
+    // The batch bar, before it acts on lines: anything typed is saved first,
+    // and then it goes on (stm:flush, whose detail.done is called).
+    var flushed = [];
+    form.addEventListener("stm:flush", function (e) {
+      e.detail.handled = true;
+      flushed.push(e.detail.done);
+      if (timer) run();
+      else if (!busy && !waiting) settle();
+    });
+    function settle() {
+      if (busy || waiting || timer) return;
+      var calls = flushed;
+      flushed = [];
+      calls.forEach(function (done) { done(); });
+    }
+    status.addEventListener("stm:saved", settle);
     // Leaving with a save still waiting: send it on the way out.
     window.addEventListener("pagehide", function () {
       if (timer || waiting) {
@@ -1361,6 +1381,148 @@
         word.textContent = "Couldn't copy";
       });
     });
+  }
+
+  // ------------------------------------------------------------ batch
+  // Tick boxes on Timesheet lines -- Day, Week and All -- and a bar for the
+  // ticked ones: copy them, mark them posted or not, or delete them, all at
+  // once. Shift+click ticks a run of them; Esc clears.
+  function initBatch() {
+    var bar = document.getElementById("bb");
+    if (!bar) return;
+    var status = document.getElementById("bb-status");
+    var count = bar.querySelector(".bb-count b");
+    var day = document.querySelector(".ts-form");  // the Day page: saved as typed
+    var last = null, sending = false;
+    document.querySelectorAll(".pick").forEach(function (p) { p.hidden = false; });
+
+    function picks() { return [].slice.call(document.querySelectorAll(".js-pick")); }
+    function chosen() { return picks().filter(function (p) { return p.checked && !p.disabled; }); }
+    function say(words) { if (status) status.textContent = words; }
+    function refresh() {
+      picks().forEach(function (p) {
+        var row = p.closest(".ts-line, .ta-line, tr");
+        if (row) row.classList.toggle("is-picked", p.checked && !p.disabled);
+      });
+      var n = chosen().length;
+      count.textContent = n;
+      if (bar.hidden !== !n) {
+        bar.hidden = !n;
+        if (n) document.documentElement.setAttribute("data-batch", "");
+        else document.documentElement.removeAttribute("data-batch");
+      }
+    }
+    function clear() {
+      var first = chosen()[0];
+      picks().forEach(function (p) { p.checked = false; });
+      refresh();
+      if (first) first.focus();
+    }
+    // How many lines are ticked: a Week row is every line it adds up.
+    function lineCount() {
+      return chosen().reduce(function (n, p) { return n + (p.dataset.ids ? p.dataset.ids.split(",").length : 1); }, 0);
+    }
+    function ids() {
+      return chosen().map(function (p) {
+        var line = p.closest(".ts-line");
+        return line ? field(line, "id").value : p.dataset.ids || "";
+      }).filter(Boolean).join(",");
+    }
+    // [day, heading, start, words] for each ticked line; a Day line from its boxes.
+    function linesOf(p) {
+      var line = p.closest(".ts-line");
+      if (line) return [["", "", clockMinutes(field(line, "start").value, "start") || 0, lineCopy(line)]];
+      try { return JSON.parse(p.dataset.lines || "[]"); } catch (err) { return []; }
+    }
+    // As Copy week puts it: a heading a day, when there's more than one day.
+    function copyWords() {
+      var list = [].concat.apply([], chosen().map(linesOf));
+      list.sort(function (a, b) { return a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : a[2] - b[2]; });
+      var many = list.some(function (l) { return l[0] !== list[0][0]; });
+      var out = [], at = null;
+      list.forEach(function (l) {
+        if (many && l[0] !== at) {
+          if (out.length) out.push("");
+          out.push(l[1]);
+          at = l[0];
+        }
+        out.push(l[3]);
+      });
+      return out.join("\n");
+    }
+    function send(action) {
+      if (sending) return;
+      var go = function () {
+        var list = ids();
+        if (!list) { say("Those lines aren't saved yet."); return; }
+        sending = true;
+        bar.querySelector('[name="ids"]').value = list;
+        bar.querySelector('[name="action"]').value = action;
+        bar.submit();
+      };
+      if (!day) return go();
+      // Anything typed is saved first, so the lines go as they read.
+      var detail = { done: go, handled: false };
+      day.dispatchEvent(new CustomEvent("stm:flush", { detail: detail }));
+      if (!detail.handled) go();
+    }
+
+    if (day) {
+      // A Day line can be ticked once it has words.
+      day.addEventListener("input", function (e) {
+        if (!e.target.matches('input[name="text"]')) return;
+        var p = e.target.closest(".ts-line").querySelector(".js-pick");
+        if (!p) return;
+        p.disabled = !e.target.value.trim();
+        if (p.disabled) p.checked = false;
+        refresh();
+      });
+    }
+    document.addEventListener("change", function (e) {
+      if (e.target.matches && e.target.matches(".js-pick")) refresh();
+    });
+    document.addEventListener("click", function (e) {
+      var p = e.target.closest && e.target.closest(".js-pick");
+      if (!p) return;
+      if (e.shiftKey && last && last !== p) {
+        var all = picks(), i = all.indexOf(last), j = all.indexOf(p);
+        if (i >= 0 && j >= 0) {
+          all.slice(Math.min(i, j), Math.max(i, j) + 1).forEach(function (q) { if (!q.disabled) q.checked = p.checked; });
+          refresh();
+        }
+      }
+      last = p;
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key !== "Escape" || bar.hidden || !e.target.closest) return;
+      if (!e.target.closest(".js-pick") && !bar.contains(e.target)) return;
+      e.preventDefault();
+      clear();
+    });
+    bar.querySelector(".bb-all").addEventListener("click", function () {
+      picks().forEach(function (p) { if (!p.disabled) p.checked = true; });
+      refresh();
+    });
+    bar.querySelector(".bb-clear").addEventListener("click", clear);
+    bar.addEventListener("click", function (e) {
+      var button = e.target.closest(".bb-act");
+      if (!button) return;
+      var action = button.dataset.action, n = lineCount();
+      if (action === "delete" && !window.confirm("Delete " + n + (n === 1 ? " line?" : " lines?"))) return;
+      if (action !== "copy") return send(action);
+      // Copied, then marked posted -- as one line's Copy does.
+      var word = button.querySelector(".bb-word");
+      copyText(copyWords()).then(function () {
+        say("Copied " + n + (n === 1 ? " line." : " lines."));
+        send("copy");
+      }, function () {
+        say("Couldn't copy here.");
+        word.textContent = "Couldn't copy";
+        setTimeout(function () { word.textContent = "Copy"; }, 2400);
+      });
+    });
+    window.addEventListener("pageshow", function (e) { if (e.persisted) sending = false; });
+    refresh();
   }
 
   // ------------------------------------------------------------ calendar grid
@@ -2077,6 +2239,7 @@
     initLineMenu();
     initCalendarGrid();
     initWeekCopy();
+    initBatch();
     initBoards();
     initAutosave();
     initSlideOrder();

@@ -924,9 +924,12 @@ a.ds-day:active { transform: scale(0.97); }
 .ta-empty { color: var(--warn-text); font-weight: 600; text-decoration: none; background: var(--warn-bg); padding: 2px 10px; border-radius: 999px; font-size: 14px; }
 .ta-lines { list-style: none; }
 .ta-line {
-  display: grid; grid-template-columns: 9.5rem minmax(0, 1fr) auto 20px; gap: var(--s3); align-items: baseline;
-  padding: 10px 0; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums;
+  display: grid; grid-template-columns: 36px 9.5rem minmax(0, 1fr) auto 20px; gap: var(--s3); align-items: baseline;
+  grid-template-areas: "pick span text len mark";
+  padding: 10px 8px 10px 0; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums;
 }
+.ta-line .pick { grid-area: pick; }
+.ta-span { grid-area: span; } .ta-text { grid-area: text; } .ta-len { grid-area: len; } .ta-mark { grid-area: mark; }
 .ta-span { color: var(--text-2); font-size: 15px; white-space: nowrap; }
 .ta-text { font-weight: 500; overflow-wrap: anywhere; }
 .ta-len { color: var(--text-3); font-size: 14px; font-weight: 600; white-space: nowrap; }
@@ -935,8 +938,7 @@ a.ds-day:active { transform: scale(0.97); }
 .ta-nothing { text-align: center; padding: var(--s6) 0; }
 .ta-more { text-align: center; margin-top: var(--s5); }
 @media (max-width: 560px) {
-  .ta-line { grid-template-columns: minmax(0, 1fr) auto 20px; grid-template-areas: "span len mark" "text text text"; gap: 2px var(--s3); }
-  .ta-span { grid-area: span; } .ta-len { grid-area: len; } .ta-mark { grid-area: mark; } .ta-text { grid-area: text; }
+  .ta-line { grid-template-columns: 36px minmax(0, 1fr) auto 20px; grid-template-areas: "pick span len mark" "pick text text text"; gap: 2px var(--s3); }
 }
 
 /* Boards. Posting: three columns -- to fill in, written, posted -- of cards
@@ -1236,9 +1238,9 @@ input[type="number"] { -moz-appearance: textfield; }
   container-type: inline-size;
 }
 .ts-line {
-  display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "when when" "text acts";
+  display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; grid-template-areas: "pick when when" "text text acts";
   align-items: center; gap: var(--s2);
-  padding: 10px 10px 10px 14px; border-top: 1px solid var(--line);
+  padding: 10px; border-top: 1px solid var(--line);
   box-shadow: inset 4px 0 0 transparent;
   transition: background-color .2s ease, box-shadow .2s ease, opacity .2s ease;
 }
@@ -1280,8 +1282,9 @@ input[type="number"] { -moz-appearance: textfield; }
   .ts-copy-word, .ts-line.is-copied .ts-copied-word { display: none; }
   .ts-copy { width: 44px; padding: 0; }
 }
-@container (min-width: 760px) {
-  .ts-line { grid-template-columns: 22.75rem minmax(0, 1fr) auto; grid-template-areas: "when text acts"; gap: var(--s3); }
+@container (min-width: 820px) {
+  .ts-line { grid-template-columns: 36px 22.75rem minmax(0, 1fr) auto; grid-template-areas: "pick when text acts"; gap: var(--s3); }
+  .ts-end, .ts-error { grid-column: 2 / -1; }
   .ts-when input[type="time"] { flex: none; width: 8.5rem; }
   .ts-len, .ts-now { min-width: 3.6rem; }
   .ts-acts { justify-content: flex-end; width: 16rem; }
@@ -1973,3 +1976,74 @@ select {
 @keyframes stm-grow-y { from { transform: scaleY(0); } }
 @keyframes stm-drop-in { from { transform: translateY(-10px); } }
 @keyframes stm-sheet-in { from { transform: translateY(100%); } }
+
+/* ==========================================================================
+   Batch: a tick box on each Timesheet line (Day, Week, All), and a bar for
+   the ticked ones that slides up from the bottom.
+   ========================================================================== */
+.pick {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px; margin: 0 -4px; border-radius: var(--r-sm); cursor: pointer;
+}
+.pick:hover { background: color-mix(in srgb, var(--accent-soft) 70%, transparent); }
+.pick input { width: 20px; height: 20px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+.pick input:disabled { visibility: hidden; }
+.ts-line .pick { grid-area: pick; justify-self: center; }
+.ta-line .pick { align-self: center; margin-block: -10px; }
+.ta-line { border-radius: var(--r-sm); }
+.tw .tw-pick { width: 44px; padding: 0 0 0 4px; }
+.ts-line.is-picked, .ta-line.is-picked, .tw tr.is-picked > * { background: var(--accent-soft); }
+
+.bb {
+  position: sticky; z-index: 36; bottom: calc(var(--s4) + env(safe-area-inset-bottom));
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2);
+  margin: var(--s4) auto 0; width: fit-content; max-width: 100%;
+  padding: var(--s2) var(--s2) var(--s2) var(--s4);
+  border: 1px solid var(--card-border); border-radius: var(--r-lg);
+  background: var(--surface); color: var(--text); box-shadow: var(--shadow-lg);
+  animation: stm-sheet-in .28s var(--ease-out);
+}
+.bb-count {
+  display: inline-flex; align-items: center; min-height: 36px; padding: 0 var(--s3); border-radius: 999px;
+  background: var(--accent-soft); color: var(--accent-text); font-size: 15px; font-weight: 600;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.bb-count b { font-weight: 700; margin-right: 4px; }
+.bb-gap { flex: 1; min-width: var(--s2); }
+.bb .btn { min-height: 44px; padding: 0 var(--s3); gap: 6px; white-space: nowrap; }
+.bb .btn .icon { width: 18px; height: 18px; }
+.bb .bb-clear { width: 44px; height: 44px; min-height: 44px; padding: 0; background: transparent; border-color: transparent; color: var(--text-3); }
+.bb .bb-clear:hover { background: var(--surface-2); color: var(--text); }
+@media (max-width: 1023px) {
+  /* Narrower: the actions as icons, named for screen readers and on hover. */
+  .bb { flex-wrap: nowrap; }
+  .bb .bb-act { width: 44px; padding: 0; }
+  .bb-word { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}
+@media (max-width: 899px) {
+  .bb { bottom: calc(var(--tab-h) + env(safe-area-inset-bottom) + var(--s3)); padding-left: var(--s2); }
+  .bb-all, .bb-gap { display: none; }
+  .bb-count { min-width: 36px; justify-content: center; padding: 0 var(--s2); }
+  .bb-count b { margin-right: 0; }
+  .bb-chosen { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  html[data-batch] .tb-pill { display: none; }
+}
+
+/* Week tools: last week's lines, or a template's, onto this week. */
+.tw-tools {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s3);
+  margin-top: var(--s4); padding: var(--s3);
+  border-radius: var(--r-md); background: var(--surface-2);
+}
+.tw-tools form { display: flex; align-items: center; gap: var(--s2); }
+.tw-tools .btn { min-height: 44px; white-space: nowrap; }
+.tw-tools select, .tw-tools input { min-height: 44px; font-size: 16px; }
+.tw-tools select { max-width: 14rem; }
+.tw-keep { margin-left: auto; }
+.tw-keep input { width: 12rem; }
+.tw-drop { width: 44px; height: 44px; min-height: 44px; background: transparent; border-color: transparent; color: var(--text-3); }
+.tw-drop:hover { background: var(--error-bg); color: var(--stop-text); }
+@media (max-width: 640px) {
+  .tw-tools form, .tw-keep { flex: 1 1 100%; flex-wrap: wrap; min-width: 0; margin-left: 0; }
+  .tw-tools select, .tw-keep input { flex: 1 1 10rem; width: 0; max-width: none; }
+}

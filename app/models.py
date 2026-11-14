@@ -68,6 +68,10 @@ class User(UserMixin, db.Model):
     pay_records = db.relationship(
         "PayRecord", backref="user", lazy=True, cascade="all, delete-orphan"
     )
+    week_templates = db.relationship(
+        "WeekTemplate", backref="user", lazy=True, cascade="all, delete-orphan",
+        order_by="WeekTemplate.name",
+    )
 
     PAY_CURRENCIES = {"₹": "₹ Rupee", "£": "£ Pound", "$": "$ Dollar", "€": "€ Euro"}
 
@@ -236,6 +240,22 @@ class PayRecord(db.Model):
     paid = db.Column(db.Float, nullable=False)
 
     __table_args__ = (db.UniqueConstraint("user_id", "month", name="uq_pay_record_user_month"),)
+
+
+class WeekTemplate(db.Model):
+    """A week's Timesheet lines kept under a name, to put on another week.
+    lines is JSON: [{"weekday": 0-6, "start": minutes, "end": minutes,
+    "text": ...}], minutes from the day's midnight (past 1,440 after it)."""
+
+    MAX_NAME = 60
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    name = db.Column(db.String(MAX_NAME), nullable=False)
+    lines = db.Column(db.Text, nullable=False, default="[]")
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (db.UniqueConstraint("user_id", "name", name="uq_week_template_user_name"),)
 
 
 class LoginCode(db.Model):

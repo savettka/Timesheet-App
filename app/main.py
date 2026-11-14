@@ -1,6 +1,7 @@
 import calendar
 import csv
 import io
+import json
 import math
 import os
 import secrets
@@ -27,7 +28,7 @@ from sqlalchemy import func
 
 from app import db
 from app import logic
-from app.models import BreakSegment, PayRecord, Salary, TimeEntry, User, WorkBlock
+from app.models import BreakSegment, PayRecord, Salary, TimeEntry, User, WeekTemplate, WorkBlock
 
 main_bp = Blueprint("main", __name__)
 
@@ -976,7 +977,7 @@ def timesheet_all():
 
     def line_view(d, a, b, block):
         return SimpleNamespace(span=logic.fmt_span(a, b), text=block.text, length=logic.fmt_length(b - a),
-                               copied=block.is_copied, minutes=b - a)
+                               copied=block.is_copied, minutes=b - a, id=block.id, pick=[pick_line(d, a, b, block)])
 
     if query:
         found = (WorkBlock.query
@@ -1026,6 +1027,7 @@ def timesheet_all():
         total = sum(len(g.lines) for g in groups)
     return render_template(
         "timesheet_all.html", groups=groups, query=query, older=older, total=total, today=today,
+        back=request.full_path.rstrip("?"),
         written=sum(g.written for g in groups), fmt_length=logic.fmt_length, fmt_hours=logic.fmt_hours,
     )
 
@@ -1164,6 +1166,12 @@ def copy_words(text, a, b):
     return f"{text} ({logic.minutes_clock(a):%H:%M} to {to:%H:%M} {'PM' if to.hour >= 12 else 'AM'})"
 
 
+def pick_line(d, a, b, block):
+    """A line as a tick box carries it, for the batch bar's Copy: its day,
+    the day's heading, where it starts, and its words as Copy puts them."""
+    return [d.isoformat(), d.strftime("%a %d %b"), a, copy_words(block.text, a, b)]
+
+
 @main_bp.route("/timesheet/week", endpoint="timesheet_week")
 @main_bp.route("/timesheet/week/<date_str>", endpoint="timesheet_week")
 @login_required
@@ -1197,8 +1205,15 @@ def timesheet_week(date_str=None):
         today_lines = [copy_words(block.text, a, b) for when, a, b, block in lines if when == d]
         if today_lines:
             copy += ([""] if copy else []) + [d.strftime("%a %d %b")] + today_lines
+    # A row's tick box chooses every line it adds up.
+    picks = defaultdict(lambda: SimpleNamespace(ids=[], lines=[]))
+    for d, a, b, block in lines:
+        picks[block.text].ids.append(str(block.id))
+        picks[block.text].lines.append(pick_line(d, a, b, block))
     return render_template(
         "timesheet_week.html",
+        picks=picks, back=request.path, can_fill=days[0] <= today,
+        templates=WeekTemplate.query.filter_by(user_id=current_user.id).order_by(WeekTemplate.name).all(),
         days=days, rows=rows, worked=worked, written=written,
         unwritten=[max(0, w - x) for w, x in zip(worked, written)],
         week_worked=sum(worked), week_target=max(0.0, week_target),
@@ -1236,7 +1251,220 @@ def timesheet_week_posted(date_str):
     return redirect(url_for("main.timesheet_week", date_str=days[0].isoformat()))
 
 
-REPORT_RANGES = {"week": "This week", "last-week": "Last week", "month": "This month", "last-month": "Last month"}
+# ------------------------------------------------------------ batch
+
+BATCH_ACTIONS = ("copy", "mark", "unmark", "delete")  # copy: copied on the page, then marked
+BATCH_MOST = 500
+
+
+def picked_ids(form):
+    """The ticked lines' ids. One `ids` value can hold several, comma
+    separated: a Week row ticks every line it adds up."""
+    ids = []
+    for value in form.getlist("ids"):
+        for part in value.split(","):
+            part = part.strip()
+            if part.isascii() and part.isdigit() and len(part) < 19:
+                ids.append(int(part))
+    return list(dict.fromkeys(ids))
+
+
+def lines_word(n):
+    return f"{n} line{'s' if n != 1 else ''}"
+
+
+@main_bp.route("/timesheet/batch", methods=["POST"])
+@login_required
+def timesheet_batch():
+    """The ticked lines, all at once: marked posted, marked not posted, or
+    deleted -- kept with no words, as one line's Delete does, so their time
+    isn't offered again. Then back to the page they were ticked on."""
+    action = request.form.get("action", "")
+    ids = picked_ids(request.form)
+    if action not in BATCH_ACTIONS or len(ids) > BATCH_MOST:
+        abort(400)
+    blocks = (WorkBlock.query.filter(WorkBlock.user_id == current_user.id, WorkBlock.id.in_(ids),
+                                     WorkBlock.text != "").all() if ids else [])
+    blocks = [b for b in blocks if b.text.casefold() != "break"]
+    for block in blocks:
+        if action in ("copy", "mark"):
+            block.copied = block.copy_mark()
+        elif action == "unmark":
+            block.copied = None
+        else:
+            block.text, block.copied = "", None
+    db.session.commit()
+    n = len(blocks)
+    if not n:
+        flash("None of those lines are there any more.", "warning")
+    elif action == "copy":
+        flash(f"Copied {lines_word(n)} and marked {'them' if n != 1 else 'it'} as posted.", "success")
+    elif action == "mark":
+        flash(f"Marked {lines_word(n)} as posted.", "success")
+    elif action == "unmark":
+        flash(f"{lines_word(n).capitalize()} no longer marked as posted.", "success")
+    else:
+        flash(f"Deleted {lines_word(n)}.", "success")
+    return redirect(local_path(request.form.get("back")) or url_for("main.timesheet_all"))
+
+
+# ------------------------------------------------------------ week fill
+
+FILL_SHORTEST = 10  # minutes: a scrap of free time shorter than this stays free
+TEMPLATE_MOST = 30
+
+
+def fill_week(user_id, days, plan, now):
+    """Put lines on a week's free time. plan is (weekday, start, end, text)
+    in minutes from the day's midnight, as last week had them or a template
+    keeps them. Only days already worked (logged in, and up to now), and
+    only time no line covers -- never over a line with words, a deleted
+    line's time or a break -- so doing it again adds nothing. Returns how
+    many lines went on."""
+    today = work_day(user_id, now)
+    entries = get_entries_for_range(user_id, days[0], days[-1])
+    added = 0
+    for d in days:
+        entry = entries.get(d)
+        wanted = sorted((a, b, text) for weekday, a, b, text in plan if weekday == d.weekday())
+        if d > today or entry is None or entry.login_time is None or not wanted:
+            continue
+        blocks = WorkBlock.query.filter_by(user_id=user_id, date=d).all()
+        until = logic.day_minute(d, now)
+        # The day's lines still to fill in, joined where they meet.
+        free = []
+        for a, b, block in logic.timesheet_lines(entry, d, now, blocks):
+            b = min(b, until)
+            if block is not None or b <= a:
+                continue
+            if free and free[-1][1] == a:
+                free[-1] = (free[-1][0], b)
+            else:
+                free.append((a, b))
+        for a, b, text in wanted:
+            placed = [(max(a, p), min(b, q)) for p, q in free if min(b, q) - max(a, p) >= FILL_SHORTEST]
+            for s, e in placed:
+                db.session.add(WorkBlock(user_id=user_id, date=d, start_time=logic.minutes_clock(s),
+                                         end_time=logic.minutes_clock(e), text=text))
+            added += len(placed)
+            free = [piece for p, q in free for piece in logic.free_pieces(p, q, placed)]
+    return added
+
+
+def week_plan(user_id, first, now):
+    """A week's lines with words as fill_week's plan."""
+    lines, _ = written_lines(user_id, first, first + timedelta(days=6), now)
+    return [(d.weekday(), a, b, block.text) for d, a, b, block in lines]
+
+
+def template_plan(template):
+    """A saved template's lines as fill_week's plan; anything unreadable in
+    it is left out."""
+    try:
+        lines = json.loads(template.lines or "[]")
+    except ValueError:
+        return []
+    plan = []
+    for line in lines if isinstance(lines, list) else []:
+        try:
+            weekday, a, b = int(line["weekday"]), int(line["start"]), int(line["end"])
+            text = clean_text(str(line["text"]))
+        except (KeyError, TypeError, ValueError):
+            continue
+        if 0 <= weekday <= 6 and 0 <= a < b <= 2880 and text and text.casefold() != "break":
+            plan.append((weekday, a, b, text))
+    return plan
+
+
+def week_from(date_str):
+    try:
+        return logic.week_dates(datetime.strptime(date_str, "%Y-%m-%d").date())
+    except ValueError:
+        abort(400)
+
+
+def said_filled(n, source):
+    if n:
+        flash(f"Added {lines_word(n)} from {source}.", "success")
+    else:
+        flash(f"Nothing added from {source}: there's no free time this week where its lines go.", "warning")
+
+
+@main_bp.route("/timesheet/week/<date_str>/copy-last", methods=["POST"])
+@login_required
+def timesheet_week_copy_last(date_str):
+    """Last week's lines put on this week's free time, day for day."""
+    days = week_from(date_str)
+    now = datetime.now()
+    plan = week_plan(current_user.id, days[0] - timedelta(days=7), now)
+    if not plan:
+        flash("Last week has no lines with words to copy.", "warning")
+    else:
+        said_filled(fill_week(current_user.id, days, plan, now), "last week")
+        db.session.commit()
+    return redirect(url_for("main.timesheet_week", date_str=days[0].isoformat()))
+
+
+@main_bp.route("/timesheet/week/<date_str>/template", methods=["POST"])
+@login_required
+def timesheet_template_save(date_str):
+    """The week's lines kept as a template, under a name; the same name
+    again replaces it."""
+    days = week_from(date_str)
+    name = " ".join(request.form.get("name", "").split())[:WeekTemplate.MAX_NAME] \
+        or f"Week of {days[0]:%d %b}"
+    lines = [{"weekday": weekday, "start": a, "end": b, "text": text}
+             for weekday, a, b, text in week_plan(current_user.id, days[0], datetime.now())]
+    back = redirect(url_for("main.timesheet_week", date_str=days[0].isoformat()))
+    if not lines:
+        flash("This week has no lines with words to keep.", "warning")
+        return back
+    template = WeekTemplate.query.filter_by(user_id=current_user.id, name=name).first()
+    if template is None:
+        if WeekTemplate.query.filter_by(user_id=current_user.id).count() >= TEMPLATE_MOST:
+            flash(f"You have {TEMPLATE_MOST} templates. Delete one first.", "error")
+            return back
+        template = WeekTemplate(user_id=current_user.id, name=name)
+        db.session.add(template)
+    template.lines = json.dumps(lines)
+    db.session.commit()
+    flash(f"Saved {lines_word(len(lines))} as “{name}”.", "success")
+    return back
+
+
+def chosen_template():
+    value = request.form.get("template", "")
+    template = None
+    if value.isascii() and value.isdigit() and len(value) < 19:
+        template = WeekTemplate.query.filter_by(id=int(value), user_id=current_user.id).first()
+    if template is None:
+        abort(404)
+    return template
+
+
+@main_bp.route("/timesheet/week/<date_str>/template/use", methods=["POST"])
+@login_required
+def timesheet_template_use(date_str):
+    """A template's lines put on this week's free time."""
+    days = week_from(date_str)
+    template = chosen_template()
+    said_filled(fill_week(current_user.id, days, template_plan(template), datetime.now()), f"“{template.name}”")
+    db.session.commit()
+    return redirect(url_for("main.timesheet_week", date_str=days[0].isoformat()))
+
+
+@main_bp.route("/timesheet/week/<date_str>/template/delete", methods=["POST"])
+@login_required
+def timesheet_template_delete(date_str):
+    days = week_from(date_str)
+    template = chosen_template()
+    flash(f"Deleted the template “{template.name}”.", "success")
+    db.session.delete(template)
+    db.session.commit()
+    return redirect(url_for("main.timesheet_week", date_str=days[0].isoformat()))
+
+
+REPORT_RANGES ={"week": "This week", "last-week": "Last week", "month": "This month", "last-month": "Last month"}
 
 
 def report_range(name, today):
@@ -1734,6 +1962,7 @@ def timesheet(date_str=None):
             can_time=day == today and can_time,
             night=night,
             login_at=logic.clock_minutes(entry.login_time) if entry is not None and entry.login_time else None,
+            back=request.path,
         )
 
     if request.method == "POST":

@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% from "partials/icons.html" import icon %}
 {% from "partials/timer.html" import timer_card %}
+{% from "partials/batch.html" import pick, batch_bar %}
 {% block title %}Timesheet{% endblock %}
 {% block page_title %}Timesheet{% endblock %}
 
@@ -85,6 +86,7 @@
         <input type="hidden" name="was_text" value="{{ line.was_text }}">
         {# Set by app.js for a line squeezed to nothing by the times beside it. #}
         <input type="hidden" name="drop" value="">
+        {% if not line.is_break %}{{ pick(span, off=not line.text) }}{% endif %}
         <div class="ts-when">
           <input type="time" name="start" value="{{ line.start }}" aria-label="From, line {{ n }}"{{ err_times|safe }}>
           <span class="ts-to" aria-hidden="true">–</span>
@@ -141,4 +143,5 @@
     </div>
   </form>
 </section>
+{{ batch_bar(back) }}
 {% endblock %}

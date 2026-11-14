@@ -582,6 +582,25 @@ def duplicate_span(start, end, limit):
     return end, min(limit, end + (end - start))
 
 
+def free_pieces(start, end, taken):
+    """What's left of [start, end) in minutes once every (a, b) in taken is
+    cut out of it, in order: 9:00-12:00 with 10:00-10:30 taken leaves
+    9:00-10:00 and 10:30-12:00."""
+    pieces = [(start, end)] if end > start else []
+    for a, b in taken:
+        cut = []
+        for p, q in pieces:
+            if b <= p or a >= q:
+                cut.append((p, q))
+                continue
+            if a > p:
+                cut.append((p, a))
+            if b < q:
+                cut.append((b, q))
+        pieces = cut
+    return pieces
+
+
 def hour_pieces(start, end):
     """[start, end) in minutes, cut at each o'clock -- with a piece of up to
     TIMESHEET_SHORT_PIECE at either end joined to the hour beside it."""

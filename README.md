@@ -86,6 +86,16 @@ This mirrors the logic in the original spreadsheet:
 - **Week timesheet** — what you worked on down the side, the days across, each day's
   hours against the weekly target, "Not written yet" for hours with no words, **Copy
   week** (every line, day by day, ready to paste) and **Mark week posted**.
+- **Many lines at once** — tick lines on the Timesheet's Day, Week and All tabs (Shift+click
+  ticks a run of them) and a bar comes up: **Copy** them (then marked posted), **Mark
+  posted**, **Mark not posted** or **Delete** (it asks first). On the Day tab anything typed
+  is saved before the bar acts. Esc clears the ticks.
+- **Copy last week and templates** — on the Week tab, **Copy last week** puts last week's
+  lines on this week, day for day, at the same times; **Save as template** keeps this week's
+  lines under a name (the same name replaces it) and **Use template** puts them on a week.
+  Either fills only free time on days you've logged in -- clipped to that day's hours, up to
+  now today, around breaks -- and never touches a line already there, or a deleted line's
+  time, so doing it twice adds nothing.
 - **Calendar day and week** — the Timesheet's lines as blocks on a time grid: click to
   write or change a line; drag a block's bottom edge to change its end, its top edge to
   change its start, or the block itself to move it, snapping to the zoom (1h, 30m, 15m or

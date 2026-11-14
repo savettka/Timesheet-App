@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "partials/icons.html" import icon %}
+{% from "partials/batch.html" import pick, batch_bar %}
 {% block title %}Timesheet{% endblock %}
 {% block page_title %}Timesheet{% endblock %}
 
@@ -36,6 +37,7 @@
     <ul class="ta-lines">
       {% for line in g.lines %}
       <li class="ta-line{{ ' is-copied' if line.copied }}">
+        {{ pick(g.date.strftime('%a %d %b') ~ ', ' ~ line.span ~ ', ' ~ line.text, ids=line.id, lines=line.pick) }}
         <span class="ta-span">{{ line.span }}</span>
         <span class="ta-text">{{ line.text }}</span>
         <span class="ta-len">{{ line.length }}</span>
@@ -55,4 +57,5 @@
   <p class="ta-more"><a class="btn btn-secondary" href="{{ url_for('main.timesheet_all', before=older.isoformat()) }}">{{ icon('chevron-down') }}Older</a></p>
   {% endif %}
 </section>
+{{ batch_bar(back) }}
 {% endblock %}

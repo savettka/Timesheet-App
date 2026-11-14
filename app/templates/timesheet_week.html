@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "partials/icons.html" import icon %}
+{% from "partials/batch.html" import pick, batch_bar %}
 {% block title %}Timesheet{% endblock %}
 {% block page_title %}Timesheet{% endblock %}
 
@@ -26,6 +27,7 @@
     <table class="tw">
       <thead>
         <tr>
+          <td class="tw-pick"></td>
           <th scope="col" class="tw-task">What you worked on</th>
           {% for d in days %}
           <th scope="col" class="{{ 'is-today' if d == today }}">
@@ -38,15 +40,17 @@
       <tbody>
         {% for text, minutes in rows %}
         <tr>
+          <td class="tw-pick">{{ pick(text, ids=picks[text].ids|join(','), lines=picks[text].lines) }}</td>
           <th scope="row" class="tw-task">{{ text }}</th>
           {% for m in minutes %}<td class="{{ 'is-today' if days[loop.index0] == today }}">{{ fmt_minutes(m) or '–' }}</td>{% endfor %}
           <td class="tw-total">{{ fmt_minutes(minutes|sum) }}</td>
         </tr>
         {% else %}
-        <tr><td class="tw-none" colspan="9">No lines with words this week yet.</td></tr>
+        <tr><td class="tw-none" colspan="10">No lines with words this week yet.</td></tr>
         {% endfor %}
         {% if unwritten|sum %}
         <tr class="tw-unwritten">
+          <td class="tw-pick"></td>
           <th scope="row" class="tw-task">Not written yet</th>
           {% for m in unwritten %}<td class="{{ 'is-today' if days[loop.index0] == today }}">{{ fmt_minutes(m) or '–' }}</td>{% endfor %}
           <td class="tw-total">{{ fmt_minutes(unwritten|sum) }}</td>
@@ -55,6 +59,7 @@
       </tbody>
       <tfoot>
         <tr>
+          <td class="tw-pick"></td>
           <th scope="row" class="tw-task">Worked</th>
           {% for m in worked %}<td class="{{ 'is-today' if days[loop.index0] == today }}">{{ fmt_minutes(m) or '–' }}</td>{% endfor %}
           <td class="tw-total">{{ fmt_minutes(week_worked) or '0:00' }}</td>
@@ -80,6 +85,35 @@
     </form>
     {% endif %}
   </div>
+
+  {# Lines onto this week's free time -- from last week, or a template --
+     and this week kept as a template. #}
+  {% if can_fill or total_lines %}
+  <div class="tw-tools" role="group" aria-label="Week tools">
+    {% if can_fill %}
+    <form method="post" action="{{ url_for('main.timesheet_week_copy_last', date_str=days[0].isoformat()) }}" class="js-once" autocomplete="off">
+      <button type="submit" class="btn btn-secondary">{{ icon('copy') }}Copy last week</button>
+    </form>
+    {% if templates %}
+    <form method="post" action="{{ url_for('main.timesheet_template_use', date_str=days[0].isoformat()) }}" class="tw-use js-once" autocomplete="off">
+      <select name="template" aria-label="Template">
+        {% for t in templates %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}
+      </select>
+      <button type="submit" class="btn btn-secondary">{{ icon('clipboard') }}Use template</button>
+      <button type="submit" class="btn btn-icon tw-drop" formaction="{{ url_for('main.timesheet_template_delete', date_str=days[0].isoformat()) }}"
+              aria-label="Delete the chosen template" title="Delete template" data-confirm="Delete the chosen template?">{{ icon('trash') }}</button>
+    </form>
+    {% endif %}
+    {% endif %}
+    {% if total_lines %}
+    <form method="post" action="{{ url_for('main.timesheet_template_save', date_str=days[0].isoformat()) }}" class="tw-keep js-once" autocomplete="off">
+      <input type="text" name="name" maxlength="60" placeholder="Template name" aria-label="Template name">
+      <button type="submit" class="btn btn-ghost">{{ icon('plus') }}Save as template</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endif %}
   <p class="visually-hidden" aria-live="polite" id="tw-status"></p>
 </section>
+{{ batch_bar(back) }}
 {% endblock %}
