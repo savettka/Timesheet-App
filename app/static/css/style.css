@@ -2173,9 +2173,10 @@ a.hm-day:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 
 /* Settings: a goal a row -- on or off, and its value. */
 .goal-rows { list-style: none; display: flex; flex-direction: column; gap: var(--s2); }
-.goal-row { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); min-height: 48px; }
+.goal-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s1) var(--s3); min-height: 48px; }
 .goal-on { display: flex; align-items: center; gap: var(--s2); min-height: 44px; font-weight: 600; cursor: pointer; }
 .goal-on input { width: 20px; height: 20px; accent-color: var(--accent); }
-.goal-value { display: flex; align-items: center; gap: 6px; }
-.goal-value input { width: 7.5rem; min-height: 44px; font-size: 16px; }
+.goal-value { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+/* Wide enough for "03:00 PM" and the clock button on a 12-hour clock. */
+.goal-value input { width: 9.5rem; min-height: 44px; font-size: 16px; }
 .goal-unit { width: 1.2em; color: var(--text-3); font-weight: 600; }
