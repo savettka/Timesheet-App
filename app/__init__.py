@@ -206,6 +206,10 @@ def create_app(config_object="config.Config"):
         db.create_all()
         _run_light_migrations()
 
+    from app import changes
+
+    changes.install()
+
     @app.errorhandler(413)
     def too_large(_error):
         # Without this, an oversized photo returns a bare browser error page.

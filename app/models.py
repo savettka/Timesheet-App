@@ -86,6 +86,7 @@ class User(UserMixin, db.Model):
     )
     goals = db.relationship("Goal", backref="user", lazy=True, cascade="all, delete-orphan")
     reminder_logs = db.relationship("ReminderLog", backref="user", lazy=True, cascade="all, delete-orphan")
+    entry_changes = db.relationship("EntryChange", backref="user", lazy=True, cascade="all, delete-orphan")
 
     PAY_CURRENCIES = {"₹": "₹ Rupee", "£": "£ Pound", "$": "$ Dollar", "€": "€ Euro"}
 
@@ -293,6 +294,23 @@ class Goal(db.Model):
     active = db.Column(db.Boolean, nullable=False, default=True)
 
     __table_args__ = (db.UniqueConstraint("user_id", "kind", name="uq_goal_user_kind"),)
+
+
+class EntryChange(db.Model):
+    """One change to a day's times (app/changes.py): what it was, what it
+    became, and where it came from -- punch, edit (by hand), timer, import
+    (copy last week or a template) or batch."""
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    entry_date = db.Column(db.Date, nullable=False)
+    field = db.Column(db.String(30), nullable=False)
+    old_value = db.Column(db.String(40), nullable=False, default="")
+    new_value = db.Column(db.String(40), nullable=False, default="")
+    source = db.Column(db.String(10), nullable=False)
+    changed_at = db.Column(db.DateTime, nullable=False)
+
+    __table_args__ = (db.Index("ix_entry_change_user_date", "user_id", "entry_date"),)
 
 
 class ReminderLog(db.Model):

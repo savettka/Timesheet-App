@@ -119,6 +119,25 @@
     </div>
   </form>
 
+  {% if history %}
+  {# Every change to this day's times, newest first (app/changes.py). #}
+  <details class="ch-log">
+    <summary>{{ icon('clock') }}Changes <span class="ch-count">{{ history|length }}</span></summary>
+    <ol class="ch-list">
+      {% for c in history %}
+      <li class="ch-row is-{{ c.source }}">
+        <span class="ch-when">{{ c.changed_at.strftime('%d %b, ') }}{{ fmt_time(c.changed_at.time()) }}</span>
+        <span class="ch-what"><b>{{ c.field }}</b>
+          {%- if c.old_value and c.new_value %} {{ c.old_value }} → {{ c.new_value }}
+          {%- elif c.new_value %} {{ c.new_value }}
+          {%- else %} {{ c.old_value }}{% endif %}</span>
+        <span class="ch-how">{{ source_words.get(c.source, c.source) }}</span>
+      </li>
+      {% endfor %}
+    </ol>
+  </details>
+  {% endif %}
+
   {% if entry %}
   <form method="post" action="{{ url_for('main.delete_entry', date_str=entry_date.isoformat(), back=back) }}" class="danger-zone"
         data-confirm="Delete everything recorded for {{ entry_date.strftime('%a %d %b') }}? This can't be undone.">

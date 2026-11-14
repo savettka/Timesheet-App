@@ -149,6 +149,10 @@ This mirrors the logic in the original spreadsheet:
   do with the time away: keep it on the task, make it a break (the line splits around it), or
   drop it (the line ends where you went). It only sees STM's pages in this browser, so time
   spent working in other programs looks like time away too.
+- **Change history** — every change to a day's login, logout, target, breaks and Timesheet
+  line times is kept, with where it came from: punched, typed in by hand, the timer, copied in
+  or a batch. A day's editor lists its changes; a day whose punch times were typed by hand is
+  marked **By hand** on History, with a lilac dot on Calendar, and in the Excel and PDF month.
 - **Settings** — change daily/weekly targets, workdays and your salary.
 - **More room** — the button at the top left hides the side menu entirely (the logo in the
   top bar still goes home); press it again to bring the menu back. The browser remembers.

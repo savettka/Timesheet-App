@@ -2137,6 +2137,38 @@ a.hm-day:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 .arr-actions { margin-top: var(--s4); justify-content: flex-end; }
 .dash-arrange-open { margin-top: var(--s5); text-align: center; }
 
+/* Change history: a day whose punch times were typed by hand, marked lilac
+   on History and Calendar, and the day's changes on its editor. */
+:root { --hand-bg: #f1ebfd; --hand-text: #5b3aa8; --hand: #8b5cf6; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --hand-bg: #2a2045; --hand-text: #d4c4ff; --hand: #a78bfa; }
+}
+:root[data-theme="dark"] { --hand-bg: #2a2045; --hand-text: #d4c4ff; --hand: #a78bfa; }
+.badge-hand { background: var(--hand-bg); color: var(--hand-text); }
+.cal-num { position: relative; }
+.cal-hand { position: absolute; top: 1px; right: -3px; width: 8px; height: 8px; border-radius: 50%; background: var(--hand); box-shadow: 0 0 0 2px var(--surface); }
+.ch-log { margin-top: var(--s5); border-top: 1px solid var(--line); padding-top: var(--s3); }
+.ch-log summary {
+  display: inline-flex; align-items: center; gap: var(--s2); min-height: 44px;
+  font-weight: 700; cursor: pointer; list-style-position: outside;
+}
+.ch-log summary .icon { color: var(--text-3); }
+.ch-count { padding: 0 8px; border-radius: 999px; background: var(--surface-2); font-size: 13px; color: var(--text-2); }
+.ch-list { list-style: none; display: flex; flex-direction: column; margin-top: var(--s2); }
+.ch-row {
+  display: grid; grid-template-columns: 9.5rem minmax(0, 1fr) auto; gap: var(--s3); align-items: baseline;
+  padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 15px; font-variant-numeric: tabular-nums;
+}
+.ch-when { color: var(--text-3); white-space: nowrap; }
+.ch-what { overflow-wrap: anywhere; }
+.ch-how { padding: 0 8px; border-radius: 999px; background: var(--surface-2); color: var(--text-2); font-size: 13px; white-space: nowrap; }
+.ch-row.is-edit .ch-how { background: var(--hand-bg); color: var(--hand-text); }
+@media (max-width: 560px) {
+  .ch-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .ch-how { grid-row: 1; grid-column: 2; }
+  .ch-what { grid-column: 1 / -1; }
+}
+
 /* The weekly email: its switch in Settings, and Preview / Send now on Reports. */
 .mail-to { display: flex; align-items: center; gap: 6px; margin-top: var(--s2); font-size: 15px; color: var(--text-2); }
 .mail-to .icon { color: var(--text-3); }

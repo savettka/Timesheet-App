@@ -154,6 +154,7 @@ def month_report(page, user, now):
             "is_missing": is_missing,
             "needs_logout": row["needs_logout"],
             "worked_any": worked_any,
+            "by_hand": d in page.get("edited", ()),
         })
 
     summary = page["summary"]
@@ -227,7 +228,7 @@ def build_xlsx(report):
     columns = [
         ("Date", 13), ("Day", 6), ("Login", 10), ("Logout", 10), ("Break time", 10),
         ("Breaks", 30), ("Worked", 10), ("Target", 10), ("Over", 10), ("Short", 10),
-        ("Status", 16), ("Notes", 36),
+        ("Status", 16), ("Edited by hand", 14), ("Notes", 36),
     ]
     for i, (_, width) in enumerate(columns):
         ws.set_column(i, i, width)
@@ -326,8 +327,9 @@ def build_xlsx(report):
         status_extra = {"font_color": WARN_TEXT, "bold": True} if day["needs_logout"] else {}
         ws.write_string(row, 10, "Still going" if day["still_going"] and not day["status"] else day["status"],
                         cell("text", day, **status_extra))
+        ws.write_string(row, 11, "Yes" if day["by_hand"] else "", cell("text", day))
         # write_string, never write: a note starting with "=" stays words.
-        ws.write_string(row, 11, day["notes"], cell("text", day))
+        ws.write_string(row, 12, day["notes"], cell("text", day))
         row += 1
 
     last_day_row = row - 1
@@ -651,8 +653,11 @@ class _Pdf:
             if day["balance"] is not None:
                 balance(6, day["balance"], base, 9)
 
-            # A forgotten logout is a tag in its own row, not a footnote.
+            # A forgotten logout is a tag in its own row, not a footnote; so
+            # are times typed in by hand.
             x = notes_x
+            if day["by_hand"]:
+                x += self.pill(x, base, "Edited by hand", "Helvetica-Bold", 8, LILAC_TEXT, LILAC, "left") + 2
             if day["needs_logout"]:
                 x += self.pill(x, base, day["status"], "Helvetica-Bold", 8, AMBER_TEXT, AMBER, "left") + 2
                 note = day["notes"]

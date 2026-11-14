@@ -85,8 +85,8 @@
         <td class="cal-day{{ ' is-today' if row.is_today }}{{ ' is-future' if row.is_future }}{{ ' is-rest' if is_rest }}{{ ' ' ~ state if state }}">
           <a class="cal-link" href="{{ url_for('main.edit_entry', date_str=row.date.isoformat(), back='calendar') }}"
              {% if row.is_today %}aria-current="date"{% endif %}>
-            <span class="visually-hidden">{{ row.date.strftime('%A %d %B') }}: {{ spoken }}</span>
-            <span class="cal-num" aria-hidden="true">{{ row.date.day }}</span>
+            <span class="visually-hidden">{{ row.date.strftime('%A %d %B') }}: {{ spoken }}{{ ', times typed by hand' if row.date in edited }}</span>
+            <span class="cal-num" aria-hidden="true">{{ row.date.day }}{% if row.date in edited %}<span class="cal-hand" title="Times typed in by hand"></span>{% endif %}</span>
             {% if short %}<span class="cal-hours" aria-hidden="true">{{ short }}</span>{% endif %}
             {% if bal %}<span class="cal-bal {{ tone }}" aria-hidden="true">{{ bal }}</span>{% endif %}
           </a>

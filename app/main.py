@@ -29,6 +29,7 @@ from sqlalchemy.orm import joinedload
 
 from app import db
 from app import logic
+from app import changes
 from app import mailer
 from app import reminders
 from app import weekly_report
@@ -2005,6 +2006,8 @@ def _month_page(year, month):
     return dict(
         summary=summary,
         rows=summary["rows"],
+        # Days whose punch times were typed in by hand (app/changes.py).
+        edited=changes.edited_days(current_user.id, first_day, last_day),
         year=year,
         month=month,
         month_name=calendar.month_name[month],
@@ -2514,6 +2517,9 @@ def edit_entry(date_str):
             next_date=entry_date + timedelta(days=1),
             back=back,
             month_url=month_url,
+            history=changes.day_history(current_user.id, entry_date),
+            source_words=changes.SOURCE_WORDS,
+            fmt_time=logic.fmt_time,
         )
 
     if request.method == "POST":

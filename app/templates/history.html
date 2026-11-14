@@ -85,6 +85,7 @@
           {%- if is_rest %} <span class="badge badge-quiet">Rest day</span>{% endif %}
           {%- if is_missing %} <span class="badge badge-warn">Not logged</span>{% endif %}
           {%- if needs_logout %} <span class="badge badge-warn">Logout missing</span>{% endif %}
+          {%- if row.date in edited %} <span class="badge badge-hand" title="Times typed in by hand">By hand</span>{% endif %}
         </th>
         <td role="cell" class="c-in{{ ' is-empty' if not (e and e.login_time) }}" data-label="Login">
           {{ fmt_time(e.login_time) if e and e.login_time else '–' }}
