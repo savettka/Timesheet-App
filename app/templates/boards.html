@@ -34,7 +34,7 @@
     <ul class="kb-list">
       {% for c in col.cards %}
       <li class="kb-card kind-{{ c.kind }}" data-id="{{ c.id }}" data-minutes="{{ c.minutes }}"
-          {%- if c.id %} draggable="true"{% endif %}>
+          {%- if c.id %} draggable="true" tabindex="0" data-copy="{{ c.copy }}" data-span="{{ c.day }} {{ c.span }}"{% endif %}>
         {% if c.kind == 'empty' %}
         <a class="kb-open" href="{{ url_for('main.timesheet', date_str=c.date.isoformat()) }}">
           <span class="kb-text">{{ c.count }} line{{ 's' if c.count != 1 }} to fill in</span>
@@ -51,6 +51,7 @@
             <span class="kb-to-posted">{{ icon('check', 'icon icon-inline') }}Posted</span><span class="kb-to-written">{{ icon('undo', 'icon icon-inline') }}Undo</span>
           </button>
         </form>
+        <button type="button" class="kb-more" aria-haspopup="menu" aria-label="More for {{ c.text }}" title="More" hidden>{{ icon('more') }}</button>
         {% endif %}
       </li>
       {% endfor %}

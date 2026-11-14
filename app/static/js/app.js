@@ -716,6 +716,15 @@
         if (note) { note.textContent = message; note.hidden = false; }
       });
     });
+
+    // The line menu's Mark posted and Mark not posted: what Copy's mark and
+    // the reset button do, without the clipboard.
+    list.addEventListener("stm:mark", function (e) {
+      var line = e.target.closest(".ts-line");
+      if (!line || !lineWords(line)) return;
+      mark(line, e.detail.on);
+      say(e.detail.on ? "Marked as posted." : "No longer marked as posted.");
+    });
   }
 
   // Times follow: change a line's end and the next line starts there;
@@ -1232,7 +1241,10 @@
       var from = card.closest(".kb-col");
       if (from === to) return;
       var posted = to.dataset.status === "posted";
+      // Moving the card would drop the keyboard's place; keep it on the card.
+      var focused = card.contains(document.activeElement) ? document.activeElement : null;
       to.querySelector(".kb-list").appendChild(card);
+      if (focused) focused.focus();
       card.classList.remove("is-dropped");
       void card.offsetWidth;  // restart the settle, if it's moved twice
       card.classList.add("is-dropped");
@@ -1281,6 +1293,12 @@
       e.preventDefault();
       col.classList.remove("is-over");
       move(dragging, col);
+    });
+    // The line menu's Mark posted and Mark not posted: the same move.
+    board.addEventListener("stm:mark", function (e) {
+      var card = e.target.closest(".kb-card[data-id]");
+      var to = card && board.querySelector('.kb-col[data-status="' + (e.detail.on ? "posted" : "written") + '"]');
+      if (to) move(card, to);
     });
     // The button: the same move, without leaving the page.
     board.addEventListener("submit", function (e) {
@@ -1368,6 +1386,10 @@
       set(form, "text", block ? block.dataset.text : "");
       var written = block && block.dataset.id;
       document.getElementById("cg-dialog-title").textContent = written ? "Change this line" : "Write a line";
+      // More: the line menu, for a line with words.
+      var more = document.getElementById("cg-more");
+      if (more) more.hidden = !(block && block.dataset.copy);
+      dialog.stmBlock = block || null;
       document.getElementById("cg-open").href = "/timesheet/" + date;
       dialog.showModal();
       document.getElementById("cg-text").focus();
@@ -1642,6 +1664,177 @@
     });
   }
 
+  // ------------------------------------------------------------ line menu
+  // A line's menu -- on the Timesheet, a Board card, a Calendar block: Copy,
+  // Mark posted (or not), Duplicate, Split in two, Delete. Opened by a right
+  // click on the line (a text box keeps the browser's own menu, for
+  // pasting), by its More button, or by Shift+F10 or the menu key on a line
+  // with the focus. The arrows move, Enter chooses, Esc closes. Where a line
+  // has a button of its own for one of these, the menu presses that.
+  function initLineMenu() {
+    var menu = document.createElement("div");
+    menu.className = "lm";
+    menu.setAttribute("role", "menu");
+    menu.setAttribute("aria-label", "Line");
+    menu.hidden = true;
+    document.body.appendChild(menu);
+    var opener = null;
+    var here = window.location.pathname + window.location.search;
+    var calendar = document.getElementById("cg-dialog");
+
+    document.querySelectorAll(".ts-more, .kb-more").forEach(function (b) { b.hidden = false; });
+
+    function lineOf(el) {
+      return el && el.closest ? el.closest(".ts-line, .kb-card[data-copy], .cg-block[data-copy]") : null;
+    }
+    function post(url) {
+      var form = document.createElement("form");
+      form.method = "post";
+      form.action = url;
+      var back = document.createElement("input");
+      back.type = "hidden";
+      back.name = "back";
+      back.value = here;
+      form.appendChild(back);
+      document.body.appendChild(form);
+      if (form.requestSubmit) form.requestSubmit(); else form.submit();
+    }
+    // Split in two and Duplicate on the Timesheet go with the page, saved.
+    function submitLine(line, name) {
+      var form = line.closest("form");
+      var box = document.createElement("input");
+      box.type = "hidden";
+      box.name = name;
+      box.value = String([].indexOf.call(line.parentNode.children, line));
+      form.appendChild(box);
+      if (form.requestSubmit) form.requestSubmit(); else form.submit();
+      if (form.dataset.sent !== "true") box.remove();  // the save was called off
+    }
+
+    function actions(line) {
+      if (line.classList.contains("ts-line")) {
+        var a = clockMinutes(field(line, "start").value, "start"), b = clockMinutes(field(line, "end").value, "end");
+        var writes = !!lineWords(line) && !line.classList.contains("is-break");
+        var copied = line.classList.contains("is-copied");
+        function marks(on) {
+          return function () { line.dispatchEvent(new CustomEvent("stm:mark", { bubbles: true, detail: { on: on } })); };
+        }
+        return [
+          { label: "Copy", ok: writes, run: function () { line.querySelector(".ts-copy").click(); } },
+          copied ? { label: "Mark not posted", ok: writes, run: marks(false) } : { label: "Mark posted", ok: writes, run: marks(true) },
+          { label: "Duplicate", ok: writes, run: function () { submitLine(line, "duplicate"); } },
+          { label: "Split in two", ok: writes && a !== null && b !== null && b - a >= 10, run: function () { submitLine(line, "split"); } },
+          { label: "Delete", ok: true, danger: true, run: function () { line.querySelector(".ts-delete").click(); } },
+        ];
+      }
+      // A Board card or a Calendar block: one saved line, by its id.
+      var url = "/line/" + line.dataset.id + "/";
+      var onBoard = line.classList.contains("kb-card");
+      var posted = line.classList.contains("kind-posted") || line.classList.contains("is-copied");
+      var minutes = onBoard ? parseInt(line.dataset.minutes, 10) : parseInt(line.dataset.b, 10) - parseInt(line.dataset.a, 10);
+      var span = onBoard ? line.dataset.span : (line.querySelector(".cg-time") || line).textContent.split(" · ")[0];
+      function setMark(on) {
+        return function () {
+          if (onBoard) {
+            line.dispatchEvent(new CustomEvent("stm:mark", { bubbles: true, detail: { on: on } }));
+            return;
+          }
+          fetch(url + (on ? "mark" : "unmark"), { method: "POST", credentials: "same-origin", headers: { Accept: "application/json" } })
+            .then(function (r) { if (!r.ok) throw new Error("not marked"); return r.json(); })
+            .then(function (done) { line.classList.toggle("is-copied", !!done.copied); })
+            .catch(function () { post(url + (on ? "mark" : "unmark")); });
+        };
+      }
+      return [
+        { label: "Copy", ok: true, run: function () {
+          copyText(line.dataset.copy).then(posted ? function () {} : setMark(true), function () {
+            window.prompt("Couldn't copy here. Copy this yourself:", line.dataset.copy);
+          });
+        } },
+        posted ? { label: "Mark not posted", ok: true, run: setMark(false) } : { label: "Mark posted", ok: true, run: setMark(true) },
+        { label: "Duplicate", ok: true, run: function () { post(url + "duplicate"); } },
+        { label: "Split in two", ok: minutes >= 10, run: function () { post(url + "split"); } },
+        { label: "Delete", ok: true, danger: true, run: function () {
+          if (window.confirm("Delete the line from " + span + "?")) post(url + "delete");
+        } },
+      ];
+    }
+
+    function items() { return [].slice.call(menu.querySelectorAll('.lm-item:not([aria-disabled="true"])')); }
+    function close(restore) {
+      if (menu.hidden) return;
+      menu.hidden = true;
+      if (restore && opener && document.contains(opener)) opener.focus();
+      opener = null;
+    }
+    function open(line, x, y, from) {
+      opener = from;
+      var host = (from && from.closest && from.closest("dialog[open]")) || document.body;
+      if (menu.parentNode !== host) host.appendChild(menu);
+      menu.innerHTML = "";
+      actions(line).forEach(function (a) {
+        var item = document.createElement("button");
+        item.type = "button";
+        item.className = "lm-item" + (a.danger ? " is-danger" : "");
+        item.setAttribute("role", "menuitem");
+        item.tabIndex = -1;
+        item.textContent = a.label;
+        if (!a.ok) item.setAttribute("aria-disabled", "true");
+        item.addEventListener("click", function () {
+          if (!a.ok) return;
+          close(true);  // back to where it was opened from, for whatever's next
+          if (calendar && calendar.open && host === calendar) calendar.close();
+          a.run();
+        });
+        menu.appendChild(item);
+      });
+      menu.hidden = false;
+      var w = menu.offsetWidth, h = menu.offsetHeight;
+      menu.style.left = Math.max(8, Math.min(x, window.innerWidth - w - 8)) + "px";
+      menu.style.top = Math.max(8, Math.min(y, window.innerHeight - h - 8)) + "px";
+      var first = items()[0];
+      if (first) first.focus();
+    }
+    function openBeside(line, el) {
+      var r = el.getBoundingClientRect();
+      open(line, r.left, r.bottom + 4, el);
+    }
+
+    menu.addEventListener("keydown", function (e) {
+      var list = items(), at = list.indexOf(document.activeElement);
+      if (e.key === "ArrowDown") { e.preventDefault(); list[(at + 1) % list.length].focus(); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); list[(at - 1 + list.length) % list.length].focus(); }
+      else if (e.key === "Home") { e.preventDefault(); list[0].focus(); }
+      else if (e.key === "End") { e.preventDefault(); list[list.length - 1].focus(); }
+      else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); close(true); }
+      else if (e.key === "Tab") { close(false); }
+    });
+    document.addEventListener("pointerdown", function (e) { if (!menu.contains(e.target)) close(false); }, true);
+    window.addEventListener("resize", function () { close(false); });
+    document.addEventListener("scroll", function () { close(false); }, true);
+
+    document.addEventListener("contextmenu", function (e) {
+      var line = lineOf(e.target);
+      if (!line || e.target.matches('input[type="text"], textarea')) return;
+      e.preventDefault();
+      open(line, e.clientX, e.clientY, line.querySelector(".ts-more, .kb-more") || line);
+    });
+    document.addEventListener("keydown", function (e) {
+      if (!((e.key === "F10" && e.shiftKey) || e.key === "ContextMenu")) return;
+      var at = document.activeElement;
+      var line = lineOf(at) || (calendar && calendar.open && calendar.contains(at) ? calendar.stmBlock : null);
+      if (!line) return;
+      e.preventDefault();
+      openBeside(line, at);
+    });
+    document.addEventListener("click", function (e) {
+      var more = e.target.closest && e.target.closest(".ts-more, .kb-more, #cg-more");
+      if (!more) return;
+      var line = more.id === "cg-more" ? calendar && calendar.stmBlock : lineOf(more);
+      if (line) openBeside(line, more);
+    });
+  }
+
   // ----------------------------------------------------------- time nudge
   // In any time box -- the Timesheet, the Calendar's box, a day's Edit
   // screen -- Up and Down move the time 5 minutes (on to the next five:
@@ -1773,6 +1966,7 @@
     initTimerBar();
     initPalette();
     initTimeNudge();
+    initLineMenu();
     initCalendarGrid();
     initWeekCopy();
     initBoards();

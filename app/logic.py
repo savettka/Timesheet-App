@@ -565,6 +565,23 @@ def timesheet_span(entry, day, now):
     return start, min(end, 2880)
 
 
+def split_point(start, end):
+    """Where a line splits in two: its middle, on a five-minute mark, at
+    least five minutes from either end. None for a line under ten minutes."""
+    if end - start < 10:
+        return None
+    middle = round((start + end) / 2 / 5) * 5
+    return min(max(middle, start + 5), end - 5)
+
+
+def duplicate_span(start, end, limit):
+    """Where a copy of a line goes: straight after it and as long, cut short
+    at limit (the end of the day it's on). None when there's no room."""
+    if end >= limit:
+        return None
+    return end, min(limit, end + (end - start))
+
+
 def hour_pieces(start, end):
     """[start, end) in minutes, cut at each o'clock -- with a piece of up to
     TIMESHEET_SHORT_PIECE at either end joined to the hour beside it."""

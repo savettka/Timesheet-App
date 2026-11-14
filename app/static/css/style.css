@@ -979,6 +979,14 @@ a.ds-day:active { transform: scale(0.97); }
 .kb-card.kind-posted .kb-btn { background: transparent; }
 .kb-btn span { display: inline-flex; align-items: center; gap: 4px; }
 .kb-card.kind-written .kb-to-written, .kb-card.kind-posted .kb-to-posted { display: none; }
+.kb-more {
+  position: absolute; right: 2px; bottom: 2px;
+  display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px;
+  border: none; border-radius: var(--r-md); background: transparent; color: var(--text-3); cursor: pointer;
+}
+.kb-more:hover { background: var(--surface-2); color: var(--text); }
+.kb-card.kind-posted .kb-more:hover { background: color-mix(in srgb, var(--success-bg) 70%, var(--surface-3)); }
+.kb-card[data-id] .kb-when { padding-right: 40px; }
 .kb-none { color: var(--text-3); font-size: 14px; padding: var(--s3) var(--s2); }
 @media (max-width: 900px) { .kb { grid-template-columns: minmax(0, 1fr); } }
 
@@ -1255,7 +1263,7 @@ input[type="number"] { -moz-appearance: textfield; }
   .ts-line { grid-template-columns: 22.75rem minmax(0, 1fr) auto; grid-template-areas: "when text acts"; gap: var(--s3); }
   .ts-when input[type="time"] { flex: none; width: 8.5rem; }
   .ts-len, .ts-now { min-width: 3.6rem; }
-  .ts-acts { justify-content: flex-end; width: 13rem; }
+  .ts-acts { justify-content: flex-end; width: 16rem; }
 }
 .ts-copy-note { color: var(--error-text); font-size: 15px; font-weight: 600; }
 .ts-foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); }
@@ -1799,6 +1807,28 @@ select {
   .cp { inset: max(var(--s4), env(safe-area-inset-top)) 0 auto 0; max-height: 80vh; }
   .cp-inner { max-height: 80vh; }
 }
+
+/* ==========================================================================
+   A line's menu: what can be done to a Timesheet line, a Board card or a
+   Calendar block, from a right click, its More button or Shift+F10.
+   ========================================================================== */
+
+.lm {
+  position: fixed; z-index: 70;
+  display: flex; flex-direction: column; gap: 2px; min-width: 200px; padding: 6px;
+  border: 1px solid var(--card-border); border-radius: var(--r-md);
+  background: var(--surface); color: var(--text); box-shadow: var(--shadow-lg);
+}
+.lm[hidden] { display: none; }
+.lm-item {
+  display: flex; align-items: center; min-height: 44px; padding: 0 var(--s3);
+  border: none; border-radius: 8px; background: transparent; color: inherit;
+  font: inherit; font-size: 15px; text-align: left; cursor: pointer;
+}
+.lm-item:hover, .lm-item:focus { background: var(--surface-2); outline: none; }
+.lm-item:focus-visible { box-shadow: inset 0 0 0 2px var(--focus); }
+.lm-item.is-danger { color: var(--stop-text); }
+.lm-item[aria-disabled="true"] { color: var(--text-3); background: transparent; cursor: default; }
 
 /* ==========================================================================
    Your profile in a small window: from your name or photo at the top, or

@@ -64,6 +64,9 @@ This mirrors the logic in the original spreadsheet:
   Stop leaves you on the page you were on.
   Stop, Break or Logout writes the Timesheet line with the exact times; starting another
   task writes the running one first. The latest tasks are a tap from starting again.
+- **A line's menu** — right-click a Timesheet line, a Board card or a Calendar block (or
+  press its ⋯ button, or Shift+F10): Copy, Mark posted or not, Duplicate (into the free
+  time straight after it, never over anything written), Split in two, Delete.
 - **Arrow keys on times** — in any time box (Timesheet, Calendar, a day's Edit screen), Up
   and Down move the time 5 minutes, with Shift an hour; the next line follows, and the
   Timesheet saves once you stop.

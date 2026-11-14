@@ -446,11 +446,12 @@ def timer_view(user, now):
     return SimpleNamespace(text=user.timer_text or "", elapsed=elapsed, clock=f"{h}:{rest // 60:02d}:{rest % 60:02d}")
 
 
-def place_timed_line(user_id, day, a, b, text, now=None):
+def place_timed_line(user_id, day, a, b, text, now=None, join=True):
     """Write a timed line, a to b in minutes, onto a day's Timesheet. The same
-    words carrying straight on from a line make that line longer; lines it
-    runs over give way -- cut short, or split around it. Minutes past 1,440
-    are after midnight, on a shift that runs on past it."""
+    words carrying straight on from a line make that line longer (unless
+    join is False: a duplicate stays a line of its own); lines it runs over
+    give way -- cut short, or split around it. Minutes past 1,440 are after
+    midnight, on a shift that runs on past it."""
     now = now or datetime.now()
     entry = TimeEntry.query.filter_by(user_id=user_id, date=day).first()
     blocks = WorkBlock.query.filter_by(user_id=user_id, date=day).all()
@@ -458,7 +459,7 @@ def place_timed_line(user_id, day, a, b, text, now=None):
     def span(blk):
         return logic.block_span(blk, entry, day, now)
 
-    line = next((blk for blk in blocks if blk.text == text and span(blk)[1] == a), None)
+    line = next((blk for blk in blocks if blk.text == text and span(blk)[1] == a), None) if join else None
     if line is not None:
         a = span(line)[0]
         line.end_time = logic.minutes_clock(b)
@@ -483,6 +484,74 @@ def place_timed_line(user_id, day, a, b, text, now=None):
         elif not blk.text:
             db.session.delete(blk)  # a deleted line's time, now the timer's
     return line
+
+
+LINE_ACTIONS = ("mark", "unmark", "duplicate", "split", "delete")
+
+
+def apply_line_action(block, action, now):
+    """One of the line menu's actions on a saved line with words: mark it
+    posted or not, duplicate it, split it in two, or delete it (kept with
+    no words, as the Timesheet's Delete does, so its time isn't offered
+    again). Returns (done, what to say)."""
+    entry = TimeEntry.query.filter_by(user_id=block.user_id, date=block.date).first()
+    a, b = logic.block_span(block, entry, block.date, now)
+    span = logic.fmt_span(a, b)
+    if action == "mark":
+        block.copied = block.copy_mark()
+        return True, f"Marked {span} as posted."
+    if action == "unmark":
+        block.copied = None
+        return True, f"{span} is no longer marked as posted."
+    if action == "delete":
+        block.text, block.copied = "", None
+        return True, f"Deleted {span}."
+    if action == "split":
+        middle = logic.split_point(a, b)
+        if middle is None:
+            return False, f"{span} is too short to split."
+        db.session.add(WorkBlock(user_id=block.user_id, date=block.date, start_time=logic.minutes_clock(middle),
+                                 end_time=block.end_time, text=block.text))
+        block.end_time = logic.minutes_clock(middle)
+        return True, f"Split {span} in two: {logic.fmt_span(a, middle)} and {logic.fmt_span(middle, b)}."
+    if action == "duplicate":
+        # Only into free time: up to the next line with words, or the day's
+        # end -- never over anything written.
+        free_until = 1440 + (logic.night_reach(entry, block.date, now) or 0)
+        for other in WorkBlock.query.filter_by(user_id=block.user_id, date=block.date):
+            if other is block or not other.text:
+                continue
+            s, e = logic.block_span(other, entry, block.date, now)
+            if e > b:
+                free_until = min(free_until, max(s, b))
+        copy = logic.duplicate_span(a, b, free_until)
+        if copy is None:
+            return False, f"There's no free time straight after {span} for a copy."
+        place_timed_line(block.user_id, block.date, *copy, block.text, now=now, join=False)
+        return True, f"Duplicated {span} at {logic.fmt_span(*copy)}."
+    raise ValueError(action)
+
+
+@main_bp.route("/line/<int:block_id>/<action>", methods=["POST"])
+@login_required
+def line_action(block_id, action):
+    """The line menu on Boards and the Calendar, for one saved line. Answers
+    in JSON when asked to (marking, without leaving the page), and
+    otherwise goes back where it came from with what it did."""
+    if action not in LINE_ACTIONS:
+        abort(404)
+    block = WorkBlock.query.filter_by(id=block_id, user_id=current_user.id).first()
+    if block is None or not block.text:
+        abort(404)
+    done, message = apply_line_action(block, action, datetime.now())
+    if done:
+        db.session.commit()
+    else:
+        db.session.rollback()
+    if request.accept_mimetypes.best == "application/json":
+        return jsonify(ok=done, message=message, copied=block.is_copied if done else None)
+    flash(message, "success" if done else "error")
+    return redirect(local_path(request.form.get("back")) or url_for("main.timesheet", date_str=block.date.isoformat()))
 
 
 def stop_timer(user, entry, when):
@@ -970,6 +1039,7 @@ def board_card(d, a, b, block, kind):
         id=str(block.id) if block is not None and block != logic.TIMESHEET_BREAK else "",
         text="Break" if block == logic.TIMESHEET_BREAK else (block.text if block is not None else ""),
         start_hhmm=logic.minutes_clock(a).strftime("%H:%M"), end_hhmm=logic.minutes_clock(b).strftime("%H:%M"),
+        copy=copy_words(block.text, a, b) if block is not None and block != logic.TIMESHEET_BREAK and block.text else "",
     )
 
 
@@ -1310,6 +1380,7 @@ def calendar_columns(user_id, days, now):
                 start_hhmm=logic.minutes_clock(a).strftime("%H:%M"), end_hhmm=logic.minutes_clock(b).strftime("%H:%M"),
                 span=logic.fmt_span(a, b), length=logic.fmt_length(b - a),
                 copied=block is not None and block != logic.TIMESHEET_BREAK and block.is_copied,
+                copy=copy_words(text, a, b) if kind == "saved" else "",
                 now=d == today and a <= minute < b,
             ))
             low, high = min(low, a), max(high, b)
@@ -1711,6 +1782,8 @@ def timesheet(date_str=None):
         to_delete = line_number("delete")
         to_copy, to_uncopy = line_number("copied"), line_number("uncopied")
         to_logout = line_number("to_logout")
+        # The line menu's Split in two and Duplicate: done once the page is saved.
+        to_split, to_duplicate = line_number("split"), line_number("duplicate")
         if to_logout:
             # "End at logout": that line's end becomes the logout, as if typed.
             if logout_at is None:
@@ -1799,6 +1872,12 @@ def timesheet(date_str=None):
             if block is not None and block.text and block not in db.session.deleted:
                 block.copied = block.copy_mark() if to_copy else None
 
+        acted = None
+        for action, index in (("split", to_split), ("duplicate", to_duplicate)):
+            block = (saved.get(int(index)) or by_id.get(fields[0][int(index)])) if index else None
+            if block is not None and block.text and block not in db.session.deleted:
+                acted = apply_line_action(block, action, now)
+
         removed = 0
         if to_logout and not any(d.error for d in drafts):
             # ...and the lines after it go: the day ends there.
@@ -1860,8 +1939,10 @@ def timesheet(date_str=None):
             words = [f"{verb if not i else verb.lower()} {count(n)}" for i, (verb, n) in
                      enumerate((verb, n) for verb, n in tally if n)]
             flash(", ".join(words) + ".", "success")
-        elif not (form.get("add") or gone or to_copy or to_uncopy):
+        elif not (form.get("add") or gone or to_copy or to_uncopy or acted):
             flash("Already saved.", "success")
+        if acted:
+            flash(acted[1], "success" if acted[0] else "error")
         if gone:
             flash(f"{count(gone).capitalize()} you changed had been removed on another device, so "
                   f"{'it was' if gone == 1 else 'they were'} left out.", "warning")

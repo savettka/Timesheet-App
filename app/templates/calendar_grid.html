@@ -45,7 +45,7 @@
            href="{{ url_for('main.timesheet', date_str=col.date.isoformat()) }}"
            style="--s: {{ b.start - grid_from }}; --l: {{ b.end - b.start }}"
            data-id="{{ b.id }}" data-start="{{ b.start_hhmm }}" data-end="{{ b.end_hhmm }}" data-text="{{ b.text }}"
-           data-a="{{ b.start }}" data-b="{{ b.end }}"
+           data-a="{{ b.start }}" data-b="{{ b.end }}"{% if b.copy %} data-copy="{{ b.copy }}"{% endif %}
            aria-label="{{ b.span }}, {{ b.text or 'nothing written yet' }}">
           <span class="cg-text">{{ b.text or 'Empty' }}</span>
           <span class="cg-time">{{ b.span }} · {{ b.length }}</span>
@@ -80,6 +80,9 @@
     <div class="form-actions">
       <button type="submit" class="btn btn-primary">{{ icon('check') }}Save</button>
       <a class="btn btn-secondary" id="cg-open" href="#">Open the day</a>
+      {# The line's menu, for a written line: Copy, Mark posted, Duplicate,
+         Split in two, Delete. #}
+      <button type="button" class="btn btn-secondary" id="cg-more" aria-haspopup="menu" hidden>{{ icon('more') }}More</button>
       <button type="button" class="btn btn-ghost" id="cg-cancel">Cancel</button>
     </div>
   </form>
