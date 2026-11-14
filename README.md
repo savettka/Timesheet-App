@@ -324,13 +324,28 @@ The app stores everything in a small SQLite database created automatically under
 
 ### Keeping it updated
 
-When you pull new changes on PythonAnywhere:
+**On its own, from GitHub.** Once set up, every push to the site's branch
+(`claude/stm-timesheet-app-tvtw3c`) updates the site by itself: GitHub tells STM
+(a webhook), and STM fetches the push, backs up the database (the last ten, as
+`~/stm-db-backup-auto-*.db`), moves forward, installs any new libraries and
+reloads. It only ever steps forward -- a rewritten history, or a file changed by
+hand on the server, stops it with nothing changed. Each run is written to
+`~/stm-deploy.log`.
+
+To set it up, once:
+
+1. Make a secret in a Bash console: `python3 -c "import secrets; print(secrets.token_hex(32))"`.
+2. Web tab → WSGI configuration file: add `os.environ['DEPLOY_SECRET'] = '<the secret>'`
+   with the other `os.environ` lines, save, and press **Reload**.
+3. GitHub → the repository → Settings → Webhooks → Add webhook: Payload URL
+   `https://<you>.pythonanywhere.com/deploy/github`, Content type
+   `application/json`, Secret `<the secret>`, **Just the push event**. GitHub's
+   test (a ping) should come back with a green tick.
+
+**By hand**, the same steps from a Bash console:
 
 ```bash
 cd ~/stm
-git pull
 workon stm-venv
-pip install -r requirements.txt
+python -m app.deploy
 ```
-
-Then hit **Reload** on the Web tab.

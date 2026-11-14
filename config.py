@@ -46,3 +46,8 @@ class Config:
     SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD")
     SMTP_USE_SSL = os.environ.get("SMTP_USE_SSL", "").lower() in {"1", "true", "yes"}
     MAIL_FROM = os.environ.get("MAIL_FROM")
+
+    # Updates from GitHub (app/deploy.py): the webhook's shared secret, and
+    # the branch the site runs. Left unset, /deploy/github doesn't exist.
+    DEPLOY_SECRET = os.environ.get("DEPLOY_SECRET")
+    DEPLOY_BRANCH = os.environ.get("DEPLOY_BRANCH", "claude/stm-timesheet-app-tvtw3c")

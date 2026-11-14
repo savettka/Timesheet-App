@@ -30,6 +30,7 @@ from sqlalchemy.orm import joinedload
 from app import db
 from app import logic
 from app import changes
+from app import deploy
 from app import holidays
 from app import mailer
 from app import reminders
@@ -2214,6 +2215,31 @@ def holidays_feed():
     db.session.commit()
     flash("New calendar link made. Anywhere still using the old one stops updating.", "success")
     return holidays_back(form_year(work_day(current_user.id, datetime.now())))
+
+
+@main_bp.route("/deploy/github", methods=["POST"])
+def deploy_github():
+    """GitHub's webhook after a push (app/deploy.py): signed with the shared
+    DEPLOY_SECRET, or turned away. A push to the site's branch brings the
+    site forward to it and reloads it; anything else is only acknowledged."""
+    secret = current_app.config.get("DEPLOY_SECRET")
+    if not secret:
+        abort(404)
+    if not deploy.verify(secret, request.get_data(cache=True), request.headers.get("X-Hub-Signature-256", "")):
+        abort(403)
+    event = request.headers.get("X-GitHub-Event", "")
+    if event == "ping":
+        return jsonify(ok=True, message="pong")
+    branch = current_app.config.get("DEPLOY_BRANCH") or deploy.DEFAULT_BRANCH
+    payload = request.get_json(silent=True) or {}
+    if event != "push" or payload.get("ref") != f"refs/heads/{branch}":
+        return jsonify(ok=True, message="Nothing to do for this."), 202
+    uri = current_app.config.get("SQLALCHEMY_DATABASE_URI", "")
+    db_path = uri.replace("sqlite:///", "", 1) if uri.startswith("sqlite:///") else None
+    wsgi_file = os.environ.get("STM_WSGI_FILE") or f"/var/www/{request.host.split(':')[0].replace('.', '_')}_wsgi.py"
+    status, message = deploy.run(branch, db_path, wsgi_file)
+    ok = status in ("updated", "current")
+    return jsonify(ok=ok, status=status, message=message), 200 if ok else (409 if status in ("busy", "stopped") else 500)
 
 
 @main_bp.route("/calendar/leave.ics")
