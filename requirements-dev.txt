@@ -1,0 +1,4 @@
+# For working on STM: what the app needs, plus the tests (python -m pytest).
+# Not needed on the server.
+-r requirements.txt
+pytest==9.2.0

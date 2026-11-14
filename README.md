@@ -166,6 +166,18 @@ python run.py
 
 Open `http://127.0.0.1:5000` — the first visit walks you through creating your account.
 
+## Run the tests
+
+```bash
+pip install -r requirements-dev.txt
+python -m pytest
+```
+
+The tests run the real app on a database of their own in memory, with the clock held
+still, so they never touch your hours. `tests/test_logic.py` pins down how the hours,
+targets, balances and Timesheet lines are worked out today; `tests/test_routes.py` opens
+every page and runs a day's Login, Break, Back and Logout.
+
 ## Deploy for free on PythonAnywhere
 
 1. **Create a PythonAnywhere account** at pythonanywhere.com (the free "Beginner" plan is
