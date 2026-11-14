@@ -1,4 +1,4 @@
-"""Sending sign-in code emails.
+"""Sending email: sign-in codes, and the weekly report.
 
 PythonAnywhere's free tier blocks outbound SMTP except to Google's mail
 servers, so the defaults here point at Gmail. Any provider works on a paid
@@ -46,15 +46,13 @@ def _build_message(to_address, code, minutes):
     return message
 
 
-def send_login_code(to_address, code, minutes):
-    """Email a sign-in code. Returns True on success.
-
-    Failures are logged and reported as False rather than raised, so a mail
-    outage shows the user a clear message instead of a 500 page.
-    """
+def _deliver(message, what):
+    """Send a built message through the configured SMTP server. Returns True
+    on success; failures are logged and reported as False rather than
+    raised, so a mail outage shows a clear message instead of a 500 page."""
     app = current_app
     if not is_configured(app):
-        app.logger.warning("Sign-in code requested but SMTP is not configured.")
+        app.logger.warning("%s, but SMTP is not configured.", what)
         return False
 
     host = app.config["SMTP_HOST"]
@@ -62,8 +60,6 @@ def send_login_code(to_address, code, minutes):
     username = app.config["SMTP_USERNAME"]
     password = app.config["SMTP_PASSWORD"]
     use_ssl = bool(app.config.get("SMTP_USE_SSL"))
-
-    message = _build_message(to_address, code, minutes)
     context = ssl.create_default_context()
 
     try:
@@ -83,5 +79,27 @@ def send_login_code(to_address, code, minutes):
     except Exception:
         # The address is deliberately not logged alongside the failure, to keep
         # user emails out of the server log.
-        app.logger.exception("Failed to send a sign-in code email.")
+        app.logger.exception("Failed to send: %s.", what)
         return False
+
+
+def send_login_code(to_address, code, minutes):
+    """Email a sign-in code. Returns True on success."""
+    if not is_configured():
+        return _deliver(None, "a sign-in code email")
+    return _deliver(_build_message(to_address, code, minutes), "a sign-in code email")
+
+
+def send_email(to_address, subject, text, html=None):
+    """Email anything else -- the weekly report -- as plain text, with an
+    HTML version beside it when given. Returns True on success."""
+    if not is_configured():
+        return _deliver(None, "an email")
+    message = EmailMessage()
+    message["Subject"] = subject
+    message["From"] = current_app.config.get("MAIL_FROM") or current_app.config["SMTP_USERNAME"]
+    message["To"] = to_address
+    message.set_content(text)
+    if html:
+        message.add_alternative(html, subtype="html")
+    return _deliver(message, "an email")

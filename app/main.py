@@ -29,6 +29,8 @@ from sqlalchemy.orm import joinedload
 
 from app import db
 from app import logic
+from app import mailer
+from app import weekly_report
 from app.models import BreakSegment, Goal, PayRecord, Salary, TimeEntry, User, WeekTemplate, WorkBlock
 
 main_bp = Blueprint("main", __name__)
@@ -514,6 +516,56 @@ def dashboard():
     ctx["layout"] = dashboard_layout(current_user)
     ctx["layout_default"] = list(DASHBOARD_CARDS)
     return render_template("dashboard.html", **ctx)
+
+
+@main_bp.route("/api/reminders")
+@login_required
+def api_reminders():
+    """Asked by every open page (app.js, initReminders): sends the weekly
+    report once it's due, and says how many seconds until it will be, for
+    the page to ask again then."""
+    due = weekly_report.run(current_user, datetime.now())
+    return jsonify(report_in=round(due) if due is not None else None)
+
+
+def report_week(value, today):
+    """The Monday of the week asked for (?week=YYYY-MM-DD), or this week's."""
+    try:
+        day = datetime.strptime(value or "", "%Y-%m-%d").date()
+    except ValueError:
+        day = today
+    return logic.week_bounds(min(day, today))[0]
+
+
+@main_bp.route("/reports/weekly-email")
+@login_required
+def weekly_email_preview():
+    """The weekly report as the email shows it, for a look before it goes."""
+    now = datetime.now()
+    monday = report_week(request.args.get("week"), work_day(current_user.id, now))
+    return weekly_report.render_html(weekly_report.build_report(current_user, monday, now))
+
+
+@main_bp.route("/reports/weekly-email/send", methods=["POST"])
+@login_required
+def weekly_email_send():
+    """The weekly report emailed now, whatever the day -- to see it, or again
+    after a change. The one that goes on its own still goes."""
+    now = datetime.now()
+    monday = report_week(request.form.get("week"), work_day(current_user.id, now))
+    back = redirect(url_for("main.reports", range=request.form.get("range") or "week"))
+    if not current_user.email:
+        flash("Add your email address to your profile first.", "error")
+        return back
+    if not mailer.is_configured():
+        flash("Email isn't set up on this server yet.", "error")
+        return back
+    report = weekly_report.build_report(current_user, monday, now)
+    if weekly_report.send(current_user, report):
+        flash(f"Sent the week of {monday:%d %b} to {current_user.email}.", "success")
+    else:
+        flash("Couldn't send it just now. Try again in a minute.", "error")
+    return back
 
 
 @main_bp.route("/api/status")
@@ -1684,6 +1736,7 @@ def reports():
         fmt_hours=logic.fmt_hours, fmt_balance=logic.fmt_balance, fmt_time=logic.fmt_time,
         fmt_length=logic.fmt_length, fmt_hours_compact=logic.fmt_hours_compact,
         heatmap=heatmap_view(current_user, today, now),
+        mail_ready=mailer.is_configured(),
     )
 
 
@@ -2782,6 +2835,12 @@ def settings():
             flash(f"Salary saved: {logic.fmt_money(amount, user.pay_symbol)} from {starts:%B %Y}.", "success")
             return redirect(url_for("main.settings") + "#pay")
 
+        elif form_type == "emails":
+            user.weekly_report = request.form.get("weekly_report") == "1"
+            db.session.commit()
+            flash("Weekly email " + ("on." if user.weekly_report else "off."), "success")
+            return redirect(url_for("main.settings") + "#emails")
+
         elif form_type == "goals":
             on = set(request.form.getlist("on"))
             saved = {g.kind: g for g in user.goals}
@@ -2897,4 +2956,5 @@ def settings():
         month_names=list(calendar.month_name)[1:],
         years=range(today.year + 1, today.year - 6, -1),
         goal_rows=goal_rows(user),
+        mail_ready=mailer.is_configured(),
     )

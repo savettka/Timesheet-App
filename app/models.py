@@ -54,6 +54,10 @@ class User(UserMixin, db.Model):
     # card names (main.DASHBOARD_CARDS). None is the usual layout.
     dashboard_layout = db.Column(db.Text, nullable=True)
 
+    # The weekly report email, 15 minutes after the last workday's logout
+    # (app/weekly_report.py). On unless switched off in Settings.
+    weekly_report = db.Column(db.Boolean, nullable=False, default=True)
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     entries = db.relationship(
@@ -77,6 +81,7 @@ class User(UserMixin, db.Model):
         order_by="WeekTemplate.name",
     )
     goals = db.relationship("Goal", backref="user", lazy=True, cascade="all, delete-orphan")
+    reminder_logs = db.relationship("ReminderLog", backref="user", lazy=True, cascade="all, delete-orphan")
 
     PAY_CURRENCIES = {"₹": "₹ Rupee", "£": "£ Pound", "$": "$ Dollar", "€": "€ Euro"}
 
@@ -284,6 +289,23 @@ class Goal(db.Model):
     active = db.Column(db.Boolean, nullable=False, default=True)
 
     __table_args__ = (db.UniqueConstraint("user_id", "kind", name="uq_goal_user_kind"),)
+
+
+class ReminderLog(db.Model):
+    """What went out (or was tried) for a period, so it goes only once: the
+    weekly report for the week starting on period, say. status is
+    "sending" while it's on its way, then "sent", "skipped" (nothing to
+    report) or "failed" (tried again later)."""
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    kind = db.Column(db.String(30), nullable=False)
+    period = db.Column(db.Date, nullable=False)
+    status = db.Column(db.String(10), nullable=False)
+    attempts = db.Column(db.Integer, nullable=False, default=0)
+    tried_at = db.Column(db.DateTime, nullable=False)
+
+    __table_args__ = (db.UniqueConstraint("user_id", "kind", "period", name="uq_reminder_user_kind_period"),)
 
 
 class LoginCode(db.Model):

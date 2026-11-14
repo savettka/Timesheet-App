@@ -41,6 +41,8 @@ def _run_light_migrations():
             statements.append("ALTER TABLE user ADD COLUMN pay_currency VARCHAR(4)")
         if "dashboard_layout" not in user_columns:
             statements.append("ALTER TABLE user ADD COLUMN dashboard_layout TEXT")
+        if "weekly_report" not in user_columns:
+            statements.append("ALTER TABLE user ADD COLUMN weekly_report BOOLEAN NOT NULL DEFAULT 1")
         if "saturday_login_hint" not in user_columns:
             statements.append("ALTER TABLE user ADD COLUMN saturday_login_hint TIME")
         if "is_admin" not in user_columns:

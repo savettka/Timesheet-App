@@ -130,6 +130,15 @@ This mirrors the logic in the original spreadsheet:
   lists every month with an overall total and a box for what the payslip really said --
   saved as you type, with the difference from STM's estimate beside it. An estimate, not
   a payslip: an employer's own rules can land a few hundred either way.
+- **Weekly email** — 15 minutes after you log out on the week's last workday (Saturday), STM
+  emails you the week: working days, working time, break time and productivity (time worked
+  over the days worked at the daily target), the week against
+  its target with overtime pay, each day's tasks with their times and what's not written yet,
+  and what's still to do. There's no scheduler on a free PythonAnywhere account, so an open STM
+  page sends it -- in the background, too -- or, with STM closed, the next page you open.
+  Once a week; **Reports** has Preview and Send now, and **Settings → Weekly email** switches
+  it off. It uses the same Gmail settings as the sign-in codes, and goes to your profile's
+  email address.
 - **Settings** — change daily/weekly targets, workdays and your salary.
 - **More room** — the button at the top left hides the side menu entirely (the logo in the
   top bar still goes home); press it again to bring the menu back. The browser remembers.

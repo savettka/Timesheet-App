@@ -1525,6 +1525,35 @@
     refresh();
   }
 
+  // ------------------------------------------------------------ reminders
+  // Every page asks /api/reminders now and then. The server sends the
+  // weekly report once it's due, and says how long until it will be: the
+  // page asks again then, even from a tab in the background -- there's no
+  // scheduler on the server to do it.
+  function initReminders() {
+    var url = document.body.dataset.remindersUrl;
+    if (!url || !window.fetch) return;
+    var due = null, asked = 0, MIN_GAP = 60000;
+
+    function ask() {
+      asked = Date.now();
+      fetch(url, { headers: { Accept: "application/json" }, credentials: "same-origin" })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (data) {
+          if (!data) return;
+          clearTimeout(due);
+          if (data.report_in !== null && data.report_in !== undefined) {
+            due = setTimeout(ask, (Math.max(0, data.report_in) + 5) * 1000);
+          }
+        })
+        .catch(function () { /* offline for a moment: the next page asks */ });
+    }
+    ask();  // every page: the one after a logout has to start the wait
+    document.addEventListener("visibilitychange", function () {
+      if (!document.hidden && Date.now() - asked >= MIN_GAP) ask();
+    });
+  }
+
   // ------------------------------------------------------------ the year
   // The heatmap: scrolled to now on a narrow screen; the day under the
   // pointer (or focused) in words below it; and one stop for Tab, with the
@@ -2406,6 +2435,7 @@
     initBatch();
     initHeatmap();
     initArrange();
+    initReminders();
     initBoards();
     initAutosave();
     initSlideOrder();

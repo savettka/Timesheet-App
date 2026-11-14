@@ -162,6 +162,26 @@
     </form>
   </section>
 
+  <section class="card" id="emails" aria-labelledby="emails-heading">
+    <h2 id="emails-heading" class="card-title">Weekly email</h2>
+    <form method="post" class="form" autocomplete="off">
+      <input type="hidden" name="form_type" value="emails">
+      <label class="goal-on">
+        <input type="checkbox" name="weekly_report" value="1" {{ 'checked' if user.weekly_report }}>
+        <span>Weekly summary, 15 minutes after Saturday's logout</span>
+      </label>
+      <p class="mail-to">
+        {%- if not mail_ready %}{{ icon('alert', 'icon icon-inline') }}Email isn't set up on this server
+        {%- elif user.email %}{{ icon('check', 'icon icon-inline') }}To {{ user.email }}
+        {%- else %}{{ icon('alert', 'icon icon-inline') }}<button type="button" class="link-btn" data-profile-open="edit">Add your email address</button>
+        {%- endif %}</p>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Save</button>
+        <a class="btn btn-secondary" href="{{ url_for('main.weekly_email_preview') }}" target="_blank" rel="noopener">{{ icon('search') }}Preview</a>
+      </div>
+    </form>
+  </section>
+
   <section class="card" aria-labelledby="profile-heading">
     <div class="card-head">
       <h2 id="profile-heading" class="card-title">Profile</h2>

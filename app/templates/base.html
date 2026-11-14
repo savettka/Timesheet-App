@@ -57,7 +57,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body>
+<body{% if current_user.is_authenticated %} data-reminders-url="{{ url_for('main.api_reminders') }}"{% endif %}>
   <a class="skip-link" href="#main">Skip to main content</a>
 
   {% macro flashes() %}

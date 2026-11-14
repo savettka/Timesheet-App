@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Weekly work summary</title>
+</head>
+{#- Email: tables and inline styles only, no images -- mail apps drop the
+    rest, and images arrive broken. STM's own colours. #}
+{%- set font = "font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;" %}
+<body style="margin:0;padding:0;background:#f1f3f6;{{ font }}color:#151823;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f1f3f6;">
+<tr><td align="center" style="padding:24px 12px;">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:100%;background:#ffffff;border:1px solid #e9ecf1;border-radius:16px;">
+
+  <tr><td style="padding:28px 28px 22px;background:#eaf0fd;border-radius:16px 16px 0 0;">
+    <p style="margin:0 0 10px;{{ font }}font-size:15px;font-weight:800;letter-spacing:.04em;color:#2350bd;">STM</p>
+    <h1 style="margin:0;{{ font }}font-size:24px;line-height:1.25;color:#151823;">Your weekly work summary</h1>
+    <p style="margin:8px 0 0;{{ font }}font-size:15px;color:#2350bd;">{{ r.first.strftime('%d %b %Y') }} – {{ r.last.strftime('%d %b %Y') }}</p>
+  </td></tr>
+
+  <tr><td style="padding:20px 16px 8px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+      {% for label, value, good in [('Working days', r.days_worked ~ ' day' ~ ('s' if r.days_worked != 1 else ''), false),
+                                    ('Working time', r.worked, false),
+                                    ('Break time', r.breaks, false),
+                                    ('Productivity', r.productivity, true)] %}
+      <td width="25%" valign="top" style="padding:0 4px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid {{ '#bfe3cb' if good else '#e2e6ed' }};border-top:3px solid {{ '#15803d' if good else '#2f63d8' }};border-radius:8px;background:{{ '#e8f6ed' if good else '#ffffff' }};">
+          <tr><td style="padding:12px 12px 14px;">
+            <p style="margin:0 0 8px;{{ font }}font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:{{ '#135e2e' if good else '#555c6f' }};">{{ label }}</p>
+            <p style="margin:0;{{ font }}font-size:20px;font-weight:800;color:{{ '#135e2e' if good else '#151823' }};">{{ value }}</p>
+          </td></tr>
+        </table>
+      </td>
+      {% endfor %}
+    </tr></table>
+  </td></tr>
+
+  <tr><td style="padding:8px 20px 4px;">
+    <p style="margin:0;{{ font }}font-size:15px;color:#3d4354;">
+      Against your {{ r.target }}: <b style="color:{{ '#157a3a' if r.ahead else '#b91c1c' }};">{{ r.balance }}</b>
+      {%- if r.overtime_pay %} · overtime pay <b style="color:#151823;">{{ r.overtime_pay }}</b>{% endif %}
+    </p>
+  </td></tr>
+
+  <tr><td style="padding:18px 20px 0;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-radius:10px;background:#f4f6f9;">
+      <tr><td style="padding:12px 16px;background:#2f63d8;border-radius:10px 10px 0 0;{{ font }}font-size:16px;font-weight:700;color:#ffffff;">Day by day</td></tr>
+      {% for row in r.rows %}
+      <tr><td style="padding:14px 16px 12px;{{ 'border-top:1px solid #e2e6ed;' if not loop.first }}">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+          <td style="{{ font }}font-size:15px;font-weight:700;color:#2350bd;">{{ row.label }}</td>
+          <td align="right" style="{{ font }}font-size:15px;font-weight:700;color:#151823;">{{ row.leave or row.worked }}</td>
+        </tr></table>
+        {% if row.tasks or row.unwritten %}
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px;background:#ffffff;border:1px solid #e2e6ed;border-radius:8px;">
+          {% for text, length in row.tasks %}
+          <tr>
+            <td style="padding:9px 12px;{{ 'border-top:1px solid #eef0f4;' if not loop.first }}{{ font }}font-size:14px;color:#3d4354;">{{ text }}</td>
+            <td align="right" style="padding:9px 12px;{{ 'border-top:1px solid #eef0f4;' if not loop.first }}{{ font }}font-size:14px;font-weight:700;color:#151823;white-space:nowrap;">{{ length }}</td>
+          </tr>
+          {% endfor %}
+          {% if row.unwritten %}
+          <tr>
+            <td style="padding:9px 12px;{{ 'border-top:1px solid #eef0f4;' if row.tasks }}{{ font }}font-size:14px;color:#7a4300;background:#fff3dc;">Not written yet</td>
+            <td align="right" style="padding:9px 12px;{{ 'border-top:1px solid #eef0f4;' if row.tasks }}{{ font }}font-size:14px;font-weight:700;color:#7a4300;background:#fff3dc;white-space:nowrap;">{{ row.unwritten }}</td>
+          </tr>
+          {% endif %}
+        </table>
+        {% endif %}
+        {% if row.span %}
+        <p style="margin:8px 0 0;{{ font }}font-size:13px;color:#555c6f;">{{ row.span }} · Break <b>{{ row.breaks }}</b></p>
+        {% endif %}
+      </td></tr>
+      {% endfor %}
+    </table>
+  </td></tr>
+
+  {% if r.unwritten_days or r.not_posted or r.open_days %}
+  <tr><td style="padding:18px 20px 0;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fff3dc;border-radius:10px;">
+      <tr><td style="padding:14px 16px;">
+        <p style="margin:0 0 6px;{{ font }}font-size:15px;font-weight:700;color:#7a4300;">Still to do</p>
+        {% for day, n in r.unwritten_days %}
+        <p style="margin:4px 0 0;{{ font }}font-size:14px;color:#7a4300;">{{ day }}: {{ n }} line{{ 's' if n != 1 }} to fill in</p>
+        {% endfor %}
+        {% if r.not_posted %}
+        <p style="margin:4px 0 0;{{ font }}font-size:14px;color:#7a4300;">{{ r.not_posted }} line{{ 's' if r.not_posted != 1 }} not marked posted</p>
+        {% endif %}
+        {% for day in r.open_days %}
+        <p style="margin:4px 0 0;{{ font }}font-size:14px;color:#7a4300;">{{ day }}: no logout</p>
+        {% endfor %}
+      </td></tr>
+    </table>
+  </td></tr>
+  {% endif %}
+
+  <tr><td align="center" style="padding:24px 20px 26px;">
+    <a href="{{ link }}" style="display:inline-block;padding:12px 22px;border-radius:10px;background:#2f63d8;{{ font }}font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;">Open STM</a>
+    <p style="margin:16px 0 0;{{ font }}font-size:12px;color:#555c6f;">Sent by STM after your last logout of the week · switch it off in Settings</p>
+  </td></tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>

@@ -85,5 +85,22 @@
     </tbody>
   </table>
 </section>
+{% if name in ('week', 'last-week') %}
+{# The week's report email: a look at it, or sent now. #}
+<section class="card rp-mail" aria-labelledby="rp-mail-title">
+  <div class="rp-mail-text">
+    <h2 id="rp-mail-title" class="card-title">Weekly email</h2>
+    <p class="card-sub">{{ current_user.email or 'No email address yet' }}</p>
+  </div>
+  <a class="btn btn-secondary" href="{{ url_for('main.weekly_email_preview', week=first.isoformat()) }}" target="_blank" rel="noopener">{{ icon('search') }}Preview</a>
+  {% if current_user.email and mail_ready %}
+  <form method="post" action="{{ url_for('main.weekly_email_send') }}" class="js-once" autocomplete="off">
+    <input type="hidden" name="week" value="{{ first.isoformat() }}">
+    <input type="hidden" name="range" value="{{ name }}">
+    <button type="submit" class="btn btn-primary">{{ icon('mail') }}Send now</button>
+  </form>
+  {% endif %}
+</section>
+{% endif %}
 {{ heatmap_card(heatmap) }}
 {% endblock %}

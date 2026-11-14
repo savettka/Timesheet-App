@@ -2137,6 +2137,17 @@ a.hm-day:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 .arr-actions { margin-top: var(--s4); justify-content: flex-end; }
 .dash-arrange-open { margin-top: var(--s5); text-align: center; }
 
+/* The weekly email: its switch in Settings, and Preview / Send now on Reports. */
+.mail-to { display: flex; align-items: center; gap: 6px; margin-top: var(--s2); font-size: 15px; color: var(--text-2); }
+.mail-to .icon { color: var(--text-3); }
+.link-btn {
+  min-height: 44px; padding: 0; border: 0; background: none; font: inherit; font-weight: 600;
+  color: var(--accent-text); text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
+}
+.content > .rp-mail { margin-top: var(--s4); display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s3); }
+.rp-mail-text { flex: 1 1 12rem; }
+.rp-mail-text .card-title { margin: 0; }
+
 /* Settings: a goal a row -- on or off, and its value. */
 .goal-rows { list-style: none; display: flex; flex-direction: column; gap: var(--s2); }
 .goal-row { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); min-height: 48px; }
