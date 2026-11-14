@@ -1595,16 +1595,50 @@ select {
 .pay-m-sub, .pay-ot-h { display: block; margin-top: 2px; font-size: 13px; color: var(--text-3); }
 .pay-ot-pay { font-weight: 650; color: var(--ahead); }
 .pay-table .c-end { font-size: 16px; font-weight: 700; }
-.pay-table .c-paid { width: 150px; }
-.pay-table .c-paid input {
-  min-height: 40px; padding: 0 var(--s2);
-  border-color: transparent; background: transparent;
+.pay-table .c-paid { width: 172px; }
+
+/* Paid: the amount as text, like the rest of the row, until it's pressed;
+   then a box of the cell's width with the currency fixed inside it. app.js
+   marks the form .is-live -- without script the box simply shows. */
+.paid { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+.paid-show, .paid-tick { display: none; }
+.pay-form.is-live .paid-show { display: inline-flex; }
+.pay-form.is-live .paid-edit { display: none; }
+.pay-form.is-live .paid.is-editing .paid-show { display: none; }
+.pay-form.is-live .paid.is-editing .paid-edit { display: flex; }
+.paid-show {
+  align-items: center; gap: 6px; min-height: 40px; padding: 0 var(--s2);
+  border: none; border-radius: var(--r-md); background: transparent;
+  color: var(--text); font: inherit; font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums;
+  cursor: pointer; transition: background-color .15s ease, transform .16s var(--ease-out);
+}
+.paid-show:hover { background: var(--surface-2); }
+.paid-show:active { transform: scale(0.97); }
+.paid-pen { width: 15px; height: 15px; color: var(--text-3); visibility: hidden; }
+.paid-show:hover .paid-pen, .paid-show:focus-visible .paid-pen { visibility: visible; }
+.paid-add {
+  display: inline-flex; align-items: center; gap: 4px; padding: 5px 11px 5px 8px; border-radius: 999px;
+  background: var(--accent-soft); color: var(--accent-text); font-size: 14px; font-weight: 600;
+}
+.paid-add .icon { width: 15px; height: 15px; }
+.paid.is-empty .paid-show { padding: 0; }
+.paid.is-empty .paid-show:hover { background: transparent; }
+.paid.is-empty .paid-show:hover .paid-add { background: color-mix(in srgb, var(--accent-soft) 70%, var(--accent)); }
+.paid.is-empty .paid-amount, .paid.is-empty .paid-pen, .paid:not(.is-empty) .paid-add { display: none; }
+.paid-edit {
+  align-items: center; width: 100%; min-height: 40px; padding-left: 10px;
+  border: 1.5px solid var(--line-strong); border-radius: var(--r-md); background: var(--surface); cursor: text;
+}
+.paid-edit:focus-within { border-color: var(--focus); box-shadow: 0 0 0 4px var(--focus-ring); }
+.paid.is-bad .paid-edit { border-color: var(--stop); background: var(--error-bg); }
+.paid-sym { color: var(--text-3); font-weight: 600; font-size: 16px; }
+.pay-table .paid-edit input {
+  min-height: 37px; padding: 0 var(--s2) 0 4px; border: none; background: transparent;
   font-size: 16px; font-weight: 600; text-align: right;
 }
-.pay-table .c-paid input::placeholder { color: var(--accent-text); font-weight: 500; }
-.pay-table .c-paid input:hover { border-color: var(--line); background: var(--surface-2); }
-.pay-table .c-paid input:focus { border-color: var(--focus); background: var(--surface); }
-.pay-table .c-paid input[aria-invalid="true"] { border-color: var(--stop); background: var(--error-bg); }
+.pay-table .paid-edit input:focus { box-shadow: none; }
+.paid.is-saved:not(.is-editing) .paid-tick { display: inline-flex; color: var(--go); }
+.paid-tick .icon { width: 17px; height: 17px; }
 .pay-diff {
   display: inline-block; min-width: 72px; padding: 4px 11px; border-radius: 999px;
   font-size: 14px; font-weight: 650; text-align: center;
@@ -1639,7 +1673,10 @@ select {
   .pay-table .c-ot .pay-ot-h { display: inline; margin: 0; }
   .pay-table .c-paid { grid-area: paid; width: auto; display: flex; align-items: center; gap: var(--s2); text-align: left; }
   .pay-table .c-paid::before { content: "Paid"; font-size: 13px; color: var(--text-3); }
-  .pay-table .c-paid input { max-width: 150px; text-align: left; border-color: var(--line); }
+  .paid { flex: 1; justify-content: flex-start; }
+  .paid-tick { order: 1; }
+  .paid-edit { max-width: 220px; }
+  .pay-table .paid-edit input { text-align: left; }
   .pay-table .c-diff { grid-area: diff; align-self: center; }
   .pay-table tfoot .c-paid { padding-right: 0; }
 }
@@ -1744,6 +1781,7 @@ select {
   .rp-fill { transform-origin: bottom; animation: stm-grow-y .7s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 40ms); }
   .kb-card.is-dropped { animation: stm-drop-in .34s var(--ease-out); }
   .pay-table tbody tr { animation: stm-slide-in .5s var(--ease-out) backwards; animation-delay: calc(var(--i, 0) * 40ms); }
+  .paid.is-saved:not(.is-editing) .paid-tick { animation: stm-pill-in .3s var(--ease-out); }
   .pf-pop[open] { animation: stm-drop-in .3s var(--ease-out); }
   .pf-sec[open] > .pf-form { animation: stm-drop-in .3s var(--ease-out); }
   .ts-line, .kb-card, .wb-card, .ta-line { transition: background-color .3s ease, box-shadow .3s ease, transform .16s var(--ease-out); }

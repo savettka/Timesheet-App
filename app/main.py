@@ -2096,7 +2096,9 @@ def pay():
             return jsonify(
                 ok=not bad,
                 saved_at=logic.fmt_time(datetime.now().time()),
-                rows={m["key"]: dict(gap_view(m["gap"]), bad=m["key"] in bad) for m in months},
+                rows={m["key"]: dict(gap_view(m["gap"]), bad=m["key"] in bad,
+                                     paid="" if m["paid"] is None else logic.fmt_money(m["paid"], user.pay_symbol))
+                      for m in months},
                 totals=dict(gap_view(totals["gap"]),
                             paid="\u2013" if totals["paid"] is None else logic.fmt_money(totals["paid"], user.pay_symbol)),
             )

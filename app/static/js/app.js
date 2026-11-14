@@ -359,16 +359,20 @@
   }
 
   // ------------------------------------------------------------------ pay
-  // The Pay page's Paid boxes save themselves, like the Timesheet: a moment
-  // after typing stops, when a box is left, or on Enter. The server answers
-  // with each month's difference and the totals worked out again, and the
-  // status says when it last saved. One save at a time; anything typed
-  // meanwhile goes in the next, and leaving the page sends what's waiting.
+  // The Pay page's Paid amounts read as text, like the rest of the row.
+  // Pressing one turns it into a box (the currency fixed inside); a moment
+  // after typing stops, on Enter, or when the box is left, it saves, and it
+  // reads as text again with a tick. Esc puts back what it said before. The
+  // server answers with each month's difference and the totals worked out
+  // again, and the status says when it last saved. One save at a time;
+  // anything typed meanwhile goes in the next, and leaving the page sends
+  // what's waiting.
   function initPayAutosave() {
     var form = document.querySelector(".pay-form");
     if (!form || !window.fetch || !window.FormData) return;
     var status = document.getElementById("pay-status");
-    var timer = null, busy = false, again = false, retry = null;
+    var timer = null, busy = false, again = false, retry = null, touched = {};
+    form.classList.add("is-live");
 
     function say(text, state) {
       if (!status) return;
@@ -385,18 +389,33 @@
       el.textContent = view.difference;
       el.className = "pay-diff " + view.tone;
     }
-    function apply(res) {
+    function boxOf(paid) { return paid.querySelector("input"); }
+    function keyOf(paid) { return boxOf(paid).name.slice(5); }
+
+    function apply(res, sent) {
       Object.keys(res.rows || {}).forEach(function (key) {
         var row = form.querySelector('tr[data-month="' + key + '"]');
         if (!row) return;
-        pill(row.querySelector(".pay-diff"), res.rows[key]);
-        var input = row.querySelector("input");
-        if (input) input.setAttribute("aria-invalid", res.rows[key].bad ? "true" : "false");
+        var view = res.rows[key], paid = row.querySelector(".paid");
+        pill(row.querySelector(".pay-diff"), view);
+        if (!paid) return;
+        var input = boxOf(paid);
+        input.setAttribute("aria-invalid", view.bad ? "true" : "false");
+        paid.classList.toggle("is-bad", !!view.bad);
+        if (view.bad) {
+          paid.classList.add("is-editing");  // back to the box, to put right
+          return;
+        }
+        paid.querySelector(".paid-amount").textContent = view.paid;
+        paid.classList.toggle("is-empty", !view.paid);
+        var label = input.getAttribute("aria-label");
+        paid.querySelector(".paid-show").setAttribute("aria-label", label + ": " + (view.paid || "not added") + ". Change");
+        if (sent[key] && document.activeElement !== input) paid.classList.add("is-saved");
       });
       if (res.totals) {
         pill(document.getElementById("pay-total-diff"), res.totals);
-        var paid = document.getElementById("pay-total-paid");
-        if (paid) paid.textContent = res.totals.paid;
+        var total = document.getElementById("pay-total-paid");
+        if (total) total.textContent = res.totals.paid;
       }
     }
     function save() {
@@ -405,7 +424,9 @@
       timer = null;
       if (busy) { again = true; return; }
       busy = true;
-      say("Saving…", "saving");
+      var sent = touched;
+      touched = {};
+      say("Saving\u2026", "saving");
       fetch(window.location.pathname, {
         method: "POST", body: body(), credentials: "same-origin",
         headers: { Accept: "application/json" }
@@ -413,11 +434,12 @@
         if (!r.ok) throw new Error("HTTP " + r.status);
         return r.json();
       }).then(function (res) {
-        apply(res);
-        if (res.ok) say("Saved · " + res.saved_at, "saved");
+        apply(res, sent);
+        if (res.ok) say("Saved \u00b7 " + res.saved_at, "saved");
         else say("Type amounts as numbers, like 23848", "error");
       }).catch(function () {
-        say("Couldn't save — trying again", "error");
+        Object.keys(sent).forEach(function (key) { touched[key] = true; });
+        say("Couldn't save \u2014 trying again", "error");
         retry = setTimeout(save, 4000);
       }).then(function () {
         busy = false;
@@ -425,15 +447,54 @@
       });
     }
 
+    function edit(paid) {
+      var input = boxOf(paid);
+      paid.dataset.was = input.value;
+      paid.classList.remove("is-saved");
+      paid.classList.add("is-editing");
+      input.focus();
+      input.select();
+    }
+    function done(paid) {
+      if (paid.classList.contains("is-bad")) return;  // stays a box until it's a number
+      paid.classList.remove("is-editing");
+    }
+
+    form.addEventListener("click", function (e) {
+      var show = e.target.closest(".paid-show");
+      if (show) edit(show.closest(".paid"));
+    });
     form.addEventListener("input", function (e) {
       if (!e.target.matches("input")) return;
-      say("Editing…", "editing");
+      touched[keyOf(e.target.closest(".paid"))] = true;
+      say("Editing\u2026", "editing");
       clearTimeout(timer);
       timer = setTimeout(save, AUTOSAVE_PAUSE_MS);
     });
-    form.addEventListener("change", function () { if (timer) save(); });
+    form.addEventListener("focusout", function (e) {
+      if (!e.target.matches("input")) return;
+      var paid = e.target.closest(".paid");
+      if (timer) save();
+      done(paid);
+    });
     form.addEventListener("keydown", function (e) {
-      if (e.key === "Enter" && e.target.matches("input")) { e.preventDefault(); save(); }
+      if (!e.target.matches("input")) return;
+      var paid = e.target.closest(".paid");
+      if (e.key === "Enter") {
+        e.preventDefault();
+        e.target.blur();
+        if (!paid.classList.contains("is-editing")) paid.querySelector(".paid-show").focus();
+      } else if (e.key === "Escape" && paid.dataset.was !== undefined) {
+        e.preventDefault();
+        if (e.target.value !== paid.dataset.was) {
+          e.target.value = paid.dataset.was;
+          touched[keyOf(paid)] = true;
+          timer = timer || -1;  // put back on the way out
+        }
+        paid.classList.remove("is-bad");
+        e.target.blur();
+        paid.querySelector(".paid-show").focus();
+      }
     });
     form.addEventListener("submit", function (e) { e.preventDefault(); save(); });
     window.addEventListener("pagehide", function () {

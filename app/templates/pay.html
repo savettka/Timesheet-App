@@ -65,8 +65,21 @@
           </td>
           <td class="c-end">{{ m.total|money }}</td>
           <td class="c-paid">
-            <input type="text" name="paid_{{ m.key }}" inputmode="decimal" placeholder="Add"
-                   value="{{ '%g'|format(m.paid) if m.paid is not none }}" aria-label="Paid for {{ month_label }}">
+            {# The amount reads like the rest of the row; app.js turns it into
+               a box when it's pressed, and back once it's saved. #}
+            <div class="paid{{ ' is-empty' if m.paid is none }}">
+              <span class="paid-tick" aria-hidden="true">{{ icon('check') }}</span>
+              <button type="button" class="paid-show" aria-label="Paid for {{ month_label }}: {{ m.paid|money if m.paid is not none else 'not added' }}. Change">
+                <span class="paid-add">{{ icon('plus') }}Add amount</span>
+                <span class="paid-amount">{{ m.paid|money if m.paid is not none }}</span>
+                {{- icon('pencil', 'icon paid-pen') }}
+              </button>
+              <label class="paid-edit">
+                <span class="paid-sym" aria-hidden="true">{{ current_user.pay_symbol }}</span>
+                <input type="text" name="paid_{{ m.key }}" inputmode="decimal" autocomplete="off"
+                       value="{{ '%g'|format(m.paid) if m.paid is not none }}" aria-label="Paid for {{ month_label }}">
+              </label>
+            </div>
           </td>
           <td class="c-diff">{{ gap_pill(m.gap) }}</td>
         </tr>
