@@ -918,3 +918,73 @@ def fmt_money(amount, symbol="₹", exact=False, signed=False):
     if signed and value:
         return ("+" if amount > 0 else "−") + text
     return ("−" + text) if (amount or 0) < 0 and value else text
+
+
+# ------------------------------------------------------------- the year
+
+HEATMAP_WEEKS = 53
+
+
+def heatmap_first(today, weeks=HEATMAP_WEEKS):
+    """The Monday the year's heatmap starts on: weeks whole weeks, the last
+    one today's."""
+    return today - timedelta(days=today.weekday()) - timedelta(weeks=weeks - 1)
+
+
+def heat_level(worked, target):
+    """How dark a day's square is, 0 to 4, from its hours against its
+    target: none, under half, under the target, the target, and an hour or
+    more over it. Any work on a day with nothing due is all over."""
+    if worked <= 0:
+        return 0
+    if target <= 0 or worked >= target + 1:
+        return 4
+    if worked >= target - 1 / 60:
+        return 3
+    return 2 if worked >= target / 2 else 1
+
+
+def year_heatmap(user, entries_by_date, today, now=None, weeks=HEATMAP_WEEKS):
+    """The last year a day at a time, for the heatmap: weeks (Monday first)
+    of days, each with its hours against its target and a shade; leave is
+    marked as well as shaded. Days before the first one recorded, and days
+    still to come, are blank. With the months each week starts, and the
+    year's totals."""
+    first = heatmap_first(today, weeks)
+    recorded = [d for d in entries_by_date if first <= d <= today]
+    began = min(recorded) if recorded else today
+    columns, months, worked_total, days_worked = [], [], 0.0, 0
+    for w in range(weeks):
+        column = []
+        for i in range(7):
+            d = first + timedelta(days=w * 7 + i)
+            entry = entries_by_date.get(d)
+            worked = entry_total_hours(entry, now=now) if entry is not None and entry.login_time else 0.0
+            target = target_hours_for(user, d, entry)
+            leave = entry is not None and entry.target_override is not None
+            if d > today:
+                kind = "future"
+            elif d < began and entry is None:
+                kind = "blank"
+            elif leave:
+                kind = "leave"
+            elif worked > 0:
+                kind = "worked"
+            elif target <= 0:
+                kind = "rest"
+            else:
+                kind = "missed" if d < today else "none"
+            if kind not in ("future", "blank"):
+                worked_total += worked
+                days_worked += worked > 0
+            column.append({"date": d, "worked": worked, "target": target, "kind": kind,
+                           "level": heat_level(worked, target) if kind not in ("future", "blank") else 0})
+        # A month's name over the week its 1st falls in.
+        starts = next((day["date"] for day in column if day["date"].day == 1), None)
+        if starts is not None or w == 0:
+            months.append((w, (starts or column[0]["date"]).strftime("%b")))
+        columns.append(column)
+    if len(months) > 1 and months[1][0] - months[0][0] < 3:
+        months.pop(0)  # the first week's month, when the next name would crowd it
+    return {"first": first, "columns": columns, "months": months,
+            "worked_hours": worked_total, "days_worked": days_worked}

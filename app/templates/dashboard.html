@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% from "partials/icons.html" import icon %}
 {% from "partials/timer.html" import timer_card %}
+{% from "partials/heatmap.html" import heatmap_card %}
 {% block title %}Home{% endblock %}
 {% block page_title %}
   {%- set first_name = ((current_user.display_name or current_user.username).split() or [current_user.username])[0] -%}
@@ -305,6 +306,7 @@
   </section>
   {% endif %}
 
+  {{ heatmap_card(heatmap) }}
 </div>
 {% endblock %}
 

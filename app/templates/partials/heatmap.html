@@ -1,0 +1,30 @@
+{#
+  The last 12 months a square a day, a week a column: darker for more of
+  the day's target worked, striped for leave. A square opens its day; the
+  arrow keys move between them (app.js, initHeatmap).
+#}
+{% macro heatmap_card(hm) %}
+<section class="card hm-card" aria-labelledby="hm-title">
+  <div class="card-head">
+    <h2 id="hm-title" class="card-title">Last 12 months</h2>
+    <span class="card-sub">{{ hm.total }} · {{ hm.days_worked }} day{{ 's' if hm.days_worked != 1 }} worked</span>
+  </div>
+  <div class="hm-scroll">
+    <div class="hm" style="--weeks: {{ hm.columns|length }}">
+      <div class="hm-months" aria-hidden="true">
+        {%- for col, name in hm.months %}<span style="grid-column: {{ col + 1 }}">{{ name }}</span>{% endfor -%}
+      </div>
+      <div class="hm-names" aria-hidden="true"><span>Mon</span><span></span><span>Wed</span><span></span><span>Fri</span><span></span><span></span></div>
+      <div class="hm-grid" role="group" aria-label="Every day of the last 12 months" data-hm>
+        {%- for column in hm.columns %}{% for day in column %}
+        {%- if day.kind in ('future', 'blank') %}<span class="hm-day is-{{ day.kind }}"></span>
+        {%- else %}<a class="hm-day lv-{{ day.level }} is-{{ day.kind }}{{ ' is-today' if day.is_today }}"
+           href="{{ url_for('main.timesheet') if day.is_today else url_for('main.timesheet', date_str=day.date.isoformat()) }}"
+           aria-label="{{ day.label }}" tabindex="{{ '0' if day.is_today else '-1' }}"></a>
+        {%- endif %}{% endfor %}{% endfor -%}
+      </div>
+    </div>
+  </div>
+  <p class="hm-read" aria-live="polite" data-rest="{{ hm.today_label }}">{{ hm.today_label }}</p>
+</section>
+{% endmacro %}

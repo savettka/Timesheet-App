@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "partials/icons.html" import icon %}
+{% from "partials/heatmap.html" import heatmap_card %}
 {% block title %}Reports{% endblock %}
 {% block page_title %}Reports{% endblock %}
 
@@ -84,4 +85,5 @@
     </tbody>
   </table>
 </section>
+{{ heatmap_card(heatmap) }}
 {% endblock %}

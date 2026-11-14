@@ -2047,3 +2047,43 @@ select {
   .tw-tools form, .tw-keep { flex: 1 1 100%; flex-wrap: wrap; min-width: 0; margin-left: 0; }
   .tw-tools select, .tw-keep input { flex: 1 1 10rem; width: 0; max-width: none; }
 }
+
+/* ==========================================================================
+   The year: a square a day for the last 12 months, on Home and Reports.
+   ========================================================================== */
+.dash-grid > .hm-card { grid-column: 1 / -1; }
+.content > .hm-card { margin-top: var(--s4); }
+.hm-scroll { overflow-x: auto; margin: var(--s3) -4px 0; padding: 4px; }
+.hm {
+  --cell: minmax(11px, 1fr);
+  display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 6px;
+  min-width: calc(var(--weeks) * 14px + 36px);
+}
+.hm-months {
+  grid-column: 2; display: grid; grid-template-columns: repeat(var(--weeks), var(--cell)); gap: 3px;
+  font-size: 13px; line-height: 1.2; color: var(--text-3);
+}
+.hm-months span { white-space: nowrap; }
+.hm-names {
+  grid-row: 2; display: grid; grid-template-rows: repeat(7, 1fr); gap: 3px; align-items: center;
+  font-size: 12px; line-height: 1; color: var(--text-3);
+}
+.hm-grid {
+  grid-row: 2; grid-column: 2; display: grid; grid-auto-flow: column;
+  grid-template-rows: repeat(7, auto); grid-template-columns: repeat(var(--weeks), var(--cell)); gap: 3px;
+}
+.hm-day { display: block; aspect-ratio: 1; border-radius: 3px; background: var(--surface-3); }
+.hm-day.is-future, .hm-day.is-blank { background: transparent; }
+.hm-day.is-rest { background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line); }
+.hm-day.lv-1 { background-color: color-mix(in srgb, var(--go) 22%, var(--surface)); }
+.hm-day.lv-2 { background-color: color-mix(in srgb, var(--go) 45%, var(--surface)); }
+.hm-day.lv-3 { background-color: color-mix(in srgb, var(--go) 72%, var(--surface)); }
+.hm-day.lv-4 { background-color: var(--go); }
+/* Leave: striped, so it never rests on colour alone. */
+.hm-day.is-leave {
+  background-image: repeating-linear-gradient(135deg, color-mix(in srgb, var(--pause) 75%, transparent) 0 2px, transparent 2px 4.5px);
+}
+.hm-day.is-today { outline: 2px solid var(--accent); outline-offset: 1px; }
+a.hm-day:hover { outline: 2px solid var(--text-2); outline-offset: 1px; }
+a.hm-day:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.hm-read { margin-top: var(--s2); min-height: 1.5em; font-size: 15px; color: var(--text-2); font-variant-numeric: tabular-nums; }

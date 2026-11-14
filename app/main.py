@@ -25,6 +25,7 @@ from flask import (
 )
 from flask_login import current_user, login_required
 from sqlalchemy import func
+from sqlalchemy.orm import joinedload
 
 from app import db
 from app import logic
@@ -61,6 +62,47 @@ def get_entries_for_range(user_id, start_date, end_date):
         TimeEntry.date <= end_date,
     ).all()
     return {e.date: e for e in entries}
+
+
+def year_entries(user_id, today):
+    """Every day recorded for the year's heatmap, breaks and all, in one
+    query -- a year of days would otherwise fetch each day's breaks alone."""
+    entries = (TimeEntry.query.options(joinedload(TimeEntry.breaks))
+               .filter(TimeEntry.user_id == user_id, TimeEntry.date >= logic.heatmap_first(today),
+                       TimeEntry.date <= today).all())
+    return {e.date: e for e in entries}
+
+
+def heat_label(day):
+    """A heatmap square in words, for its link and the line under the grid."""
+    worked, target, kind = day["worked"], day["target"], day["kind"]
+    if kind == "leave":
+        what = "leave" + (f", {logic.fmt_duration(worked)} worked" if worked else "")
+    elif kind == "rest":
+        what = "rest day"
+    elif kind == "worked":
+        what = (f"{logic.fmt_duration(worked)} of {logic.fmt_duration(target)}" if target
+                else f"{logic.fmt_duration(worked)} on a rest day")
+    elif kind == "missed":
+        what = "nothing logged"
+    else:
+        what = "nothing yet"
+    return f"{day['date']:%a %d %b %Y}: {what}"
+
+
+def heatmap_view(user, today, now, entries=None):
+    """The year's heatmap (logic.year_heatmap) ready for the page."""
+    hm = logic.year_heatmap(user, entries if entries is not None else year_entries(user.id, today), today, now=now)
+    hm["today_label"] = ""
+    for column in hm["columns"]:
+        for day in column:
+            day["label"] = heat_label(day)
+            day["is_today"] = day["date"] == today
+            if day["is_today"]:
+                hm["today_label"] = day["label"]
+    hm["today"] = today
+    hm["total"] = logic.fmt_duration(hm["worked_hours"])
+    return hm
 
 
 def generate_temp_password(length=12):
@@ -355,6 +397,7 @@ def dashboard():
     ctx["can_time"] = ctx["day_state"] == "working"
     ctx["recent"] = recent_texts(current_user.id, today)
     ctx["pay"] = pay_for(current_user, today.year, today.month, ctx["month"]["balance_hours"])
+    ctx["heatmap"] = heatmap_view(current_user, today, ctx["now"])
     return render_template("dashboard.html", **ctx)
 
 
@@ -1464,7 +1507,7 @@ def timesheet_template_delete(date_str):
     return redirect(url_for("main.timesheet_week", date_str=days[0].isoformat()))
 
 
-REPORT_RANGES ={"week": "This week", "last-week": "Last week", "month": "This month", "last-month": "Last month"}
+REPORT_RANGES = {"week": "This week", "last-week": "Last week", "month": "This month", "last-month": "Last month"}
 
 
 def report_range(name, today):
@@ -1525,6 +1568,7 @@ def reports():
         tasks=tasks[:10], task_total=sum(m for _, m in tasks) or 1, written=len(lines),
         fmt_hours=logic.fmt_hours, fmt_balance=logic.fmt_balance, fmt_time=logic.fmt_time,
         fmt_length=logic.fmt_length, fmt_hours_compact=logic.fmt_hours_compact,
+        heatmap=heatmap_view(current_user, today, now),
     )
 
 

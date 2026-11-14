@@ -108,6 +108,9 @@ This mirrors the logic in the original spreadsheet:
 - **Dashboard** — today's hours, this week's progress bar toward your target, a
   suggested logout time once you're close to (or past) the weekly target, and the last
   week's days with Timesheet lines still to fill in.
+- **Last 12 months** — on Home and Reports, a square a day: darker for more of the day's
+  target worked, striped for leave, outlined for today. Point at (or tab to) a square for its
+  hours in words; click it to open the day. The arrow keys move a day or a week.
 - **Pay** — put your monthly salary in **Settings → Pay**, with the month it starts from
   (a rise gets its own line, so earlier months keep their old salary). Each month's
   hourly rate is the salary over its working hours (its workdays in Settings × the daily
