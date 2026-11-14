@@ -153,6 +153,10 @@ This mirrors the logic in the original spreadsheet:
   line times is kept, with where it came from: punched, typed in by hand, the timer, copied in
   or a batch. A day's editor lists its changes; a day whose punch times were typed by hand is
   marked **By hand** on History, with a lilac dot on Calendar, and in the Excel and PDF month.
+- **Balance adjustments** — on History, **Adjust the balance** adds hours to (or, with a
+  minus, takes them off) a month's balance on a date, with a reason: time off in lieu, a
+  correction. Each shows as its own row under its day and counts in the month's balance on
+  History, Home, Calendar, Pay and the Excel/PDF month; the days' own figures don't change.
 - **Settings** — change daily/weekly targets, workdays and your salary.
 - **More room** — the button at the top left hides the side menu entirely (the logo in the
   top bar still goes home); press it again to bring the menu back. The browser remembers.

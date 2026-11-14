@@ -33,7 +33,7 @@ from app import changes
 from app import mailer
 from app import reminders
 from app import weekly_report
-from app.models import BreakSegment, Goal, PayRecord, Salary, TimeEntry, User, WeekTemplate, WorkBlock
+from app.models import BalanceAdjustment, BreakSegment, Goal, PayRecord, Salary, TimeEntry, User, WeekTemplate, WorkBlock
 
 main_bp = Blueprint("main", __name__)
 
@@ -66,6 +66,13 @@ def get_entries_for_range(user_id, start_date, end_date):
         TimeEntry.date <= end_date,
     ).all()
     return {e.date: e for e in entries}
+
+
+def adjustments_between(user_id, first, last):
+    """Balance adjustments dated first to last (History adds them)."""
+    return (BalanceAdjustment.query.filter(BalanceAdjustment.user_id == user_id, BalanceAdjustment.date >= first,
+                                           BalanceAdjustment.date <= last)
+            .order_by(BalanceAdjustment.date, BalanceAdjustment.id).all())
 
 
 def year_entries(user_id, today):
@@ -504,8 +511,9 @@ def dashboard():
     first_day = today.replace(day=1)
     last_day = today.replace(day=calendar.monthrange(today.year, today.month)[1])
     month_entries = get_entries_for_range(current_user.id, first_day, last_day)
-    ctx["month"] = logic.month_summary(
-        current_user, month_entries, today.year, today.month, today, now=ctx["now"]
+    ctx["month"] = logic.adjusted_month_summary(
+        current_user, month_entries, today.year, today.month, today,
+        adjustments_between(current_user.id, first_day, last_day), now=ctx["now"]
     )
     ctx["to_fill"] = days_to_fill(current_user.id, ctx["now"], today)
     ctx["timer"] = timer_view(current_user, ctx["now"])
@@ -1999,7 +2007,8 @@ def _month_page(year, month):
     last_day = date(year, month, calendar.monthrange(year, month)[1])
     now = datetime.now()
     entries_by_date = get_entries_for_range(current_user.id, first_day, last_day)
-    summary = logic.month_summary(current_user, entries_by_date, year, month, today, now=now)
+    summary = logic.adjusted_month_summary(current_user, entries_by_date, year, month, today,
+                                           adjustments_between(current_user.id, first_day, last_day), now=now)
 
     prev_month = (first_day - timedelta(days=1)).replace(day=1)
     next_month_first = last_day + timedelta(days=1)
@@ -2033,6 +2042,56 @@ def history(year=None, month=None):
     if page is None:
         return redirect(url_for("main.history"))
     return render_template("history.html", **page)
+
+
+def parse_hours(raw):
+    """Hours typed for a balance adjustment: 2, -1.5, +2:30 or −0:45. None
+    for anything else, nothing at all, or more than 100h either way."""
+    raw = (raw or "").strip().replace("−", "-").replace(" ", "")
+    sign = -1 if raw.startswith("-") else 1
+    raw = raw.lstrip("+-")
+    try:
+        if ":" in raw:
+            h, m = raw.split(":", 1)
+            if not (h.isdigit() or h == "") or not m.isdigit() or int(m) >= 60:
+                return None
+            value = int(h or 0) + int(m) / 60
+        else:
+            value = float(raw)
+    except ValueError:
+        return None
+    value *= sign
+    return value if math.isfinite(value) and 0 < abs(value) <= 100 else None
+
+
+@main_bp.route("/history/adjust", methods=["POST"])
+@login_required
+def adjust_balance():
+    """A balance adjustment added from History: hours on a date, and why."""
+    try:
+        day = datetime.strptime(request.form.get("date", ""), "%Y-%m-%d").date()
+    except ValueError:
+        day = None
+    hours = parse_hours(request.form.get("hours"))
+    if day is None or not 1970 <= day.year <= 2100 or hours is None:
+        flash("Give the adjustment a date and its hours, like 2 or -1:30.", "error")
+        return redirect(local_path(request.form.get("back")) or url_for("main.history"))
+    reason = " ".join(request.form.get("reason", "").split())[:BalanceAdjustment.MAX_REASON]
+    db.session.add(BalanceAdjustment(user_id=current_user.id, date=day, hours=hours, reason=reason))
+    db.session.commit()
+    flash(f"Adjusted the balance {logic.fmt_balance(hours)} on {day:%a %d %b}.", "success")
+    return redirect(url_for("main.history", year=day.year, month=day.month))
+
+
+@main_bp.route("/history/adjust/<int:adjustment_id>/delete", methods=["POST"])
+@login_required
+def delete_adjustment(adjustment_id):
+    adjustment = BalanceAdjustment.query.filter_by(id=adjustment_id, user_id=current_user.id).first_or_404()
+    day, hours = adjustment.date, adjustment.hours
+    db.session.delete(adjustment)
+    db.session.commit()
+    flash(f"Removed the {logic.fmt_balance(hours)} adjustment on {day:%a %d %b}.", "success")
+    return redirect(url_for("main.history", year=day.year, month=day.month))
 
 
 EXPORTS = {
@@ -2655,9 +2714,11 @@ def pay_months(user, now):
     for d, entry in get_entries_for_range(user.id, first, today).items():
         by_month[(d.year, d.month)][d] = entry
     paid = {r.month: r.paid for r in user.pay_records}
+    adjustments = adjustments_between(user.id, first, today)
     months = []
     for year, month in sorted(by_month, reverse=True):
-        summary = logic.month_summary(user, by_month[(year, month)], year, month, today, now=now)
+        summary = logic.adjusted_month_summary(user, by_month[(year, month)], year, month, today, adjustments,
+                                               now=now)
         pay = pay_for(user, year, month, summary["balance_hours"])
         if pay is None:
             continue

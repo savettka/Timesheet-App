@@ -36,6 +36,9 @@
       </dd>
     </div>
   </dl>
+  {% if summary.adjustments %}
+  <p class="adj-note">{{ icon('sliders') }}Includes {{ fmt_balance(summary.adjusted_hours) }} of adjustments</p>
+  {% endif %}
   {% if summary.today_in_progress %}
   <p class="card-note">Today is still running, so only the hours it has reached count so far &mdash;
     the balance is your overtime as it stands right now.</p>
@@ -48,6 +51,27 @@
        href="{{ url_for('main.export_month', year=year, month=month, kind='pdf') }}"
        aria-label="Download {{ month_name }} {{ year }} as PDF">{{ icon('download') }}PDF</a>
   </div>
+  {# Hours added to or taken off the balance by hand. #}
+  {% set default_day = ((rows|selectattr('is_today')|first) or rows[-1]).date %}
+  <details class="adj-add">
+    <summary>{{ icon('plus') }}Adjust the balance</summary>
+    <form method="post" action="{{ url_for('main.adjust_balance') }}" class="adj-form js-once" autocomplete="off">
+      <input type="hidden" name="back" value="{{ url_for('main.history', year=year, month=month) }}">
+      <div class="field">
+        <label for="adj-date">Date</label>
+        <input type="date" id="adj-date" name="date" value="{{ default_day.isoformat() }}" required>
+      </div>
+      <div class="field">
+        <label for="adj-hours">Hours</label>
+        <input type="text" id="adj-hours" name="hours" inputmode="text" placeholder="2:30 or -1" required>
+      </div>
+      <div class="field adj-reason">
+        <label for="adj-reason">Reason <span class="optional">(optional)</span></label>
+        <input type="text" id="adj-reason" name="reason" maxlength="120" placeholder="Time off in lieu">
+      </div>
+      <button type="submit" class="btn btn-primary">{{ icon('check') }}Add</button>
+    </form>
+  </details>
 </section>
 
 <section class="card days-card" aria-labelledby="days-title">
@@ -113,6 +137,19 @@
         {% endif %}
         <td role="cell" class="c-go" aria-hidden="true">{{ icon('chevron-right') }}</td>
       </tr>
+      {% for a in summary.adjustments if a.date == row.date %}
+      {% set label = fmt_balance(a.hours) ~ ' adjustment on ' ~ a.date.strftime('%a %d %b') %}
+      <tr role="row" class="adj-row">
+        <th scope="row" role="rowheader" class="c-day">{{ icon('sliders', 'icon icon-inline') }}Adjustment</th>
+        <td role="cell" class="c-adj" colspan="5" data-label="Reason">{{ a.reason or '–' }}</td>
+        <td role="cell" class="c-bal {{ 'is-ahead' if a.hours > 0 else 'is-behind' }}" data-label="Balance">{{ fmt_balance(a.hours) }}</td>
+        <td role="cell" class="c-x">
+          <form method="post" action="{{ url_for('main.delete_adjustment', adjustment_id=a.id) }}" data-confirm="Remove the {{ label }}?">
+            <button type="submit" class="btn btn-icon adj-del" aria-label="Remove the {{ label }}" title="Remove">{{ icon('x') }}</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
       {% endfor %}
     </tbody>
   </table>

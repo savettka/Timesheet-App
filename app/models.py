@@ -87,6 +87,8 @@ class User(UserMixin, db.Model):
     goals = db.relationship("Goal", backref="user", lazy=True, cascade="all, delete-orphan")
     reminder_logs = db.relationship("ReminderLog", backref="user", lazy=True, cascade="all, delete-orphan")
     entry_changes = db.relationship("EntryChange", backref="user", lazy=True, cascade="all, delete-orphan")
+    balance_adjustments = db.relationship("BalanceAdjustment", backref="user", lazy=True,
+                                          cascade="all, delete-orphan")
 
     PAY_CURRENCIES = {"₹": "₹ Rupee", "£": "£ Pound", "$": "$ Dollar", "€": "€ Euro"}
 
@@ -294,6 +296,20 @@ class Goal(db.Model):
     active = db.Column(db.Boolean, nullable=False, default=True)
 
     __table_args__ = (db.UniqueConstraint("user_id", "kind", name="uq_goal_user_kind"),)
+
+
+class BalanceAdjustment(db.Model):
+    """Hours added to (or taken off) a month's balance by hand, on a date,
+    with why: time off in lieu, a correction agreed with the office."""
+
+    MAX_REASON = 120
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    date = db.Column(db.Date, nullable=False)
+    hours = db.Column(db.Float, nullable=False)
+    reason = db.Column(db.String(MAX_REASON), nullable=False, default="")
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
 class EntryChange(db.Model):

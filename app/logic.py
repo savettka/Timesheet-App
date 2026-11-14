@@ -252,6 +252,21 @@ def month_summary(user, entries_by_date, year, month, today, now=None):
     }
 
 
+def adjusted_month_summary(user, entries_by_date, year, month, today, adjustments, now=None):
+    """month_summary, with the month's balance adjustments -- hours added or
+    taken off by hand, each with a date, hours and a reason -- counted in
+    its balance. The days stay as they were; the adjustments are listed
+    beside them, and month_summary itself is unchanged."""
+    summary = dict(month_summary(user, entries_by_date, year, month, today, now=now))
+    mine = sorted((a for a in adjustments if (a.date.year, a.date.month) == (year, month)),
+                  key=lambda a: (a.date, a.id or 0))
+    summary["adjustments"] = mine
+    summary["adjusted_hours"] = sum(a.hours for a in mine)
+    summary["unadjusted_balance_hours"] = summary["balance_hours"]
+    summary["balance_hours"] += summary["adjusted_hours"]
+    return summary
+
+
 def month_workdays(user, year, month):
     """How many of the month's days are workdays in Settings: Mon-Sat gives
     26 in September 2026. Leave days count -- they're paid."""

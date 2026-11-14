@@ -182,6 +182,8 @@ def month_report(page, user, now):
         "break_total": sum(d["break_minutes"] for d in days),
         "running": page["is_current_month"],
         "generated": now,
+        # Hours added or taken off by hand: in the balance, listed apart.
+        "adjustments": [(a.date, _minutes(a.hours), a.reason) for a in summary.get("adjustments", ())],
     }
 
 
@@ -342,6 +344,18 @@ def build_xlsx(report):
         letter = chr(ord("A") + col)
         ws.write_formula(row, col, f"=SUM({letter}{first_day_row + 1}:{letter}{last_day_row + 1})", total_duration)
     ws.write_string(row, 10, _days_worked(report["days_worked"]), total)
+
+    # Balance adjustments: in the month's overtime above, each a row of its own.
+    for day, minutes, reason in report["adjustments"]:
+        row += 1
+        plain = {"border": 1, "border_color": LINE}
+        ws.write_datetime(row, 0, datetime.combine(day, time()), fmt(num_format="dd mmm yyyy", **plain))
+        ws.write_string(row, 1, "Adjustment", fmt(bold=True, **plain))
+        over, short = (8, 9) if minutes > 0 else (9, 8)
+        ws.write_datetime(row, over, timedelta(minutes=abs(minutes)),
+                          fmt(num_format="[h]:mm", font_color=AHEAD if minutes > 0 else BEHIND, **plain))
+        ws.write_blank(row, short, None, fmt(**plain))
+        ws.write_string(row, 12, reason, fmt(**plain))
 
     ws.freeze_panes(head_row + 1, 0)
     ws.autofilter(head_row, 0, last_day_row, len(columns) - 1)
@@ -678,7 +692,10 @@ class _Pdf:
         put(4, fmt_minutes(r["worked"]), base, "Helvetica-Bold", 9.5)
         put(5, fmt_minutes(r["target"]), base, "Helvetica-Bold", 9.5)
         balance(6, r["balance"], base, 9.5)
-        self.text(notes_x, base, _days_worked(r["days_worked"]), "Helvetica", 8.5, BRAND_MUTED)
+        adjusted = sum(m for _, m, _ in r["adjustments"])
+        self.text(notes_x, base, _days_worked(r["days_worked"])
+                  + (f" · incl. {fmt_signed(adjusted)} adjusted" if r["adjustments"] else ""),
+                  "Helvetica", 8.5, BRAND_MUTED)
         self.footer(1, 2)
 
     # -- page 2: the month as pastel tiles

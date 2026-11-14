@@ -33,7 +33,7 @@ SOURCES = {
     "main.timesheet_batch": "batch",
     "main.timesheet_week_copy_last": "import", "main.timesheet_template_use": "import",
 }
-SOURCE_WORDS = {"punch": "Punched", "edit": "By hand", "timer": "Timer", "import": "Copied in", "batch": "Batch"}
+SOURCE_WORDS = {"punch": "By button", "edit": "By hand", "timer": "Timer", "import": "Copied in", "batch": "Batch"}
 
 
 def source():
