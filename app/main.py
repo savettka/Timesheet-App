@@ -2390,13 +2390,14 @@ def timesheet(date_str=None):
             # A break moved or reworded is saved as a line, and still shown as a break.
             is_break=is_break or text.casefold() == "break",
             placeholder="", error="", error_on="", can_end=False, end_confirm="",
-            copied=block.copied if block is not None and block.is_copied else "", length="",
+            copied=block.copied if block is not None and block.is_copied else "", length="", span="",
         )
 
     def day_views(lines):
         views = [line_view(hhmm(start), hhmm(end), block) for start, end, block in lines]
         for view, (start, end, _) in zip(views, lines):
             view.length = logic.fmt_length(end - start)
+            view.span = logic.fmt_span(start, end)  # the phone's list: 9:00–10:00 AM
         minute = logic.day_minute(day, now)
         current = next((v for v, (start, end, _) in zip(views, lines)
                         if day == today and start <= minute < end), None)
@@ -2519,7 +2520,7 @@ def timesheet(date_str=None):
             draft = SimpleNamespace(
                 id=block_id, start=start_raw, end=end_raw, text=text, was_start=was_start, was_end=was_end,
                 was_text=was_text, is_now=False, is_break=False, placeholder="", error="", error_on="",
-                can_end=False, end_confirm="", copied="", length="",
+                can_end=False, end_confirm="", copied="", length="", span="",
             )
             drafts.append(draft)
             if dropped[index] == "1":

@@ -2482,6 +2482,18 @@ button.tab-link { border: 0; background: transparent; font: inherit; font-size: 
      taking two lines rather than pushing its box underneath. */
   .goal-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
   .goal-value input { width: 8.5rem; }
+
+  /* Timesheet: to look at, not to write in -- no tick boxes, no batch bar,
+     and the Day tab's lines as a list. */
+  .pick, .bb, .ts-form { display: none !important; }
+  .ta-line { grid-template-columns: minmax(0, 1fr) auto 20px; grid-template-areas: "span len mark" "text text text"; padding-left: 0; }
+  .ts-read { margin-top: var(--s3); border-top: 1px solid var(--line); }
+  .ts-read .ta-break .ta-text { color: var(--text-3); font-weight: 500; }
+  .ts-read .ta-blank .ta-text {
+    justify-self: start; padding: 2px 10px; border-radius: 999px;
+    background: var(--warn-bg); color: var(--warn-text); font-size: 14px; font-weight: 600;
+  }
+  .ts-read .ts-now { font-size: 12.5px; }
 }
 
 /* Opening a page: its parts slide up into place, not in from the side --

@@ -7,6 +7,12 @@
     return Math.floor(total / 60) + "h " + String(total % 60).padStart(2, "0") + "m";
   }
 
+  // A phone (style.css's breakpoint): the Timesheet and Calendar are there
+  // to look at, so nothing on them writes or changes a line.
+  function onPhone() {
+    return !!(window.matchMedia && window.matchMedia("(max-width: 899px)").matches);
+  }
+
   // A length of time for a sentence: 25m, 1h 05m, 8h (matches the server).
   function fmtDuration(hours) {
     var total = Math.max(0, Math.round(hours * 60));
@@ -2383,6 +2389,12 @@
 
     var dragged = false;
     grid.addEventListener("click", function (e) {
+      // A phone only looks: a line's link opens its day on the Timesheet,
+      // and the empty part of the day does nothing.
+      if (onPhone()) {
+        if (!e.target.closest(".cg-block[href]")) e.preventDefault();
+        return;
+      }
       if (dragged) { e.preventDefault(); dragged = false; return; }
       var col = e.target.closest(".cg-col");
       if (!col) return;
@@ -2399,7 +2411,7 @@
     // the line itself (with a mouse or pen) moves the whole of it, snapping
     // to the zoom. A press that hardly moves is a click: the line's box opens.
     grid.addEventListener("pointerdown", function (e) {
-      if (e.button !== 0) return;
+      if (e.button !== 0 || onPhone()) return;
       var block = e.target.closest('.cg-block[aria-describedby="cg-keys"]');
       if (!block) return;
       var grip = e.target.closest(".cg-grip");
@@ -2447,7 +2459,7 @@
     var keyed = null, keyA, keyB, keyA0, keyB0, waiting = null;
     grid.addEventListener("keydown", function (e) {
       var block = e.target.closest && e.target.closest('.cg-block[aria-describedby="cg-keys"]');
-      if (!block) return;
+      if (!block || onPhone()) return;
       if (e.key === "Escape" && keyed === block) {
         e.preventDefault();
         clearTimeout(waiting);
@@ -2852,6 +2864,7 @@
     document.addEventListener("contextmenu", function (e) {
       var line = lineOf(e.target);
       if (!line || e.target.matches('input[type="text"], textarea')) return;
+      if (onPhone() && !line.matches(".kb-card")) return;  // Timesheet and Calendar: look only
       e.preventDefault();
       open(line, e.clientX, e.clientY, line.querySelector(".ts-more, .kb-more") || line);
     });

@@ -86,7 +86,7 @@
     </table>
   </div>
 
-  <div class="ts-foot">
+  <div class="ts-foot desk-only">
     {% if copy_text %}
     <button type="button" class="btn btn-secondary tw-copy" data-copy="{{ copy_text }}" hidden>{{ icon('copy') }}<span>Copy week</span></button>
     {% endif %}
@@ -107,7 +107,7 @@
   {# Lines onto this week's free time -- from last week, or a template --
      and this week kept as a template. #}
   {% if can_fill or total_lines %}
-  <div class="tw-tools" role="group" aria-label="Week tools">
+  <div class="tw-tools desk-only" role="group" aria-label="Week tools">
     {% if can_fill %}
     <form method="post" action="{{ url_for('main.timesheet_week_copy_last', date_str=days[0].isoformat()) }}" class="js-once" autocomplete="off">
       <button type="submit" class="btn btn-secondary">{{ icon('copy') }}Copy last week</button>

@@ -6,7 +6,7 @@
 {% block page_title %}Timesheet{% endblock %}
 
 {% block content %}
-{% if timer or can_time %}<div class="ts-card ts-timer">{{ timer_card(timer, can_time, recent, 'timesheet') }}</div>{% endif %}
+{% if timer or can_time %}<div class="ts-card ts-timer desk-only">{{ timer_card(timer, can_time, recent, 'timesheet') }}</div>{% endif %}
 <section class="card form-card ts-card" aria-labelledby="day-title">
   <nav class="seg" aria-label="Timesheet view">
     <a href="{{ url_for('main.timesheet', date_str=day.isoformat()) }}" aria-current="page">Day</a>
@@ -56,6 +56,24 @@
     {% if day_span %}<li class="ts-chip">{{ icon('clock') }}{{ day_span }} · <b>{{ day_worked }}</b> worked</li>{% endif %}
     <li class="ts-chip ts-chip-copied" id="ts-copied-count"{{ ' hidden' if not posts }}>{{ icon('check') }}<span><b>{{ posts|selectattr('copied')|list|length }} of {{ posts|length }}</b> copied</span></li>
   </ul>
+
+  {# A phone only looks at the day: its lines, as on the All tab. #}
+  <div class="phone-only">
+    {% if lines %}
+    <ul class="ta-lines ts-read" aria-label="Your time on {{ day.strftime('%A %d %B') }}">
+      {% for line in lines %}
+      <li class="ta-line{{ ' ta-break' if line.is_break }}{{ ' ta-blank' if not line.text }}">
+        <span class="ta-span">{{ line.span or (line.start ~ '–' ~ line.end) }}</span>
+        <span class="ta-text">{{ line.text or 'Not written' }}</span>
+        <span class="ta-len">{% if line.is_now %}<span class="badge ts-now">Now</span>{% else %}{{ line.length }}{% endif %}</span>
+        <span class="ta-mark">{% if line.copied %}{{ icon('check', 'icon icon-inline') }}<span class="visually-hidden">copied</span>{% endif %}</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="ta-none ta-nothing">Nothing logged this day.</p>
+    {% endif %}
+  </div>
 
   {# Always to this page's own date, so a page left open past midnight still
      saves to the day it shows. #}
