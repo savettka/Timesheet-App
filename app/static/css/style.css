@@ -2367,7 +2367,7 @@ input[type="time"][readonly], input[type="date"][readonly] { caret-color: transp
 .goal-rows { list-style: none; display: flex; flex-direction: column; gap: var(--s2); }
 .goal-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s1) var(--s3); min-height: 48px; }
 .goal-on { display: flex; align-items: center; gap: var(--s2); min-height: 44px; font-weight: 600; cursor: pointer; }
-.goal-on input { width: 20px; height: 20px; accent-color: var(--accent); }
+.goal-on input { flex: none; width: 20px; height: 20px; accent-color: var(--accent); }
 .goal-value { display: flex; align-items: center; gap: 6px; margin-left: auto; }
 /* Wide enough for "03:00 PM" and the clock button on a 12-hour clock. */
 .goal-value input { width: 9.5rem; min-height: 44px; font-size: 16px; }
@@ -2382,11 +2382,14 @@ body { overflow-x: clip; }
 @media (max-width: 899px) {
   .content { padding-top: 12px; padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(12px, env(safe-area-inset-right)); }
   .card { padding: 16px 14px; border-radius: 16px; }
+  .card.days-card { padding: 0; }
   .dash-grid, .settings-grid, .hol-grid, .rp-grid { gap: 12px; }
   .content > .card + .card, .content > section + section { margin-top: 12px; }
   .explain { display: none; }
   .seg { margin-bottom: 12px; }
-  .seg a { min-height: 44px; padding: 0 16px; }
+  /* The full width, in equal parts, every label on one line. */
+  .seg { width: 100%; }
+  .seg a { flex: 1 1 0; justify-content: center; min-height: 44px; padding: 0 6px; font-size: min(14px, 3.75vw); white-space: nowrap; }
   .month-nav { gap: 8px; margin-bottom: 12px; }
   .month-nav .btn-icon { width: 44px; height: 44px; min-height: 44px; }
   .month-title { min-width: 0; font-size: 19px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -2439,6 +2442,46 @@ button.tab-link { border: 0; background: transparent; font: inherit; font-size: 
   .tw-day-tasks .is-unwritten { color: var(--warn-text); }
   .tw-day-tasks .is-unwritten span:last-child { color: var(--warn-text); }
   .tw-none { padding: var(--s4) 0; text-align: center; color: var(--text-3); }
+}
+
+/* Phones, page by page. */
+@media (max-width: 899px) {
+  /* Home: the clock card tighter. */
+  .status-card { gap: 14px; }
+  .timer-value { font-size: 44px; }
+
+  /* History and Reports: each day one row, all of it a tap. */
+  .days .day-link::after { content: ""; position: absolute; inset: 0; }
+  .days .c-none { display: block; padding: var(--s4); color: var(--text-3); text-align: center; }
+
+  /* Settings: a list of its sections; the one in the address opens alone,
+     with a way back to the list. */
+  /* A section opens at the top of the page, under its back link. */
+  .settings-grid > .card { display: none; scroll-margin-top: 100vh; }
+  .settings-grid > .card:target { display: block; }
+  .set-menu:has(~ .settings-grid > .card:target), .set-back { display: none; }
+  .set-back:has(~ .settings-grid > .card:target) { display: inline-flex; }
+  .set-menu {
+    border-radius: var(--r-lg); background: var(--surface); border: 1px solid var(--card-border);
+    box-shadow: var(--shadow); overflow: hidden;
+  }
+  .set-menu a {
+    display: flex; align-items: center; gap: var(--s3); min-height: 54px; padding: 0 var(--s4);
+    border-top: 1px solid var(--line); color: var(--text); font-size: 16px; font-weight: 600; text-decoration: none;
+  }
+  .set-menu a:first-child { border-top: 0; }
+  .set-menu a:active { background: var(--surface-2); }
+  .set-menu a span { flex: 1; }
+  .set-menu .icon { width: 20px; height: 20px; color: var(--accent-text); }
+  .set-menu .set-chev { color: var(--text-3); }
+  .set-back {
+    align-items: center; gap: 4px; min-height: 44px; margin-bottom: var(--s2);
+    color: var(--accent-text); font-weight: 600; text-decoration: none;
+  }
+  /* Goals and Reminders: the values one column down the right, a long name
+     taking two lines rather than pushing its box underneath. */
+  .goal-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+  .goal-value input { width: 8.5rem; }
 }
 
 /* Opening a page: its parts slide up into place, not in from the side --

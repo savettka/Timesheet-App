@@ -5,8 +5,19 @@
 {% block page_title %}Settings{% endblock %}
 
 {% block content %}
+{# A phone: the sections as a list, each opening on its own -- the one in
+   the address (#goals) shows, the rest wait (style.css). #}
+<a class="set-back phone-only" href="#">{{ icon('chevron-left') }}Settings</a>
+<nav class="set-menu phone-only" aria-label="Settings">
+  {% for anchor, label, icon_name in [('targets', 'Hours & targets', 'clock'), ('pay', 'Pay', 'wallet'),
+                                     ('goals', 'Goals', 'flag'), ('reminders', 'Reminders', 'alert'),
+                                     ('emails', 'Weekly email', 'mail'), ('holidays', 'Holidays', 'calendar'),
+                                     ('profile', 'Profile', 'user')] + ([('team', 'Team members', 'list')] if user.is_admin else []) %}
+  <a href="#{{ anchor }}">{{ icon(icon_name) }}<span>{{ label }}</span>{{ icon('chevron-right', 'icon set-chev') }}</a>
+  {% endfor %}
+</nav>
 <div class="settings-grid">
-  <section class="card" aria-labelledby="targets-heading">
+  <section class="card" id="targets" aria-labelledby="targets-heading">
     <h2 id="targets-heading" class="card-title">Hours &amp; targets</h2>
     <p class="card-note explain">The same rule as your spreadsheet: 8h a day on workdays, nothing on your rest day,
       48h a week &mdash; change any of it here.</p>
@@ -195,7 +206,7 @@
         </li>
         {% endfor %}
       </ul>
-      <p class="hint" id="idle-hint">Away counts only STM's pages in this browser, not other programs.</p>
+      <p class="hint explain" id="idle-hint">Away counts only STM's pages in this browser, not other programs.</p>
       <p class="notify-row" hidden>
         <span class="notify-state">Browser notifications</span>
         <button type="button" class="btn btn-secondary btn-sm" data-notify>Turn on</button>
@@ -236,7 +247,7 @@
     </div>
   </section>
 
-  <section class="card" aria-labelledby="profile-heading">
+  <section class="card" id="profile" aria-labelledby="profile-heading">
     <div class="card-head">
       <h2 id="profile-heading" class="card-title">Profile</h2>
       {% if user.is_admin %}<span class="badge badge-accent">Admin</span>{% endif %}
@@ -256,7 +267,7 @@
   </section>
 
   {% if user.is_admin %}
-  <section class="card card-wide" aria-labelledby="team-heading">
+  <section class="card card-wide" id="team" aria-labelledby="team-heading">
     <div class="card-head">
       <h2 id="team-heading" class="card-title">Team members</h2>
       <span class="badge">Only you can see this</span>

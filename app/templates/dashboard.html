@@ -77,7 +77,7 @@
           {%- elif day_state == 'done' -%}
             {{ fmt_time(today_entry.login_time) }} to {{ fmt_time(today_entry.logout_time) }}
           {%- elif day_state == 'stale' -%}
-            You logged in at {{ fmt_time(open_entry.login_time) }} and it looks like you didn't log out.
+            <span class="desk-only">You logged in at {{ fmt_time(open_entry.login_time) }} and it looks like you didn't log out.</span><span class="phone-only">In at {{ fmt_time(open_entry.login_time) }} &middot; no logout</span>
           {%- elif today_entry and today_entry.is_leave -%}
             {{ today_entry.leave_label or 'Leave' }} today &middot; {{ fmt_duration(today_target) + ' due' if today_target else 'nothing due' }}
           {%- elif today_target == 0 -%}
@@ -125,7 +125,7 @@
         {# Times are put right in the day editor, the same place as any other
            correction -- not in a box on Home. #}
         {% set stale_day = open_entry.date.strftime('%a %d %b') %}
-        <p class="stale-text">Open the day and put in the time you finished
+        <p class="stale-text explain">Open the day and put in the time you finished
           {%- if open_break %}, and when your {{ fmt_time(open_break.break_start) }} break ended{% endif %}.</p>
         <a class="btn btn-action btn-go" href="{{ url_for('main.edit_entry', date_str=open_entry.date.isoformat()) }}">
           {{ icon('pencil') }}Fix {{ stale_day }}</a>
@@ -157,7 +157,7 @@
         {%- if month_minutes > 0 %}ahead of target{% elif month_minutes < 0 %}behind target{% else %}right on target{% endif -%}
       </span>
     </p>
-    <p class="card-note">{{ fmt_hours(month.worked_hours) }} worked of {{ fmt_hours(month.target_hours) }} due so far{% if month.today_in_progress %} &middot; today counts as you go{% endif %}.</p>
+    <p class="card-note">{{ fmt_hours(month.worked_hours) }} worked of {{ fmt_hours(month.target_hours) }} due so far{% if month.today_in_progress %}<span class="explain"> &middot; today counts as you go</span>{% endif %}</p>
     {% if pay %}
     {# What this month's overtime pays at its hourly rate, and the salary at
        month end with it -- moving as the hours do. #}

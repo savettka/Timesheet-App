@@ -40,7 +40,7 @@
       </li>
       {% endfor %}
     </ol>
-    <p class="rp-readout" id="rp-readout" aria-live="polite">{{ 'Point at or tap a bar for its day.' if days|length > 7 else '' }}</p>
+    <p class="rp-readout" id="rp-readout" aria-live="polite">{% if days|length > 7 %}<span class="explain">Point at or tap a bar for its day.</span>{% endif %}</p>
   </section>
 
   <section class="card" aria-labelledby="rp-tasks">
@@ -71,7 +71,7 @@
     <tbody>
       {% for d in days if not d.future and (d.entry or d.due) %}
       {% set m = (d.balance * 60)|round|int %}
-      <tr class="{{ 'is-today' if d.is_today }}">
+      <tr class="day-row{{ ' is-today' if d.is_today }}">
         <td class="c-day"><a class="day-link" href="{{ url_for('main.timesheet', date_str=d.date.isoformat()) }}">{{ d.date.strftime('%a %d %b') }}</a></td>
         <td class="c-in">{{ fmt_time(d.entry.login_time) if d.entry and d.entry.login_time else '–' }}</td>
         <td class="c-out">{{ fmt_time(d.entry.logout_time) if d.entry and d.entry.logout_time else '–' }}</td>
@@ -80,7 +80,7 @@
         <td class="c-bal {{ 'is-ahead' if m > 0 else ('is-behind' if m < 0 else '') }}">{{ fmt_balance(d.balance) }}</td>
       </tr>
       {% else %}
-      <tr><td colspan="6" class="is-empty">Nothing logged in this period yet.</td></tr>
+      <tr><td colspan="6" class="c-none">Nothing logged in this period yet.</td></tr>
       {% endfor %}
     </tbody>
   </table>
