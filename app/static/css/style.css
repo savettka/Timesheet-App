@@ -2395,6 +2395,15 @@ body { overflow-x: clip; }
   .cal th, .cal-hours, .cal-bal, .cal-day.is-leave .cal-hours { font-size: 13px; }
   .card-title { font-size: 18px; }
 }
+/* The tab bar's More: a button like the links beside it, its pill shown on
+   a page that lives behind it. */
+button.tab-link { border: 0; background: transparent; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.tab-link.is-here { color: var(--text); }
+.tab-link.is-here .icon { background: var(--pill); color: var(--on-pill); }
+.more-sheet .pf-row[aria-current="page"] { background: var(--accent-soft); color: var(--accent-text); font-weight: 600; }
+.more-sheet .pf-row .icon { width: 20px; height: 20px; }
+@media (min-width: 900px) { .more-sheet { display: none; } }
+
 /* Opening a page: its parts slide up into place, not in from the side --
    which on a phone pushed them past the edge of the screen. */
 @media (prefers-reduced-motion: no-preference) and (max-width: 899px) {

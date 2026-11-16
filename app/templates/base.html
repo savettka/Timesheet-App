@@ -141,7 +141,13 @@
       ]),
   ] %}
   {% set nav_items = nav_sections|map(attribute=1)|sum(start=[]) %}
-  {% set tab_items = nav_items|rejectattr(0, 'in', ['main.settings', 'main.history', 'main.pay'])|list %}
+  {# Phones: four pages under the thumb, the rest behind More. #}
+  {% set tab_items = nav_items|selectattr(0, 'in', ['main.dashboard', 'main.timesheet', 'main.calendar', 'main.reports'])|list %}
+  {% set more_items = nav_items|rejectattr(0, 'in', ['main.dashboard', 'main.timesheet', 'main.calendar', 'main.reports'])|list
+      + [('main.holidays_page', 'Holidays', 'flag', ['main.holidays_page'])] %}
+  {% set here = namespace(more=false) %}
+  {% for item in more_items if request.endpoint in item[3] %}{% set here.more = true %}{% endfor %}
+  {% set on_more = here.more %}
   <div class="app-shell">
     <aside class="sidebar" id="side-menu">
       <a class="brand" href="{{ url_for('main.dashboard') }}">
@@ -206,8 +212,26 @@
           {{ icon(icon_name) }}<span>{{ label }}</span>
         </a>
       {% endfor %}
+      <button type="button" class="tab-link{{ ' is-here' if on_more }}" data-more aria-haspopup="dialog"
+              aria-controls="more-sheet" aria-expanded="false">
+        {{ icon('more') }}<span>More</span>
+      </button>
     </nav>
   </div>
+
+  {# More, on a phone: the pages that don't fit the bar, in a sheet. #}
+  <dialog class="pf-pop more-sheet" id="more-sheet" aria-labelledby="more-title">
+    <div class="pf-inner">
+      <div class="pf-head">
+        <div class="pf-who"><p class="pf-name" id="more-title">More</p></div>
+        <button type="button" class="btn btn-icon btn-ghost pf-close" data-more-close aria-label="Close">{{ icon('x') }}</button>
+      </div>
+      {% for endpoint, label, icon_name, active_on in more_items %}
+      <a class="pf-row" href="{{ url_for(endpoint) }}"{% if request.endpoint in active_on %} aria-current="page"{% endif %}>
+        {{ icon(icon_name) }}<span>{{ label }}</span></a>
+      {% endfor %}
+    </div>
+  </dialog>
 
   {% if bar and bar.idle %}
   {# The idle prompt (app.js, initIdle): back after a while with no activity

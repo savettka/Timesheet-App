@@ -358,6 +358,25 @@
     pop.addEventListener("submit", function () { pop.close(); });
   }
 
+  // More, in a phone's tab bar: the pages that don't fit there, in a sheet
+  // from the bottom. Escape, the cross or a press outside shuts it.
+  function initMoreSheet() {
+    var sheet = document.getElementById("more-sheet");
+    var button = document.querySelector("[data-more]");
+    if (!sheet || !button || typeof sheet.showModal !== "function") return;
+    button.addEventListener("click", function () {
+      sheet.showModal();
+      button.setAttribute("aria-expanded", "true");
+    });
+    sheet.addEventListener("click", function (e) {
+      if (e.target === sheet || (e.target.closest && e.target.closest("[data-more-close]"))) sheet.close();
+    });
+    sheet.addEventListener("close", function () {
+      button.setAttribute("aria-expanded", "false");
+      button.focus();
+    });
+  }
+
   // ------------------------------------------------------------------ pay
   // The Pay page's Paid amounts read as text, like the rest of the row.
   // Pressing one turns it into a box (the currency fixed inside); a moment
@@ -3002,6 +3021,7 @@
     initBreakRows();
     initAvatarPicker();
     initProfilePop();
+    initMoreSheet();
     initPayAutosave();
     initDayType();
     initTimesheetCopy();
