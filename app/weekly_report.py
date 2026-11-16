@@ -1,7 +1,7 @@
 """The weekly report email: the week as the firm's own weekly summary lays
-it out -- working days, time worked and on breaks, a productivity rate,
-each day's tasks -- with the week against its target, and what's still to
-do on the Timesheet.
+it out -- working days (only days with time worked), time worked and on
+breaks, a productivity rate, and each day's hours and breaks -- with the
+week against its target. Nothing from the Timesheet's lines.
 
 It goes 15 minutes after the logout on the week's last workday (Saturday,
 as Settings has it). There's no scheduler on the free PythonAnywhere plan,
@@ -10,20 +10,20 @@ with how long until it's due, and the page asks again then -- or, with no
 page open, the next time one is. ReminderLog keeps it to once a week.
 """
 
-from collections import defaultdict
 from datetime import datetime, time, timedelta
 
 from flask import render_template, url_for
 from sqlalchemy.exc import IntegrityError
 
 from app import db, logic, mailer
-from app.models import ReminderLog, TimeEntry, WorkBlock
+from app.models import ReminderLog, TimeEntry
 
 KIND = "weekly_report"
 DELAY = timedelta(minutes=15)    # after the last workday's logout
 RETRY = timedelta(minutes=15)    # after a failed send
 STUCK = timedelta(minutes=10)    # a send that never said how it went
 MOST_TRIES = 4
+WORKED_DAY = 1  # minutes: less than this worked isn't a working day
 
 
 def clock(seconds):
@@ -42,17 +42,14 @@ def productivity(worked_hours, days_worked, daily_target):
 
 
 def build_report(user, monday, now):
-    """Everything the week's email says, from Monday to Sunday."""
+    """Everything the week's email says, from Monday to Sunday: the days
+    worked -- a day with no time worked (logged in by mistake) is neither
+    counted nor shown -- with their hours and breaks, and leave."""
     days = logic.week_dates(monday)
     entries = {e.date: e for e in TimeEntry.query.filter(
         TimeEntry.user_id == user.id, TimeEntry.date >= days[0], TimeEntry.date <= days[-1])}
-    blocks = defaultdict(list)
-    for b in WorkBlock.query.filter(WorkBlock.user_id == user.id, WorkBlock.date >= days[0],
-                                    WorkBlock.date <= days[-1]):
-        blocks[b.date].append(b)
 
-    rows, worked_total, break_total, days_worked = [], 0.0, 0.0, 0
-    unwritten_days, not_posted, open_days = [], 0, []
+    rows, worked_total, break_total, days_worked, open_days = [], 0.0, 0.0, 0, []
     target = user.weekly_target_hours
     for d in days:
         entry = entries.get(d)
@@ -60,35 +57,21 @@ def build_report(user, monday, now):
             target += logic.target_hours_for(user, d, entry) - logic.entry_target_hours(user, d)
         logged = entry is not None and entry.login_time is not None
         leave = (entry.leave_label or "Leave") if entry is not None and entry.target_override is not None else None
-        if not logged:
+        worked = logic.entry_total_hours(entry, now=now) if logged else 0.0
+        if logged and logic.is_stale_shift(entry, now):
+            open_days.append(f"{d:%a %d %b}")
+        if worked * 60 < WORKED_DAY:
             if leave:
                 rows.append({"date": d, "label": f"{d:%A, %d %b %Y}", "worked": clock(0), "breaks": clock(0),
-                             "tasks": [], "unwritten": None, "span": "", "leave": leave})
+                             "span": "", "leave": leave})
             continue
-        if logic.is_stale_shift(entry, now):
-            open_days.append(f"{d:%a %d %b}")
-        worked = logic.entry_total_hours(entry, now=now)
         breaks = logic.entry_break_hours(entry, now=now)
-        tasks, written, empty = defaultdict(int), 0, 0
-        minute = logic.day_minute(d, now)
-        for a, b, block in logic.timesheet_lines(entry, d, now, blocks[d]):
-            if block is None:
-                empty += b <= minute
-            elif block != logic.TIMESHEET_BREAK and block.text and block.text.casefold() != "break":
-                tasks[block.text] += (b - a) * 60
-                written += (b - a) * 60
-                not_posted += not block.is_copied
-        if empty:
-            unwritten_days.append((f"{d:%a %d %b}", empty))
-        unwritten = worked * 3600 - written
         worked_total += worked
         break_total += breaks
-        days_worked += worked > 0
+        days_worked += 1
         until = logic.fmt_time(entry.logout_time) if entry.logout_time else "now"
         rows.append({
             "date": d, "label": f"{d:%A, %d %b %Y}", "worked": clock(worked * 3600), "breaks": clock(breaks * 3600),
-            "tasks": [(text, clock(s)) for text, s in sorted(tasks.items(), key=lambda t: (-t[1], t[0].casefold()))],
-            "unwritten": clock(unwritten) if unwritten >= 60 else None,
             "span": f"{logic.fmt_time(entry.login_time)} – {until}", "leave": leave,
         })
 
@@ -108,7 +91,7 @@ def build_report(user, monday, now):
         "target": logic.fmt_target_hours(target), "balance": logic.fmt_balance(balance),
         "ahead": round(balance * 60) >= 0,
         "overtime_pay": logic.fmt_money(pay["overtime_pay"], user.pay_symbol) if pay and pay["overtime_pay"] else None,
-        "rows": rows, "unwritten_days": unwritten_days, "not_posted": not_posted, "open_days": open_days,
+        "rows": rows, "open_days": open_days,
         "has_work": days_worked > 0,
     }
 
@@ -132,17 +115,11 @@ def render_text(report):
            + (f" · overtime pay {r['overtime_pay']}" if r["overtime_pay"] else ""), ""]
     for row in r["rows"]:
         out.append(f"{row['label']}  {row['leave'] or row['worked']}")
-        out += [f"  {text}  {length}" for text, length in row["tasks"]]
-        if row["unwritten"]:
-            out.append(f"  Not written yet  {row['unwritten']}")
-        if not row["leave"] or row["span"]:
+        if row["span"]:
             out.append(f"  {row['span']} · Break {row['breaks']}")
         out.append("")
-    if r["unwritten_days"] or r["not_posted"] or r["open_days"]:
-        out.append("Still to do:")
-        out += [f"  {day}: {n} line{'s' if n != 1 else ''} to fill in" for day, n in r["unwritten_days"]]
-        if r["not_posted"]:
-            out.append(f"  {r['not_posted']} line{'s' if r['not_posted'] != 1 else ''} not marked posted")
+    if r["open_days"]:
+        out.append("To fix:")
         out += [f"  {day}: no logout" for day in r["open_days"]]
     return "\n".join(out) + "\n"
 

@@ -53,41 +53,19 @@
           <td style="{{ font }}font-size:15px;font-weight:700;color:#2350bd;">{{ row.label }}</td>
           <td align="right" style="{{ font }}font-size:15px;font-weight:700;color:#151823;">{{ row.leave or row.worked }}</td>
         </tr></table>
-        {% if row.tasks or row.unwritten %}
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px;background:#ffffff;border:1px solid #e2e6ed;border-radius:8px;">
-          {% for text, length in row.tasks %}
-          <tr>
-            <td style="padding:9px 12px;{{ 'border-top:1px solid #eef0f4;' if not loop.first }}{{ font }}font-size:14px;color:#3d4354;">{{ text }}</td>
-            <td align="right" style="padding:9px 12px;{{ 'border-top:1px solid #eef0f4;' if not loop.first }}{{ font }}font-size:14px;font-weight:700;color:#151823;white-space:nowrap;">{{ length }}</td>
-          </tr>
-          {% endfor %}
-          {% if row.unwritten %}
-          <tr>
-            <td style="padding:9px 12px;{{ 'border-top:1px solid #eef0f4;' if row.tasks }}{{ font }}font-size:14px;color:#7a4300;background:#fff3dc;">Not written yet</td>
-            <td align="right" style="padding:9px 12px;{{ 'border-top:1px solid #eef0f4;' if row.tasks }}{{ font }}font-size:14px;font-weight:700;color:#7a4300;background:#fff3dc;white-space:nowrap;">{{ row.unwritten }}</td>
-          </tr>
-          {% endif %}
-        </table>
-        {% endif %}
         {% if row.span %}
-        <p style="margin:8px 0 0;{{ font }}font-size:13px;color:#555c6f;">{{ row.span }} · Break <b>{{ row.breaks }}</b></p>
+        <p style="margin:6px 0 0;{{ font }}font-size:13px;color:#555c6f;">{{ row.span }} · Break <b>{{ row.breaks }}</b></p>
         {% endif %}
       </td></tr>
       {% endfor %}
     </table>
   </td></tr>
 
-  {% if r.unwritten_days or r.not_posted or r.open_days %}
+  {% if r.open_days %}
   <tr><td style="padding:18px 20px 0;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fff3dc;border-radius:10px;">
       <tr><td style="padding:14px 16px;">
-        <p style="margin:0 0 6px;{{ font }}font-size:15px;font-weight:700;color:#7a4300;">Still to do</p>
-        {% for day, n in r.unwritten_days %}
-        <p style="margin:4px 0 0;{{ font }}font-size:14px;color:#7a4300;">{{ day }}: {{ n }} line{{ 's' if n != 1 }} to fill in</p>
-        {% endfor %}
-        {% if r.not_posted %}
-        <p style="margin:4px 0 0;{{ font }}font-size:14px;color:#7a4300;">{{ r.not_posted }} line{{ 's' if r.not_posted != 1 }} not marked posted</p>
-        {% endif %}
+        <p style="margin:0 0 6px;{{ font }}font-size:15px;font-weight:700;color:#7a4300;">To fix</p>
         {% for day in r.open_days %}
         <p style="margin:4px 0 0;{{ font }}font-size:14px;color:#7a4300;">{{ day }}: no logout</p>
         {% endfor %}

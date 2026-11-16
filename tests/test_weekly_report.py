@@ -42,6 +42,9 @@ def week(app, user_id):
         db.session.add(WorkBlock(user_id=user_id, date=MON, start_time=T(14, 0), end_time=T(17, 0), text="VAT return"))
         db.session.add(TimeEntry(user_id=user_id, date=D(2026, 11, 10), target_override=0.0, leave_type="full",
                                  leave_label="Diwali"))
+        # Wednesday: the laptop opened by mistake -- no time worked.
+        db.session.add(TimeEntry(user_id=user_id, date=D(2026, 11, 11), login_time=T(11, 0, 5),
+                                 logout_time=T(11, 0, 30)))
         db.session.add(TimeEntry(user_id=user_id, date=SAT, login_time=T(9, 0), logout_time=T(13, 30, 20)))
         db.session.commit()
 
@@ -69,24 +72,24 @@ def test_the_report(app, user_id, week, clock):
     with app.test_request_context():
         user = db.session.get(User, user_id)
         r = weekly_report.build_report(user, MON, clock.now)
+        # Wednesday's mistake is neither counted nor shown.
         assert (r["days_worked"], r["worked"], r["breaks"]) == (2, "12:30:20", "01:00:00")
         assert r["productivity"] == "78.16%"  # 12:30:20 over two 8h days
         assert (r["target"], r["balance"]) == ("40h", "−27h 30m")  # 48h less Diwali's 8h
         assert r["overtime_pay"] is None
         monday, tuesday, saturday = r["rows"]
         assert monday["label"] == "Monday, 09 Nov 2026" and monday["worked"] == "08:00:00"
-        assert monday["tasks"] == [("VAT return", "06:00:00"), ("Emails", "01:00:00")]
-        assert monday["unwritten"] == "01:00:00" and monday["breaks"] == "01:00:00"
-        assert monday["span"] == "9:00 AM – 6:00 PM"
+        assert monday["breaks"] == "01:00:00" and monday["span"] == "9:00 AM – 6:00 PM"
         assert tuesday["leave"] == "Diwali"
-        assert saturday["tasks"] == [] and saturday["unwritten"] == "04:30:20"
-        assert r["not_posted"] == 2  # the VAT return lines; Emails is posted
-        assert ("Mon 09 Nov", 1) in r["unwritten_days"] and r["unwritten_days"][-1][0] == "Sat 14 Nov"
+        assert saturday["worked"] == "04:30:20"
         html = weekly_report.render_html(r)
-        assert "Your weekly work summary" in html and "78.16%" in html and "VAT return" in html
-        assert "<img" not in html
+        assert "Your weekly work summary" in html and "78.16%" in html and "<img" not in html
+        # Nothing from the Timesheet's lines.
+        for word in ("VAT return", "Emails", "Not written", "fill in", "posted", "Wednesday"):
+            assert word not in html, word
         text = weekly_report.render_text(r)
         assert "Productivity: 78.16%" in text and "Tuesday, 10 Nov 2026  Diwali" in text
+        assert "VAT return" not in text and "Wednesday" not in text
 
 
 def test_when_its_due(app, user_id, week, clock):
@@ -191,7 +194,7 @@ def test_not_set_up(app, client, user_id, week, clock):
 def test_preview_and_send_now(app, client, user_id, week, mail, clock):
     clock.set(2026, 11, 12, 15, 0)
     page = client.get("/reports/weekly-email?week=2026-11-10").get_data(as_text=True)
-    assert "09 Nov 2026 – 15 Nov 2026" in page and "VAT return" in page
+    assert "09 Nov 2026 – 15 Nov 2026" in page and "Monday, 09 Nov 2026" in page and "VAT return" not in page
     reports = client.get("/reports").get_data(as_text=True)
     assert "Weekly email" in reports and "Send now" in reports
     r = client.post("/reports/weekly-email/send", data={"week": "2026-11-09", "range": "week"}, follow_redirects=True)

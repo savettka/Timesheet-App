@@ -131,10 +131,11 @@ This mirrors the logic in the original spreadsheet:
   saved as you type, with the difference from STM's estimate beside it. An estimate, not
   a payslip: an employer's own rules can land a few hundred either way.
 - **Weekly email** — 15 minutes after you log out on the week's last workday (Saturday), STM
-  emails you the week: working days, working time, break time and productivity (time worked
-  over the days worked at the daily target), the week against
-  its target with overtime pay, each day's tasks with their times and what's not written yet,
-  and what's still to do. There's no scheduler on a free PythonAnywhere account, so an open STM
+  emails you the week in the layout of a weekly attendance summary: working days, working time, break
+  time and productivity (time worked over the days worked at the daily target), the week
+  against its target with overtime pay, and each day's hours, login to logout and breaks.
+  A day with no time worked (logged in by mistake) isn't counted or shown, and nothing from
+  the Timesheet's lines is in it. There's no scheduler on a free PythonAnywhere account, so an open STM
   page sends it -- in the background, too -- or, with STM closed, the next page you open.
   Once a week; **Reports** has Preview and Send now, and **Settings → Weekly email** switches
   it off. It uses the same Gmail settings as the sign-in codes, and goes to your profile's
