@@ -3111,7 +3111,7 @@ def settings():
                 amount = starts = None
             if (amount is None or not (math.isfinite(amount) and 0 < amount < 1e9)
                     or not 2000 <= starts.year <= 2100):
-                flash("Enter your monthly salary as a number, like 23000.", "error")
+                flash("Enter your monthly salary as a number.", "error")
                 return redirect(url_for("main.settings") + "#pay")
             salary = Salary.query.filter_by(user_id=user.id, starts=starts).first()
             if salary is None:

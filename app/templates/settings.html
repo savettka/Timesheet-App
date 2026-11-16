@@ -103,7 +103,7 @@
         <div class="field">
           <label for="pay-amount">{{ 'New monthly salary' if user.salaries else 'Monthly salary' }}</label>
           <input type="text" id="pay-amount" name="amount" inputmode="decimal"
-                 placeholder="{{ '%g'|format(user.salaries[0].amount) if user.salaries else '23000' }}">
+                 {%- if user.salaries %} placeholder="{{ '%g'|format(user.salaries[0].amount) }}"{% endif %}>
         </div>
         <div class="field">
           <label for="pay-currency">Currency</label>

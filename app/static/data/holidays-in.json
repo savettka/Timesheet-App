@@ -9,7 +9,6 @@
     "2026": {
       "source": "Office holiday list 2026",
       "checked": "2026-11-14",
-      "region": "Karnataka",
       "office": true,
       "holidays": [
         {"date": "2026-01-26", "name": "Republic Day"},

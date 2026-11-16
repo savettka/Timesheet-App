@@ -915,7 +915,7 @@ def fmt_time(t):
 
 
 def fmt_money(amount, symbol="₹", exact=False, signed=False):
-    """Money as it's written on a payslip: ₹24,390, or ₹106.48 with exact.
+    """Money as it's written on a payslip: ₹24,390, or ₹105.25 with exact.
     Rupees are grouped the Indian way (₹1,23,456); signed gives +₹390 and
     −₹460, with a real minus sign like fmt_balance."""
     places = 2 if exact else 0

@@ -123,7 +123,7 @@ This mirrors the logic in the original spreadsheet:
 - **Pay** — put your monthly salary in **Settings → Pay**, with the month it starts from
   (a rise gets its own line, so earlier months keep their old salary). Each month's
   hourly rate is the salary over its working hours (its workdays in Settings × the daily
-  target: ₹23,000 over 27 days of 8h is ₹106.48), and the month's overtime -- its balance
+  target), and the month's overtime -- its balance
   on Calendar -- is paid at that rate; a month behind earns none. Home shows this
   month's overtime pay and the salary at month end, Calendar adds the month's overtime
   pay to its top line, and the **Pay** page leads with this month's salary so far, then
