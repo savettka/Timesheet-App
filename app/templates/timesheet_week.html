@@ -13,7 +13,7 @@
   </nav>
   <div class="month-nav">
     <a class="btn btn-icon" href="{{ prev_url }}" aria-label="Previous week">{{ icon('chevron-left') }}</a>
-    <h2 id="tw-title" class="month-title">{{ days[0].strftime('%d %b') }} – {{ days[-1].strftime('%d %b %Y') }}</h2>
+    <h2 id="tw-title" class="month-title"><span class="desk-only">{{ days[0].strftime('%d %b') }} – {{ days[-1].strftime('%d %b %Y') }}</span><span class="phone-only">{{ days[0].strftime('%d') if days[0].month == days[-1].month else days[0].strftime('%d %b') }}–{{ days[-1].strftime('%d %b') }}</span></h2>
     <a class="btn btn-icon" href="{{ next_url }}" aria-label="Next week">{{ icon('chevron-right') }}</a>
   </div>
   {% if not is_current %}<p class="month-jump"><a class="link" href="{{ url_for('main.timesheet_week') }}">Jump to this week</a></p>{% endif %}
@@ -23,7 +23,25 @@
     {% if total_lines %}<li class="ts-chip ts-chip-copied">{{ icon('check') }}<b>{{ copied }} of {{ total_lines }}</b> copied</li>{% endif %}
   </ul>
 
-  <div class="tw-scroll">
+  {# A phone: a day at a time -- its hours, and what they went on. #}
+  <ol class="tw-days phone-only">
+    {% for day in day_lists %}
+    <li class="tw-day{{ ' is-today' if day.date == today }}">
+      <a class="tw-day-head" href="{{ url_for('main.timesheet', date_str=day.date.isoformat()) }}">
+        <span>{{ day.date.strftime('%a %d %b') }}</span><b>{{ fmt_minutes(day.worked) or '0:00' }}</b></a>
+      {% if day.tasks or day.unwritten %}
+      <ul class="tw-day-tasks">
+        {% for text, m in day.tasks %}<li><span>{{ text }}</span><span>{{ fmt_minutes(m) }}</span></li>{% endfor %}
+        {% if day.unwritten %}<li class="is-unwritten"><span>Not written yet</span><span>{{ fmt_minutes(day.unwritten) }}</span></li>{% endif %}
+      </ul>
+      {% endif %}
+    </li>
+    {% else %}
+    <li class="tw-none">No lines with words this week yet.</li>
+    {% endfor %}
+  </ol>
+
+  <div class="tw-scroll desk-only">
     <table class="tw">
       <thead>
         <tr>

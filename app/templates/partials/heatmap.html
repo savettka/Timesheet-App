@@ -6,13 +6,16 @@
 {% macro heatmap_card(hm, card="", hidden=false) %}
 <section class="card hm-card" aria-labelledby="hm-title"{% if card %} data-card="{{ card }}"{% endif %}{% if hidden %} hidden{% endif %}>
   <div class="card-head">
-    <h2 id="hm-title" class="card-title">Last 12 months</h2>
-    <span class="card-sub">{{ hm.total }} · {{ hm.days_worked }} day{{ 's' if hm.days_worked != 1 }} worked</span>
+    <h2 id="hm-title" class="card-title"><span class="desk-only">Last 12 months</span><span class="phone-only">Last 4 months</span></h2>
+    <span class="card-sub desk-only">{{ hm.total }} · {{ hm.days_worked }} day{{ 's' if hm.days_worked != 1 }} worked</span>
   </div>
+  {# A phone shows only the last 17 weeks, which fit its width: the weeks
+     before them are hidden (style.css), and so are their months' names. #}
+  {% set early = hm.columns|length - 17 %}
   <div class="hm-scroll">
     <div class="hm" style="--weeks: {{ hm.columns|length }}">
       <div class="hm-months" aria-hidden="true">
-        {%- for col, name in hm.months %}<span style="grid-column: {{ col + 1 }}">{{ name }}</span>{% endfor -%}
+        {%- for col, name in hm.months %}<span{% if col < early %} class="hm-early"{% endif %} style="grid-column: {{ col + 1 }}; --pcol: {{ col - early + 1 }}">{{ name }}</span>{% endfor -%}
       </div>
       <div class="hm-names" aria-hidden="true"><span>Mon</span><span></span><span>Wed</span><span></span><span>Fri</span><span></span><span></span></div>
       <div class="hm-grid" role="group" aria-label="Every day of the last 12 months" data-hm>

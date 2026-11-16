@@ -13,6 +13,19 @@
     // sees a white flash first. With no choice saved, the page follows the
     // device's own light/dark setting.
     (function () {
+      // A phone: the week grids too wide for it open as their day view
+      // (Calendar) or the posting board (Boards) instead.
+      try {
+        if (window.matchMedia && matchMedia("(max-width: 899px)").matches) {
+          var p = location.pathname, q = new URLSearchParams(location.search);
+          if (p.indexOf("/calendar/week") === 0) {
+            location.replace(p.replace("/calendar/week", "/calendar/day") + location.search);
+          } else if (p === "/boards" && q.get("view") === "week") {
+            q.delete("view");
+            location.replace("/boards" + (String(q) ? "?" + q : ""));
+          }
+        }
+      } catch (e) { /* an old browser: the week view as it is */ }
       try {
         var saved = localStorage.getItem("stm-theme");
         if (saved === "dark" || saved === "light") {

@@ -1507,12 +1507,24 @@ def timesheet_week(date_str=None):
     for d, a, b, block in lines:
         picks[block.text].ids.append(str(block.id))
         picks[block.text].lines.append(pick_line(d, a, b, block))
+    # On a phone, the week a day at a time instead of the table.
+    unwritten = [max(0, w - x) for w, x in zip(worked, written)]
+    day_lists = []
+    for i, d in enumerate(days):
+        tasks = defaultdict(int)
+        for when, a, b, block in lines:
+            if when == d:
+                tasks[block.text] += b - a
+        if worked[i] or tasks:
+            day_lists.append(SimpleNamespace(date=d, worked=worked[i], unwritten=unwritten[i],
+                                             tasks=sorted(tasks.items(), key=lambda t: (-t[1], t[0].casefold()))))
     return render_template(
         "timesheet_week.html",
+        day_lists=day_lists,
         picks=picks, back=request.path, can_fill=days[0] <= today,
         templates=WeekTemplate.query.filter_by(user_id=current_user.id).order_by(WeekTemplate.name).all(),
         days=days, rows=rows, worked=worked, written=written,
-        unwritten=[max(0, w - x) for w, x in zip(worked, written)],
+        unwritten=unwritten,
         week_worked=sum(worked), week_target=max(0.0, week_target),
         copied=sum(1 for *_, block in lines if block.is_copied), total_lines=len(lines),
         copy_text="\n".join(copy), today=today,

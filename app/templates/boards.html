@@ -10,11 +10,11 @@
 {% block content %}
 <nav class="seg" aria-label="Board">
   <a href="{{ url_for('main.boards', view='posting', week=days[0].isoformat()) }}"{{ ' aria-current="page"'|safe if view == 'posting' }}>Posting</a>
-  <a href="{{ url_for('main.boards', view='week', week=days[0].isoformat()) }}"{{ ' aria-current="page"'|safe if view == 'week' }}>Week</a>
+  <a class="desk-only" href="{{ url_for('main.boards', view='week', week=days[0].isoformat()) }}"{{ ' aria-current="page"'|safe if view == 'week' }}>Week</a>
 </nav>
 <div class="month-nav kb-nav">
   <a class="btn btn-icon" href="{{ week_url(prev_week) }}" aria-label="The week before">{{ icon('chevron-left') }}</a>
-  <h2 class="month-title">{{ days[0].strftime('%d %b') }} – {{ days[-1].strftime('%d %b %Y') }}</h2>
+  <h2 class="month-title"><span class="desk-only">{{ days[0].strftime('%d %b') }} – {{ days[-1].strftime('%d %b %Y') }}</span><span class="phone-only">{{ days[0].strftime('%d') if days[0].month == days[-1].month else days[0].strftime('%d %b') }}–{{ days[-1].strftime('%d %b') }}</span></h2>
   {% if next_week %}<a class="btn btn-icon" href="{{ week_url(next_week) }}" aria-label="The week after">{{ icon('chevron-right') }}</a>
   {% else %}<span class="btn btn-icon day-nav-blank" aria-hidden="true"></span>{% endif %}
 </div>

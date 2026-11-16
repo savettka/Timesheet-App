@@ -2404,6 +2404,43 @@ button.tab-link { border: 0; background: transparent; font: inherit; font-size: 
 .more-sheet .pf-row .icon { width: 20px; height: 20px; }
 @media (min-width: 900px) { .more-sheet { display: none; } }
 
+/* What only fits a computer, and what a phone gets in its place. */
+.phone-only { display: none; }
+@media (max-width: 899px) {
+  .desk-only { display: none !important; }
+  .phone-only { display: revert; }
+
+  /* Calendar: no zoom or drag handles -- a tap opens the line. */
+  .cg-grip { display: none; }
+
+  /* The year: its last 17 weeks, which fit the screen. */
+  .hm { --weeks: 17 !important; min-width: 0; }
+  .hm-grid > :nth-child(-n+252) { display: none; }
+  .hm-months .hm-early { display: none; }
+  .hm-months span { grid-column: var(--pcol) !important; }
+  .hm-scroll { overflow: visible; }
+
+  /* The week's timesheet, a day at a time. */
+  .tw-days { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+  .tw-day { border-radius: var(--r-md); background: var(--surface-2); overflow: hidden; }
+  .tw-day.is-today { background: color-mix(in srgb, var(--accent-soft) 70%, var(--surface-2)); }
+  .tw-day-head {
+    display: flex; align-items: center; justify-content: space-between; gap: var(--s3);
+    min-height: 48px; padding: 0 var(--s3); color: var(--text); text-decoration: none; font-weight: 600;
+  }
+  .tw-day-head b { font-variant-numeric: tabular-nums; }
+  .tw-day-tasks { list-style: none; padding: 0 var(--s3) var(--s2); }
+  .tw-day-tasks li {
+    display: flex; justify-content: space-between; gap: var(--s3); padding: 7px 0;
+    border-top: 1px solid var(--line); font-size: 15px; color: var(--text-2); font-variant-numeric: tabular-nums;
+  }
+  .tw-day-tasks li span:first-child { min-width: 0; overflow-wrap: anywhere; }
+  .tw-day-tasks li span:last-child { flex: none; font-weight: 600; color: var(--text); }
+  .tw-day-tasks .is-unwritten { color: var(--warn-text); }
+  .tw-day-tasks .is-unwritten span:last-child { color: var(--warn-text); }
+  .tw-none { padding: var(--s4) 0; text-align: center; color: var(--text-3); }
+}
+
 /* Opening a page: its parts slide up into place, not in from the side --
    which on a phone pushed them past the edge of the screen. */
 @media (prefers-reduced-motion: no-preference) and (max-width: 899px) {

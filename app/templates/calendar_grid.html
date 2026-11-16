@@ -7,7 +7,7 @@
 <section class="card cg-card" aria-labelledby="cg-title">
   <nav class="seg" aria-label="Calendar view">
     <a href="{{ day_url }}"{{ ' aria-current="page"'|safe if view == 'day' }}>Day</a>
-    <a href="{{ week_url }}"{{ ' aria-current="page"'|safe if view == 'week' }}>Week</a>
+    <a class="desk-only" href="{{ week_url }}"{{ ' aria-current="page"'|safe if view == 'week' }}>Week</a>
     <a href="{{ month_url }}">Month</a>
   </nav>
   <div class="month-nav">
@@ -18,7 +18,7 @@
   {% if not is_current %}<p class="month-jump"><a class="link" href="{{ today_url }}">Jump to today</a></p>{% endif %}
   {# How fine the grid is: a slot an hour, half an hour, 15 or 5 minutes.
      Kept in the browser (app.js); a drag snaps to it. #}
-  <div class="cg-zoom" role="group" aria-label="Zoom">
+  <div class="cg-zoom desk-only" role="group" aria-label="Zoom">
     {% for step, label in [(60, '1h'), (30, '30m'), (15, '15m'), (5, '5m')] %}
     <button type="button" class="cg-zoom-btn" data-zoom="{{ step }}" aria-pressed="{{ 'true' if step == 60 else 'false' }}"
             aria-label="{{ label }} slots">{{ label }}</button>

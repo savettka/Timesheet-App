@@ -2156,7 +2156,8 @@
         else if (e.key === "End") to = [].slice.call(grid.querySelectorAll("a.hm-day")).pop();
         else return;
         e.preventDefault();
-        if (!to || to.tagName !== "A") return;  // the edge, or a day not reached
+        // The edge, a day not reached, or one hidden (a phone's shorter year).
+        if (!to || to.tagName !== "A" || !to.offsetParent) return;
         e.target.tabIndex = -1;
         to.tabIndex = 0;
         to.focus();
