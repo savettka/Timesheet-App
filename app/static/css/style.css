@@ -2444,7 +2444,7 @@ button.tab-link { border: 0; background: transparent; font: inherit; font-size: 
   .tw-none { padding: var(--s4) 0; text-align: center; color: var(--text-3); }
 }
 
-/* Phones, page by page. */
+/* Phones, page by page (899px, the same breakpoint as onPhone() in app.js). */
 @media (max-width: 899px) {
   /* Home: the clock card tighter. */
   .status-card { gap: 14px; }
