@@ -8,7 +8,7 @@
 <div class="settings-grid">
   <section class="card" aria-labelledby="targets-heading">
     <h2 id="targets-heading" class="card-title">Hours &amp; targets</h2>
-    <p class="card-note">The same rule as your spreadsheet: 8h a day on workdays, nothing on your rest day,
+    <p class="card-note explain">The same rule as your spreadsheet: 8h a day on workdays, nothing on your rest day,
       48h a week &mdash; change any of it here.</p>
     <form method="post" class="form">
       <input type="hidden" name="form_type" value="targets">
@@ -44,7 +44,7 @@
         <input type="time" id="saturday_login_hint" name="saturday_login_hint"
                aria-describedby="saturday-hint"
                value="{{ user.saturday_login_hint.strftime('%H:%M') if user.saturday_login_hint else '' }}">
-        <p class="hint" id="saturday-hint">Lets Home show a real logout time for Saturday, planned from
+        <p class="hint explain" id="saturday-hint">Lets Home show a real logout time for Saturday, planned from
           earlier in the week &mdash; not just once you've logged in that day.</p>
       </div>
 
@@ -60,7 +60,7 @@
                  inputmode="numeric" aria-describedby="break-hint" value="{{ user.saturday_break_minutes }}">
         </div>
       </div>
-      <p class="hint" id="break-hint">Suggested logout times leave room for this break even before you've
+      <p class="hint explain" id="break-hint">Suggested logout times leave room for this break even before you've
         taken it. Your recorded hours only ever use the breaks you actually log.</p>
 
       <div class="form-actions">
@@ -261,7 +261,7 @@
       <h2 id="team-heading" class="card-title">Team members</h2>
       <span class="badge">Only you can see this</span>
     </div>
-    <p class="card-note">Everyone has their own sign-in and their own hours, targets and history &mdash;
+    <p class="card-note explain">Everyone has their own sign-in and their own hours, targets and history &mdash;
       nothing is shared between accounts, and only you can add or remove people.</p>
 
     <ul class="user-list">

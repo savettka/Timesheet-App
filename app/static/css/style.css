@@ -2372,3 +2372,31 @@ input[type="time"][readonly], input[type="date"][readonly] { caret-color: transp
 /* Wide enough for "03:00 PM" and the clock button on a 12-hour clock. */
 .goal-value input { width: 9.5rem; min-height: 44px; font-size: 16px; }
 .goal-unit { width: 1.2em; color: var(--text-3); font-weight: 600; }
+
+/* ==========================================================================
+   Phones: the layout basics. Nothing wider than the screen, ever; a little
+   less padding so the content has the width; taps 44px; no text under 13px;
+   titles on one line; the sentences that only explain, gone.
+   ========================================================================== */
+body { overflow-x: clip; }
+@media (max-width: 899px) {
+  .content { padding-top: 12px; padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(12px, env(safe-area-inset-right)); }
+  .card { padding: 16px 14px; border-radius: 16px; }
+  .dash-grid, .settings-grid, .hol-grid, .rp-grid { gap: 12px; }
+  .content > .card + .card, .content > section + section { margin-top: 12px; }
+  .explain { display: none; }
+  .seg { margin-bottom: 12px; }
+  .seg a { min-height: 44px; padding: 0 16px; }
+  .month-nav { gap: 8px; margin-bottom: 12px; }
+  .month-nav .btn-icon { width: 44px; height: 44px; min-height: 44px; }
+  .month-title { min-width: 0; font-size: 19px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .badge, .days .badge, .wb-status { font-size: 13px; }
+  .day-chip-name, .day-chip-hours { font-size: 13px; }
+  .cal th, .cal-hours, .cal-bal, .cal-day.is-leave .cal-hours { font-size: 13px; }
+  .card-title { font-size: 18px; }
+}
+/* Opening a page: its parts slide up into place, not in from the side --
+   which on a phone pushed them past the edge of the screen. */
+@media (prefers-reduced-motion: no-preference) and (max-width: 899px) {
+  @keyframes stm-slide-in { from { transform: translateY(12px); } }
+}

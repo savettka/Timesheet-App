@@ -120,7 +120,7 @@
         <form method="post" action="{{ url_for('main.punch_in') }}" class="js-once">
           <button type="submit" class="btn btn-secondary btn-block btn-lg">{{ icon('login') }}Login again</button>
         </form>
-        <p class="hint">Came back to work? The time since you logged out will count as a break.</p>
+        <p class="hint explain">Came back to work? The time since you logged out will count as a break.</p>
       {% elif day_state == 'stale' %}
         {# Times are put right in the day editor, the same place as any other
            correction -- not in a box on Home. #}

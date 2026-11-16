@@ -34,7 +34,7 @@
         <input type="time" id="logout_time" name="logout_time" value="{{ hhmm(f.logout_time) if f else '' }}">
       </div>
     </div>
-    <p class="hint">A logout earlier than the login counts as the next morning, for a shift past midnight.</p>
+    <p class="hint explain">A logout earlier than the login counts as the next morning, for a shift past midnight.</p>
 
     <fieldset class="fieldset">
       <legend>Breaks</legend>
@@ -105,7 +105,7 @@
                placeholder="e.g. Annual leave, Sick day, Bank holiday"
                value="{{ (f.leave_label if f else '') or '' }}">
       </div>
-      <p class="hint">Leave lowers what you owe that week to match: a full day off costs nothing, and a half
+      <p class="hint explain">Leave lowers what you owe that week to match: a full day off costs nothing, and a half
         day costs {{ '%g'|format(default_target / 2) }}h with no break assumed.</p>
     </fieldset>
 
