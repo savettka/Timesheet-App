@@ -127,7 +127,7 @@
                placeholder="{{ 'Switch to…' if bar.timer else 'What are you working on?' }}"
                aria-label="{{ 'Switch the timer to' if bar.timer else 'Start the timer on' }}">
         <button type="submit" class="btn btn-primary tb-btn">{{ icon('play') }}<span class="tb-btn-word">Start</span></button>
-        {% if bar.recent %}<datalist id="tb-recent-{{ where }}">{% for text in bar.recent %}<option value="{{ text }}">{% endfor %}</datalist>{% endif %}
+        {% if bar.recent %}<datalist id="tb-recent-{{ where }}">{% for text in bar.recent if not bar.timer or text != bar.timer.text %}<option value="{{ text }}">{% endfor %}</datalist>{% endif %}
       </form>
       {% endif %}
     </div>

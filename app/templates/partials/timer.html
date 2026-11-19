@@ -28,7 +28,7 @@
     <button type="submit" class="btn btn-primary timer-btn">{{ icon('play') }}Start</button>
   </form>
   {% if recent %}
-  <datalist id="timer-recent">{% for text in recent %}<option value="{{ text }}">{% endfor %}</datalist>
+  <datalist id="timer-recent">{% for text in recent if not timer or text != timer.text %}<option value="{{ text }}">{% endfor %}</datalist>
   <div class="timer-again-row">
     {% for text in recent[:4] if not timer or text != timer.text %}
     <form method="post" action="{{ url_for('main.timer_start') }}" class="js-once" autocomplete="off">

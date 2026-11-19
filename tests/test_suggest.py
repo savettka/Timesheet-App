@@ -4,7 +4,7 @@ import datetime as dt
 import re
 
 from app import db
-from app.models import WorkBlock
+from app.models import TimeEntry, WorkBlock
 
 T = dt.time
 THU = dt.date(2026, 11, 12)
@@ -27,6 +27,23 @@ def test_fifty_latest_from_the_last_60_days(app, client, user_id):
     got = options(client.get("/timesheet").get_data(as_text=True), "ts-recent")
     assert len(got) == 50
     assert got[:2] == ["Task 0", "Task 1"] and "Break" not in got and "Too old" not in got
+
+
+def test_the_timer_boxes_leave_out_the_running_task(app, client, clock, user_id):
+    with app.app_context():
+        db.session.add(TimeEntry(user_id=user_id, date=THU, login_time=T(9, 0)))
+        for n, text in enumerate(("VAT return", "Payroll")):
+            db.session.add(WorkBlock(user_id=user_id, date=THU - dt.timedelta(days=n + 1), start_time=T(9, 0),
+                                     end_time=T(9, 30), text=text))
+        db.session.commit()
+    clock.set(2026, 11, 12, 10, 0)
+    client.post("/timer/start", data={"text": "VAT return"})
+    clock.set(2026, 11, 12, 10, 5)
+    sheet = client.get("/timesheet").get_data(as_text=True)
+    assert "VAT return" in options(sheet, "ts-recent")  # a line can still say it
+    for list_id in ("tb-recent-sheet", "timer-recent"):
+        assert options(sheet, list_id) == ["Payroll"]
+    assert options(client.get("/dashboard").get_data(as_text=True), "timer-recent") == ["Payroll"]
 
 
 def test_each_task_box_has_its_list(app, client, user_id):
