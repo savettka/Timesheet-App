@@ -830,7 +830,7 @@ input, textarea { caret-color: var(--accent); }
 .rp-stat.is-ahead dd { color: var(--ahead); }
 .rp-stat.is-behind dd { color: var(--behind); }
 .rp-grid { display: grid; gap: var(--s4); grid-template-columns: minmax(0, 1fr); margin-bottom: var(--s4); }
-@media (min-width: 1040px) { .rp-grid { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); } }
+.rp-time { max-width: 760px; margin-inline: auto; }
 .rp-bars { list-style: none; display: grid; grid-template-columns: repeat(var(--days), minmax(0, 1fr)); gap: 4px; align-items: end; height: 220px; margin-top: var(--s4); }
 .rp-bar { display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; min-width: 0; }
 .rp-bar-col { position: relative; flex: 1; width: min(100%, 40px); }

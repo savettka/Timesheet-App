@@ -2573,7 +2573,9 @@
       return { label: a.textContent.trim(), url: a.getAttribute("href") };
     });
     [["Week timesheet", "/timesheet/week"], ["Every line written", "/timesheet/all"],
-     ["Calendar week", "/calendar/week"], ["Calendar day", "/calendar/day"]].forEach(function (p) {
+     ["Calendar week", "/calendar/week"], ["Calendar day", "/calendar/day"],
+     // Off the menus: found only here.
+     ["Where the time went", "/reports/time"]].forEach(function (p) {
       pages.push({ label: p[0], url: p[1] });
     });
 

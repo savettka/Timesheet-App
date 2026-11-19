@@ -1792,15 +1792,15 @@ def report_range(name, today):
 @main_bp.route("/reports")
 @login_required
 def reports():
-    """Hours by day against target, breaks, overtime, the tasks the time went
-    on, and when each day began and ended -- for a week or a month."""
+    """Hours by day against target, breaks, overtime, and when each day began
+    and ended -- for a week or a month. Where the time went has its own page."""
     now = datetime.now()
     today = work_day(current_user.id, now)
     name = request.args.get("range", "week")
     if name not in REPORT_RANGES:
         name = "week"
     first, last = report_range(name, today)
-    lines, entries = written_lines(current_user.id, first, min(last, today), now)
+    _, entries = written_lines(current_user.id, first, min(last, today), now)
     days = []
     d = first
     while d <= last:
@@ -1818,10 +1818,6 @@ def reports():
     starts = [logic.clock_minutes(x.entry.login_time) for x in worked_days]
     # A logout after midnight is late, not early: 12:30 AM counts as 24:30.
     ends = [logic.timesheet_span(x.entry, x.date, now)[1] for x in worked_days if x.entry.logout_time]
-    tasks = defaultdict(int)
-    for _, a, b, block in lines:
-        tasks[block.text] += b - a
-    tasks = sorted(tasks.items(), key=lambda t: -t[1])
     top = max((x.worked for x in days), default=0)
     scale = max(top, max((x.target for x in days), default=0), 1)
     return render_template(
@@ -1831,11 +1827,33 @@ def reports():
         breaks=sum(x.breaks for x in days), days_worked=len(worked_days),
         avg_start=logic.fmt_clock(logic.minutes_clock(sum(starts) // len(starts))) if starts else "",
         avg_end=logic.fmt_clock(logic.minutes_clock(sum(ends) // len(ends) % 1440)) if ends else "",
-        tasks=tasks[:10], task_total=sum(m for _, m in tasks) or 1, written=len(lines),
         fmt_hours=logic.fmt_hours, fmt_balance=logic.fmt_balance, fmt_time=logic.fmt_time,
         fmt_length=logic.fmt_length, fmt_hours_compact=logic.fmt_hours_compact,
         heatmap=heatmap_view(current_user, today, now),
         mail_ready=mailer.is_configured(),
+    )
+
+
+@main_bp.route("/reports/time")
+@login_required
+def reports_time():
+    """Where the time went: the range's written lines added up by what they
+    say. Off the menus; the command palette (Ctrl+K) finds it."""
+    now = datetime.now()
+    today = work_day(current_user.id, now)
+    name = request.args.get("range", "week")
+    if name not in REPORT_RANGES:
+        name = "week"
+    first, last = report_range(name, today)
+    lines, _ = written_lines(current_user.id, first, min(last, today), now)
+    tasks = defaultdict(int)
+    for _, a, b, block in lines:
+        tasks[block.text] += b - a
+    tasks = sorted(tasks.items(), key=lambda t: -t[1])
+    return render_template(
+        "reports_time.html",
+        name=name, ranges=REPORT_RANGES, first=first, last=last,
+        tasks=tasks, total=sum(m for _, m in tasks), written=len(lines), fmt_length=logic.fmt_length,
     )
 
 

@@ -42,25 +42,6 @@
     </ol>
     <p class="rp-readout" id="rp-readout" aria-live="polite">{% if days|length > 7 %}<span class="explain">Point at or tap a bar for its day.</span>{% endif %}</p>
   </section>
-
-  <section class="card" aria-labelledby="rp-tasks">
-    <div class="card-head">
-      <h2 id="rp-tasks" class="card-title">Where the time went</h2>
-      {% if written %}<a class="link" download href="{{ url_for('main.reports_csv', range=name) }}">{{ icon('download', 'icon icon-inline') }} CSV</a>{% endif %}
-    </div>
-    {% if tasks %}
-    <ul class="rp-tasks">
-      {% for text, minutes in tasks %}
-      <li>
-        <span class="rp-task-text">{{ text }}</span><span class="rp-task-time">{{ fmt_length(minutes) }}</span>
-        <span class="rp-task-bar" aria-hidden="true"><span style="width: {{ (minutes / task_total * 100)|round(1) }}%"></span></span>
-      </li>
-      {% endfor %}
-    </ul>
-    {% else %}
-    <p class="hint">No Timesheet lines with words in this period yet.</p>
-    {% endif %}
-  </section>
 </div>
 
 <section class="card days-card rp-attendance" aria-labelledby="rp-att">

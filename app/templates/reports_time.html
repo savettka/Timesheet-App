@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+{% block title %}Where the time went{% endblock %}
+{% block page_title %}Where the time went{% endblock %}
+
+{#
+  The range's written lines added up by what they say. No menu leads here;
+  the command palette does (Ctrl+K, "where").
+#}
+{% block content %}
+<nav class="seg" aria-label="Period">
+  {% for key, label in ranges.items() %}
+  <a href="{{ url_for('main.reports_time', range=key) }}"{{ ' aria-current="page"'|safe if key == name }}>{{ label }}</a>
+  {% endfor %}
+</nav>
+<p class="rp-period">{{ first.strftime('%a %d %b') }} – {{ last.strftime('%a %d %b %Y') }}</p>
+
+<section class="card rp-time" aria-labelledby="rp-tasks">
+  <div class="card-head">
+    <h2 id="rp-tasks" class="card-title">{{ fmt_length(total) or '0m' }} written</h2>
+    {% if written %}<a class="link" download href="{{ url_for('main.reports_csv', range=name) }}">{{ icon('download', 'icon icon-inline') }} CSV</a>{% endif %}
+  </div>
+  {% if tasks %}
+  <ul class="rp-tasks">
+    {% for text, minutes in tasks %}
+    <li>
+      <span class="rp-task-text">{{ text }}</span><span class="rp-task-time">{{ fmt_length(minutes) }}</span>
+      <span class="rp-task-bar" aria-hidden="true"><span style="width: {{ (minutes / total * 100)|round(1) }}%"></span></span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="hint">No Timesheet lines with words in this period yet.</p>
+  {% endif %}
+</section>
+{% endblock %}

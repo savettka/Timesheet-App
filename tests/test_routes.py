@@ -13,7 +13,7 @@ THU = dt.date(2026, 11, 12)
 PAGES = [
     "/dashboard", "/timesheet", "/timesheet/2026-11-11", "/timesheet/week", "/timesheet/all",
     "/timesheet/all?q=VAT", "/calendar", "/calendar/2026/10", "/calendar/week", "/calendar/day", "/boards",
-    "/boards?view=week", "/reports", "/reports?range=month", "/reports/lines.csv", "/history",
+    "/boards?view=week", "/reports", "/reports?range=month", "/reports/time", "/reports/time?range=month", "/reports/lines.csv", "/history",
     "/history/2026/10", "/entry/2026-11-11", "/pay", "/settings", "/api/status",
 ]
 
