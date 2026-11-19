@@ -184,6 +184,10 @@ def create_app(config_object="config.Config"):
     app = Flask(__name__, instance_relative_config=True)
     app.config.from_object(config_object)
 
+    from app.proxy import FromProxy
+
+    app.wsgi_app = FromProxy(app.wsgi_app, app.config)
+
     # The default SQLite URI (config.Config) points at <project_root>/instance/stm.db;
     # make sure that directory exists regardless of how Flask resolves instance_path.
     db_uri = app.config.get("SQLALCHEMY_DATABASE_URI", "")

@@ -42,8 +42,9 @@ _login_failures = {}
 
 def client_ip():
     """The visitor's address. PythonAnywhere's proxy passes it in X-Real-IP
-    (setting it itself, so it can't be forged from outside); anywhere else,
-    the connection's own address."""
+    (setting it itself, so it can't be forged from outside), and so does
+    app/proxy.py for a visit through your own domain; anywhere else, the
+    connection's own address."""
     return request.headers.get("X-Real-IP") or request.remote_addr or "unknown"
 
 
@@ -174,7 +175,7 @@ def request_code():
     if request.method == "POST":
         email = (request.form.get("email") or "").strip().lower()
 
-        if _ip_rate_limited(request.remote_addr or "unknown"):
+        if _ip_rate_limited(client_ip()):
             flash("Too many code requests from this device. Try again later.", "error")
             return render_template("login_code.html")
 

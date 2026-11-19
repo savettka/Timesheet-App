@@ -51,3 +51,8 @@ class Config:
     # the branch the site runs. Left unset, /deploy/github doesn't exist.
     DEPLOY_SECRET = os.environ.get("DEPLOY_SECRET")
     DEPLOY_BRANCH = os.environ.get("DEPLOY_BRANCH", "claude/stm-timesheet-app-tvtw3c")
+
+    # Your own domain, through a proxy in front (app/proxy.py): the secret it
+    # sends, so its word on the visitor's address and the domain is trusted.
+    # Left unset, nothing it sends is believed.
+    PROXY_SECRET = os.environ.get("STM_PROXY_SECRET")

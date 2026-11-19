@@ -351,3 +351,17 @@ cd ~/stm
 workon stm-venv
 python -m app.deploy
 ```
+
+### Your own domain, through a proxy
+
+A small proxy in front (a Cloudflare Worker, say) can put STM on a domain of your
+own while it keeps running here. The proxy passes each visit on with four headers:
+`X-STM-Proxy` (a shared secret), `X-STM-Client-IP` (the visitor's address),
+`X-STM-Host` (your domain) and `X-STM-Proto` (`https`).
+
+STM believes them only when the secret matches `STM_PROXY_SECRET`. Make one in a
+Bash console with `python3 -c "import secrets; print(secrets.token_urlsafe(32))"`,
+add `os.environ['STM_PROXY_SECRET'] = '<the secret>'` to the WSGI file, press
+**Reload**, and give the proxy the same secret. Then sign-in limits count each
+visitor's own address, and the links STM writes out use your domain. Left unset,
+the headers count for nothing. The GitHub webhook keeps using this site's own address.
