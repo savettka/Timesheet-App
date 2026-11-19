@@ -2265,7 +2265,7 @@ input[type="time"][readonly], input[type="date"][readonly] { caret-color: transp
 @media (pointer: coarse) { .pk-list li { min-height: 44px; } }
 
 /* A task box's suggestions: three at most, under the box (over it when
-   there's no room below). */
+   there's no room below), the same on every task box. */
 .sg-pop {
   position: fixed; z-index: 80; list-style: none; margin: 0; padding: 4px;
   border: 1px solid var(--card-border); border-radius: var(--r-md);
