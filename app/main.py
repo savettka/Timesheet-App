@@ -417,9 +417,12 @@ def build_dashboard_context():
 # ------------------------------------------------------------------ pages
 
 @main_bp.route("/")
-@login_required
 def index():
-    return redirect(url_for("main.dashboard"))
+    """Home for anyone signed in; for anyone else, the landing page, its
+    Sign in leading to the sign-in page (or first-run setup)."""
+    if current_user.is_authenticated:
+        return redirect(url_for("main.dashboard"))
+    return render_template("landing.html")
 
 
 def days_to_fill(user_id, now, today, days=7):

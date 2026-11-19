@@ -4,7 +4,7 @@
 {% block auth_content %}
 <div class="auth-card">
   <div class="auth-brand">
-    {{ stm_logo('logo-mark logo-lg') }}
+    <a href="{{ url_for('main.index') }}" class="auth-home" aria-label="STM, the landing page">{{ stm_logo('logo-mark logo-lg') }}</a>
     <h1>Sign in to STM</h1>
     <p>Track your login, breaks and logout, and see how your week is going.</p>
   </div>

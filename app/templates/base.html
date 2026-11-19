@@ -69,6 +69,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  {% block head_extra %}{% endblock %}
 </head>
 <body{% if current_user.is_authenticated %} data-reminders-url="{{ url_for('main.api_reminders') }}"{% endif %}>
   <a class="skip-link" href="#main">Skip to main content</a>
@@ -386,11 +387,15 @@
     </div>
   </dialog>
   {% else %}
+  {# Signed out: a card in the middle (sign in, setup), unless the page lays
+     out its own (the landing page). #}
+  {% block public_page %}
   <div class="auth-top">{{ theme_toggle('theme-toggle-icon') }}</div>
   <main id="main" class="auth-shell" tabindex="-1">
     {{ flashes() }}
     {% block auth_content %}{% endblock %}
   </main>
+  {% endblock %}
   {% endif %}
 
   {# Shown by app.js while the next page loads: a small circle over the page,

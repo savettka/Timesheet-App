@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% from "partials/logo.html" import stm_logo %}
+{% from "partials/icons.html" import icon %}
+{#
+  The landing page (/), for anyone signed out: what STM is, and Sign in.
+  Every picture of the app is STM's own pieces drawn small with made-up
+  words and times -- never anyone's real lines -- and hidden from screen
+  readers, as each sits under a heading that says the same.
+#}
+{% block title %}Simple Time Manager{% endblock %}
+{% block head_extra %}
+  <meta name="robots" content="noindex">
+  <meta name="description" content="STM: log your login, breaks and logout, and see your week add up.">
+{% endblock %}
+
+{% block public_page %}
+{% set sign_in = url_for('auth.login') %}
+<header class="lp-top">
+  <div class="lp-wrap">
+    <a class="lp-brand" href="{{ url_for('main.index') }}">{{ stm_logo('logo-mark lp-logo') }}<span>STM</span></a>
+    <button type="button" class="theme-toggle js-theme-toggle theme-toggle-icon" aria-pressed="false">
+      {{ icon('moon', 'icon icon-when-light') }}{{ icon('sun', 'icon icon-when-dark') }}
+      <span class="theme-toggle-label">Dark mode</span>
+    </button>
+    <a class="btn btn-primary" href="{{ sign_in }}">Sign in</a>
+  </div>
+</header>
+
+<main id="main" class="lp" tabindex="-1">
+  <section class="lp-hero">
+    <div class="lp-wrap">
+      <div class="lp-hero-text" data-lp-in>
+        <h1>Clock in. Take a break. Your week adds itself up.</h1>
+        <p class="lp-lead">Hours, breaks and your weekly target, worked out as you go.</p>
+        <a class="btn btn-primary btn-lg lp-cta" href="{{ sign_in }}">Sign in</a>
+      </div>
+      <div class="lp-hero-art" data-lp-in style="--i: 1">
+        <div class="lp-card lp-clock" aria-hidden="true">
+          <div class="lp-clock-top"><span class="lp-dot"></span><b>Logged in</b><span class="lp-muted">since 9:02 AM</span></div>
+          <div class="lp-big">6h 41m <span>today</span></div>
+          <div class="lp-week">
+            <div class="lp-week-row"><span>This week</span><span>38h 20m of 48h</span></div>
+            <div class="lp-meter"><i style="--w: 80%"></i></div>
+          </div>
+          <div class="lp-acts">
+            <span class="lp-act lp-act-break">{{ icon('coffee') }}Break</span>
+            <span class="lp-act lp-act-out">{{ icon('logout') }}Logout</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="lp-section" aria-labelledby="lp-taps-title">
+    <div class="lp-wrap">
+      <h2 class="lp-h2" id="lp-taps-title" data-lp-in>Your day in four taps</h2>
+      <ol class="lp-taps">
+        <li class="lp-tap tap-in" data-lp-in style="--i: 0">{{ icon('login') }}<b>Login</b><time>9:02 AM</time></li>
+        <li class="lp-tap tap-break" data-lp-in style="--i: 1">{{ icon('coffee') }}<b>Break</b><time>1:00 PM</time></li>
+        <li class="lp-tap tap-back" data-lp-in style="--i: 2">{{ icon('play') }}<b>Back</b><time>1:45 PM</time></li>
+        <li class="lp-tap tap-out" data-lp-in style="--i: 3">{{ icon('logout') }}<b>Logout</b><time>6:05 PM</time></li>
+      </ol>
+      <p class="lp-total" data-lp-in style="--i: 4"><span>Worked</span><strong>8h 18m</strong></p>
+    </div>
+  </section>
+
+  <section class="lp-section" aria-labelledby="lp-features-title">
+    <div class="lp-wrap">
+      <h2 class="lp-h2" id="lp-features-title" data-lp-in>Where the day went</h2>
+      <div class="lp-features">
+        <article class="lp-f lp-f-wide f-sheet" data-lp-in>
+          <h3>Timesheet</h3>
+          <p>One line an hour, ready to copy.</p>
+          <div class="lp-mini lp-ts" aria-hidden="true">
+            <div class="lp-ts-row is-copied"><span class="t">9:00–10:00</span><span class="w">VAT return · Harbour Bakery</span><span class="lp-chip">{{ icon('check') }}Copied</span></div>
+            <div class="lp-ts-row"><span class="t">10:00–11:00</span><span class="w">Payroll run · Northgate Dental</span><span class="lp-chip">{{ icon('copy') }}Copy</span></div>
+            <div class="lp-ts-row"><span class="t">11:00–12:00</span><span class="w">Bank reconciliation</span><span class="lp-chip">{{ icon('copy') }}Copy</span></div>
+          </div>
+        </article>
+
+        <article class="lp-f lp-f-wide f-cal" data-lp-in style="--i: 1">
+          <h3>Calendar</h3>
+          <p>Your lines on a week, moved by dragging.</p>
+          <div class="lp-mini" aria-hidden="true">
+            <div class="lp-cal-head"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span></div>
+            <div class="lp-cal">
+              <div class="lp-cal-day"><i class="lp-blk" style="--s: 4; --l: 22"></i><i class="lp-blk is-break" style="--s: 44; --l: 10"></i><i class="lp-blk" style="--s: 56; --l: 30"></i></div>
+              <div class="lp-cal-day"><i class="lp-blk" style="--s: 8; --l: 34"></i><i class="lp-blk is-break" style="--s: 44; --l: 10"></i><i class="lp-blk" style="--s: 58; --l: 18"></i></div>
+              <div class="lp-cal-day"><i class="lp-blk" style="--s: 4; --l: 16"></i><i class="lp-blk" style="--s: 22; --l: 18"></i><i class="lp-blk is-break" style="--s: 44; --l: 10"></i><i class="lp-blk" style="--s: 56; --l: 36"></i></div>
+              <div class="lp-cal-day"><i class="lp-blk" style="--s: 10; --l: 30"></i><i class="lp-blk is-break" style="--s: 44; --l: 8"></i><i class="lp-blk" style="--s: 54; --l: 24"></i></div>
+              <div class="lp-cal-day"><i class="lp-blk" style="--s: 4; --l: 40"></i><i class="lp-blk is-break" style="--s: 46; --l: 8"></i></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="lp-f f-timer" data-lp-in>
+          <h3>Timer</h3>
+          <p>Start a task; it writes its own line.</p>
+          <div class="lp-mini" aria-hidden="true">
+            <div class="lp-timer">{{ icon('play') }}<span class="clock">0:42:10</span><span class="lp-muted">VAT return</span></div>
+            <div class="lp-input">pay<i class="lp-caret"></i></div>
+            <ul class="lp-sugg">
+              <li class="is-on"><b>Pay</b>roll run</li>
+              <li><b>PAY</b>E reminders</li>
+              <li>Client <b>pay</b>ments chase</li>
+            </ul>
+          </div>
+        </article>
+
+        <article class="lp-f f-reports" data-lp-in style="--i: 1">
+          <h3>Reports</h3>
+          <p>Every day against its target.</p>
+          <div class="lp-mini" aria-hidden="true">
+            <div class="lp-plot">
+              <i class="lp-target"></i>
+              <i class="lp-col is-met" style="--h: 85%"></i>
+              <i class="lp-col is-met" style="--h: 92%"></i>
+              <i class="lp-col is-met" style="--h: 81%"></i>
+              <i class="lp-col is-met" style="--h: 87%"></i>
+              <i class="lp-col" style="--h: 66%"></i>
+              <i class="lp-col" style="--h: 40%"></i>
+            </div>
+            <div class="lp-plot-days"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>
+          </div>
+        </article>
+
+        <article class="lp-f f-pay" data-lp-in style="--i: 2">
+          <h3>Pay</h3>
+          <p>The month's overtime, as money.</p>
+          <div class="lp-mini lp-pay" aria-hidden="true">
+            <span class="lp-muted">Overtime · November</span>
+            <strong>+6h 30m</strong>
+            <span class="lp-pay-money">≈ ₹2,450</span>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="lp-section" aria-labelledby="lp-phone-title">
+    <div class="lp-wrap lp-phone-row">
+      <div class="lp-phone" aria-hidden="true" data-lp-in>
+        <div class="lp-screen">
+          <div class="lp-screen-top">{{ stm_logo('logo-mark') }}<span>Home</span></div>
+          <div class="lp-screen-pill"><span class="lp-dot"></span>Logged in · 9:02 AM</div>
+          <div class="lp-screen-card"><span class="lp-muted">Today</span><strong>6h 41m</strong></div>
+          <div class="lp-screen-card"><span class="lp-muted">This week</span><strong>38h 20m</strong><div class="lp-meter"><i style="--w: 80%"></i></div></div>
+          <nav class="lp-screen-bar">
+            <span class="is-on">{{ icon('home') }}Home</span>
+            <span>{{ icon('clipboard') }}Timesheet</span>
+            <span>{{ icon('calendar') }}Calendar</span>
+            <span>{{ icon('chart') }}Reports</span>
+            <span>{{ icon('more') }}More</span>
+          </nav>
+        </div>
+      </div>
+      <div class="lp-phone-text" data-lp-in style="--i: 1">
+        <h2 class="lp-h2" id="lp-phone-title">On your phone too</h2>
+        <p class="lp-lead">Add it to your home screen; press and hold for a shortcut.</p>
+        <ul class="lp-shorts">
+          <li class="tap-in">{{ icon('login') }}Login</li>
+          <li class="tap-break">{{ icon('coffee') }}Break</li>
+          <li class="tap-out">{{ icon('logout') }}Logout</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="lp-section">
+    <div class="lp-wrap">
+      <div class="lp-close" data-lp-in>
+        <h2 class="lp-h2">Ready when you are</h2>
+        <a class="btn btn-lg lp-close-btn" href="{{ sign_in }}">Sign in</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="lp-foot">
+  <div class="lp-wrap">{{ stm_logo('logo-mark lp-logo') }}<span>STM · Simple Time Manager · {{ today.year }}</span></div>
+</footer>
+{% endblock %}

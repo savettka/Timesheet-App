@@ -2225,6 +2225,24 @@
     document.addEventListener("animationend", function (e) { if (!pop.contains(e.target)) place(); }, true);
   }
 
+  // ------------------------------------------------------------ landing page
+  // Each part slides up into place as it comes into view (never a fade).
+  // Without the script, or with reduced motion, everything just sits there.
+  function initLanding() {
+    var parts = document.querySelectorAll("[data-lp-in]");
+    if (!parts.length || !("IntersectionObserver" in window)) return;
+    if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    document.documentElement.classList.add("lp-anim");
+    var seen = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        e.target.classList.add("is-in");
+        seen.unobserve(e.target);
+      });
+    }, { rootMargin: "0px 0px -6% 0px" });
+    [].forEach.call(parts, function (p) { seen.observe(p); });
+  }
+
   // ------------------------------------------------------------ idle
   // While the timer runs, a stretch with no pointer or key activity on any
   // STM page is noticed when activity comes back; past the wait set in
@@ -3222,6 +3240,7 @@
     initIdle();
     initPickers();
     initSuggest();
+    initLanding();
     initBoards();
     initAutosave();
     initSlideOrder();
