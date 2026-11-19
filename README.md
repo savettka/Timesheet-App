@@ -354,8 +354,9 @@ python -m app.deploy
 
 ### Your own domain, through a proxy
 
-A small proxy in front (a Cloudflare Worker, say) can put STM on a domain of your
-own while it keeps running here. The proxy passes each visit on with four headers:
+A small proxy in front can put STM on a domain of your own while it keeps running
+here: `proxy/cloudflare-worker.js` is one, for a Cloudflare Worker (its settings are
+at the top of the file). The proxy passes each visit on with four headers:
 `X-STM-Proxy` (a shared secret), `X-STM-Client-IP` (the visitor's address),
 `X-STM-Host` (your domain) and `X-STM-Proto` (`https`).
 
