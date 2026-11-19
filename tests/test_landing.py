@@ -17,7 +17,7 @@ def test_signed_out_root_is_the_landing_page(app, user_id):
 
 def test_free_and_who_to_ask(app, user_id):
     html = app.test_client().get("/").get_data(as_text=True)
-    assert "No cost." in html and "mailto:" not in html  # STM_CONTACT_EMAIL unset
+    assert "Free to use." in html and "mailto:" not in html  # STM_CONTACT_EMAIL unset
     app.config["CONTACT_EMAIL"] = "someone@example.org"
     html = app.test_client().get("/").get_data(as_text=True)
     assert html.count('href="mailto:someone@example.org?subject=STM%20account"') == 2

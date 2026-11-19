@@ -2554,8 +2554,7 @@ button.tab-link { border: 0; background: transparent; font: inherit; font-size: 
 .lp-hero h1 { font-size: clamp(38px, 6.2vw, 62px); line-height: 1.03; letter-spacing: -0.035em; font-weight: 700; text-wrap: balance; }
 .lp-lead { margin-top: var(--s4); max-width: 34ch; font-size: 19px; line-height: 1.45; color: var(--text-2); text-wrap: pretty; }
 .lp-cta { margin-top: var(--s5); padding-inline: 32px; }
-.lp-free { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: var(--s4); font-size: 15px; color: var(--text-2); }
-.lp-badge { padding: 3px 10px; border-radius: 99px; background: var(--success-bg); color: var(--success-text); font-size: 13px; font-weight: 700; }
+.lp-free { max-width: 36ch; margin-top: var(--s4); font-size: 16px; line-height: 1.5; color: var(--text-2); text-wrap: pretty; }
 .lp-free a { color: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; overflow-wrap: anywhere; }
 .lp-close .lp-free { color: inherit; }
 .lp-hero-art { padding: clamp(20px, 4vw, 44px); border-radius: 28px; background: var(--info-bg); }

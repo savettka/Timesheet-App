@@ -17,8 +17,8 @@
 {% set sign_in = url_for('auth.login') %}
 {# Free, and who to ask for an account (STM_CONTACT_EMAIL, set on the server). #}
 {% macro free_line() %}
-<p class="lp-free"><span class="lp-badge">Free</span><span>No cost.
-  {%- if contact %} For an account, email <a href="mailto:{{ contact }}?subject=STM%20account">{{ contact }}</a>{% endif %}</span></p>
+<p class="lp-free">Free to use.
+  {%- if contact %} Email <a href="mailto:{{ contact }}?subject=STM%20account">{{ contact }}</a> and I'll set up your account.{% endif %}</p>
 {% endmacro %}
 <header class="lp-top">
   <div class="lp-wrap">
