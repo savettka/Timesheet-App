@@ -2034,10 +2034,11 @@
   // ------------------------------------------------------------ suggestions
   // The task boxes (the timer's, a Timesheet line's, the Calendar's) offer
   // what was written before: STM's own list, three at most, narrowing as you
-  // type. The words sit in the page's datalist, which the browser still uses
-  // where there's no script. Down and Up move, Enter or a tap picks, Esc
-  // closes; picking fills the box and nothing more.
-  var SG_MAX = 3;
+  // type. An empty Timesheet line offers the latest three on a click or Down.
+  // The words sit in the page's datalist, which the browser still uses where
+  // there's no script. Down and Up move, Enter or a tap picks, Esc closes;
+  // picking fills the box and nothing more.
+  var SG_MAX = 3, SG_EMPTY = ".ts-text";
   function initSuggest() {
     var pop = document.createElement("ul");
     pop.className = "sg-pop";
@@ -2071,7 +2072,7 @@
     // offered back.
     function matches(el) {
       var q = el.value.trim().toLowerCase();
-      if (!q) return [];
+      if (!q) return el.matches(SG_EMPTY) ? words(el).slice(0, SG_MAX) : [];
       var parts = q.split(/\s+/), first = [], word = [], inside = [];
       words(el).forEach(function (text) {
         var low = text.toLowerCase();
@@ -2108,7 +2109,7 @@
       if (!field) return;
       var r = field.getBoundingClientRect();
       if (r.bottom < 0 || r.top > window.innerHeight) { close(); return; }
-      var w = Math.min(window.innerWidth - 16, Math.max(r.width, 220));
+      var w = Math.min(window.innerWidth - 16, Math.max(r.width, 300));
       pop.style.width = w + "px";
       pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + "px";
       var below = window.innerHeight - r.bottom, h = pop.offsetHeight;
@@ -2171,6 +2172,10 @@
     document.addEventListener("input", function (e) {
       if (!picking && ready(e.target)) show(e.target);
     });
+    document.addEventListener("click", function (e) {
+      var el = e.target;
+      if (el !== field && el.matches && el.matches(SG_EMPTY) && !el.value.trim() && ready(el)) show(el);
+    });
     document.addEventListener("focusout", function (e) { if (e.target === field) close(); });
     document.addEventListener("keydown", function (e) {
       var el = e.target;
@@ -2179,7 +2184,7 @@
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         if (e.altKey || e.ctrlKey || e.metaKey) return;
         if (!open) {
-          if (e.key === "ArrowUp" || !el.value.trim()) return;
+          if (e.key === "ArrowUp") return;
           show(el);
           if (field !== el) return;
           n = pop.children.length;
