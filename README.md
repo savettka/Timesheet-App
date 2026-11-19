@@ -5,6 +5,13 @@ A personal time-clock web app that replaces the manual Excel timesheet: tap **Lo
 break** and **weekly hours** for you — including telling you when you've hit your **48-hour weekly target** so you know
 you can log out early (e.g. on Saturday).
 
+My own copy runs on a free PythonAnywhere account and opens on a domain of my own,
+through a Cloudflare Worker in front of it. The PythonAnywhere address sends people on to
+that domain, and every push to GitHub updates the site by itself. How each part is set up
+is under [Deploy for free on PythonAnywhere](#deploy-for-free-on-pythonanywhere),
+[Keeping it updated](#keeping-it-updated) and
+[Your own domain, through a proxy](#your-own-domain-through-a-proxy).
+
 ## How the numbers are worked out
 
 This mirrors the logic in the original spreadsheet:
