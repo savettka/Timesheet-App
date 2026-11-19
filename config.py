@@ -56,3 +56,6 @@ class Config:
     # sends, so its word on the visitor's address and the domain is trusted.
     # Left unset, nothing it sends is believed.
     PROXY_SECRET = os.environ.get("STM_PROXY_SECRET")
+    # That domain's address (https://...): pages opened at this server's own
+    # address go on there. Left unset, they stay.
+    PUBLIC_URL = os.environ.get("STM_PUBLIC_URL")

@@ -366,3 +366,8 @@ add `os.environ['STM_PROXY_SECRET'] = '<the secret>'` to the WSGI file, press
 **Reload**, and give the proxy the same secret. Then sign-in limits count each
 visitor's own address, and the links STM writes out use your domain. Left unset,
 the headers count for nothing. The GitHub webhook keeps using this site's own address.
+
+To send people from this site's own address to your domain, add
+`os.environ['STM_PUBLIC_URL'] = 'https://<your domain>'` too. Pages opened here then
+go on to the same page there (a 302, so unsetting it undoes it). The proxy's own
+visits, form posts, the GitHub webhook and the leave calendar feed stay put.

@@ -11,12 +11,22 @@ to the server.
     X-STM-Client-IP  the visitor's address: sign-in limits count per address
     X-STM-Host       the domain asked for: links STM writes out use it
     X-STM-Proto      https or http
+
+With STM_PUBLIC_URL set too, a page opened at the server's own address
+sends the browser on to the same page there, for now (302) so it's undone by
+unsetting it. Not sent on: the proxy's own visits, anything but GET and
+HEAD, the GitHub webhook, and the leave calendar feed that calendar apps
+already subscribe to.
 """
 import hmac
 import ipaddress
 import re
+from urllib.parse import quote
+
+from werkzeug.utils import redirect
 
 HOST = re.compile(r"[A-Za-z0-9.-]{1,253}(:\d{1,5})?\Z")
+STAYS = ("/deploy/", "/calendar/leave.ics")
 
 
 class FromProxy:
@@ -44,4 +54,20 @@ class FromProxy:
                 environ["HTTP_HOST"] = host
             proto = environ.get("HTTP_X_STM_PROTO", "")
             environ["wsgi.url_scheme"] = proto if proto in ("http", "https") else "https"
+        elif not given:
+            # Anything carrying the header, right or wrong, is the proxy: sent
+            # on, a proxy with a stale secret would only come back here.
+            to = self._public_page(environ)
+            if to:
+                return redirect(to, 302)(environ, start_response)
         return self.wsgi_app(environ, start_response)
+
+    def _public_page(self, environ):
+        public = (self.config.get("PUBLIC_URL") or "").rstrip("/")
+        path = environ.get("SCRIPT_NAME", "") + environ.get("PATH_INFO", "")
+        if (not public or environ.get("REQUEST_METHOD") not in ("GET", "HEAD")
+                or path.startswith(STAYS)):
+            return None
+        to = public + quote(path.encode("latin-1"), safe="/:@!$&'()*+,;=-._~%")
+        query = environ.get("QUERY_STRING", "")
+        return to + "?" + query if query else to
