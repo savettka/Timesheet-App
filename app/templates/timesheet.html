@@ -147,7 +147,7 @@
       {% endfor %}
     </ol>
     {# Recent words, offered while typing a line. #}
-    {% if recent %}<datalist id="ts-recent">{% for text in recent %}<option value="{{ text }}">{% endfor %}</datalist>{% endif %}
+    {% if recent %}<datalist id="ts-recent">{% for text in recent if not bar.timer or text != bar.timer.text %}<option value="{{ text }}">{% endfor %}</datalist>{% endif %}
     <p class="visually-hidden" aria-live="polite" id="ts-copy-status"></p>
     <p class="ts-copy-note" id="ts-copy-note" hidden></p>
 

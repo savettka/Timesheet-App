@@ -29,7 +29,7 @@ def test_fifty_latest_from_the_last_60_days(app, client, user_id):
     assert got[:2] == ["Task 0", "Task 1"] and "Break" not in got and "Too old" not in got
 
 
-def test_the_timer_boxes_leave_out_the_running_task(app, client, clock, user_id):
+def test_every_list_leaves_out_the_running_task(app, client, clock, user_id):
     with app.app_context():
         db.session.add(TimeEntry(user_id=user_id, date=THU, login_time=T(9, 0)))
         for n, text in enumerate(("VAT return", "Payroll")):
@@ -40,8 +40,7 @@ def test_the_timer_boxes_leave_out_the_running_task(app, client, clock, user_id)
     client.post("/timer/start", data={"text": "VAT return"})
     clock.set(2026, 11, 12, 10, 5)
     sheet = client.get("/timesheet").get_data(as_text=True)
-    assert "VAT return" in options(sheet, "ts-recent")  # a line can still say it
-    for list_id in ("tb-recent-sheet", "timer-recent"):
+    for list_id in ("ts-recent", "tb-recent-sheet", "timer-recent"):
         assert options(sheet, list_id) == ["Payroll"]
     assert options(client.get("/dashboard").get_data(as_text=True), "timer-recent") == ["Payroll"]
     assert options(client.get("/calendar/week").get_data(as_text=True), "cg-recent") == ["Payroll"]
