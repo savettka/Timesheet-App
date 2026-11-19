@@ -15,11 +15,6 @@
 
 {% block public_page %}
 {% set sign_in = url_for('auth.login') %}
-{# Free, and who to ask for an account (STM_CONTACT_EMAIL, set on the server). #}
-{% macro free_line() %}
-<p class="lp-free">Free to use.
-  {%- if contact %} Email <a href="mailto:{{ contact }}?subject=STM%20account">{{ contact }}</a> and I'll set up your account.{% endif %}</p>
-{% endmacro %}
 <header class="lp-top">
   <div class="lp-wrap">
     <a class="lp-brand" href="{{ url_for('main.index') }}">{{ stm_logo('logo-mark lp-logo') }}<span>STM</span></a>
@@ -38,7 +33,6 @@
         <h1>Clock in. Take a break. Your week adds itself up.</h1>
         <p class="lp-lead">Hours, breaks and your weekly target, worked out as you go.</p>
         <a class="btn btn-primary btn-lg lp-cta" href="{{ sign_in }}">Sign in</a>
-        {{ free_line() }}
       </div>
       <div class="lp-hero-art" data-lp-in style="--i: 1">
         <div class="lp-card lp-clock" aria-hidden="true">
@@ -177,7 +171,11 @@
       <div class="lp-close" data-lp-in>
         <div>
           <h2 class="lp-h2">Ready when you are</h2>
-          {{ free_line() }}
+          {# Said once, in the owner's words. The address is STM_CONTACT_EMAIL,
+             set on the server, so it stays out of the code. #}
+          <p class="lp-note">I made STM for my own timesheets, and anyone can use it for free.
+            There's no sign-up page: I add people myself.
+            {%- if contact %} Email <a href="mailto:{{ contact }}?subject=STM%20account">{{ contact }}</a> with the username you'd like.{% endif %}</p>
         </div>
         <a class="btn btn-lg lp-close-btn" href="{{ sign_in }}">Sign in</a>
       </div>

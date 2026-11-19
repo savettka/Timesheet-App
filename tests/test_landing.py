@@ -17,10 +17,11 @@ def test_signed_out_root_is_the_landing_page(app, user_id):
 
 def test_free_and_who_to_ask(app, user_id):
     html = app.test_client().get("/").get_data(as_text=True)
-    assert "Free to use." in html and "mailto:" not in html  # STM_CONTACT_EMAIL unset
+    assert html.count("anyone can use it for free") == 1 and "mailto:" not in html  # STM_CONTACT_EMAIL unset
     app.config["CONTACT_EMAIL"] = "someone@example.org"
     html = app.test_client().get("/").get_data(as_text=True)
-    assert html.count('href="mailto:someone@example.org?subject=STM%20account"') == 2
+    assert html.count('href="mailto:someone@example.org?subject=STM%20account"') == 1
+    assert "with the username you'd like" in html
 
 
 def test_signed_in_root_opens_home(client):
