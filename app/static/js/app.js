@@ -2034,11 +2034,11 @@
   // ------------------------------------------------------------ suggestions
   // The task boxes (the timer's, a Timesheet line's, the Calendar's) offer
   // what was written before: STM's own list, three at most, narrowing as you
-  // type. An empty Timesheet line offers the latest three on a click or Down.
-  // The words sit in the page's datalist, which the browser still uses where
-  // there's no script. Down and Up move, Enter or a tap picks, Esc closes;
-  // picking fills the box and nothing more.
-  var SG_MAX = 3, SG_EMPTY = ".ts-text";
+  // type. An empty Timesheet line or timer box offers the latest three on a
+  // click or Down. The words sit in the page's datalist, which the browser
+  // still uses where there's no script. Down and Up move, Enter or a tap
+  // picks, Esc closes; picking fills the box and nothing more.
+  var SG_MAX = 3, SG_EMPTY = '.ts-text, .timer-input, .tb-new input[name="text"]';
   function initSuggest() {
     var pop = document.createElement("ul");
     pop.className = "sg-pop";
