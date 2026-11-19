@@ -44,6 +44,7 @@ def test_the_timer_boxes_leave_out_the_running_task(app, client, clock, user_id)
     for list_id in ("tb-recent-sheet", "timer-recent"):
         assert options(sheet, list_id) == ["Payroll"]
     assert options(client.get("/dashboard").get_data(as_text=True), "timer-recent") == ["Payroll"]
+    assert options(client.get("/calendar/week").get_data(as_text=True), "cg-recent") == ["Payroll"]
 
 
 def test_each_task_box_has_its_list(app, client, user_id):

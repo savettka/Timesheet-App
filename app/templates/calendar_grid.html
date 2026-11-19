@@ -91,7 +91,7 @@
       <input type="text" id="cg-text" name="text" maxlength="300" autocomplete="off"
              {%- if recent %} list="cg-recent"{% endif %}>
     </div>
-    {% if recent %}<datalist id="cg-recent">{% for text in recent %}<option value="{{ text }}">{% endfor %}</datalist>{% endif %}
+    {% if recent %}<datalist id="cg-recent">{% for text in recent if not bar.timer or text != bar.timer.text %}<option value="{{ text }}">{% endfor %}</datalist>{% endif %}
     <div class="form-actions">
       <button type="submit" class="btn btn-primary">{{ icon('check') }}Save</button>
       <a class="btn btn-secondary" id="cg-open" href="#">Open the day</a>
