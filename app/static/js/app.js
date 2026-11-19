@@ -2031,6 +2031,195 @@
     window.addEventListener("scroll", place, true);
   }
 
+  // ------------------------------------------------------------ suggestions
+  // The task boxes (the timer's, a Timesheet line's, the Calendar's) offer
+  // what was written before: STM's own list, three at most, narrowing as you
+  // type. The words sit in the page's datalist, which the browser still uses
+  // where there's no script. Down and Up move, Enter or a tap picks, Esc
+  // closes; picking fills the box and nothing more.
+  var SG_MAX = 3;
+  function initSuggest() {
+    var pop = document.createElement("ul");
+    pop.className = "sg-pop";
+    pop.id = "sg-pop";
+    pop.setAttribute("role", "listbox");
+    pop.setAttribute("aria-label", "Suggestions");
+    pop.hidden = true;
+    document.body.appendChild(pop);
+    var field = null, active = -1, picking = false, uid = 0;
+
+    // A box with a datalist: the browser's own list goes, the words stay.
+    function ready(el) {
+      if (!el || el.tagName !== "INPUT") return false;
+      if (el.hasAttribute("list")) {
+        el.dataset.suggest = el.getAttribute("list");
+        el.removeAttribute("list");
+        el.setAttribute("role", "combobox");
+        el.setAttribute("aria-autocomplete", "list");
+        el.setAttribute("aria-expanded", "false");
+        el.setAttribute("aria-controls", "sg-pop");
+      }
+      return !!el.dataset.suggest;
+    }
+    function words(el) {
+      var dl = document.getElementById(el.dataset.suggest);
+      return dl ? [].map.call(dl.options, function (o) { return o.value; }).filter(Boolean) : [];
+    }
+
+    // Best first: starting with what's typed, then a word starting with it,
+    // then anywhere; latest first within each. What's typed in full isn't
+    // offered back.
+    function matches(el) {
+      var q = el.value.trim().toLowerCase();
+      if (!q) return [];
+      var parts = q.split(/\s+/), first = [], word = [], inside = [];
+      words(el).forEach(function (text) {
+        var low = text.toLowerCase();
+        if (low === q || !parts.every(function (p) { return low.indexOf(p) >= 0; })) return;
+        if (low.indexOf(q) === 0) first.push(text);
+        else if ((" " + low).indexOf(" " + parts[0]) >= 0) word.push(text);
+        else inside.push(text);
+      });
+      return first.concat(word, inside).slice(0, SG_MAX);
+    }
+    // The typed words in bold.
+    function label(text, el) {
+      var low = text.toLowerCase(), on = [], i;
+      for (i = 0; i < text.length; i++) on.push(false);
+      el.value.trim().toLowerCase().split(/\s+/).forEach(function (p) {
+        for (var at = p ? low.indexOf(p) : -1; at >= 0; at = low.indexOf(p, at + p.length)) {
+          for (i = at; i < at + p.length && i < on.length; i++) on[i] = true;
+        }
+      });
+      var frag = document.createDocumentFragment(), run = "";
+      for (i = 0; i <= text.length; i++) {
+        if (run && (i === text.length || on[i] !== on[i - 1])) {
+          var node = on[i - 1] ? document.createElement("b") : document.createElement("span");
+          node.textContent = run;
+          frag.appendChild(node);
+          run = "";
+        }
+        if (i < text.length) run += text[i];
+      }
+      return frag;
+    }
+
+    function place() {
+      if (!field) return;
+      var r = field.getBoundingClientRect();
+      if (r.bottom < 0 || r.top > window.innerHeight) { close(); return; }
+      var w = Math.min(window.innerWidth - 16, Math.max(r.width, 220));
+      pop.style.width = w + "px";
+      pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + "px";
+      var below = window.innerHeight - r.bottom, h = pop.offsetHeight;
+      var up = below < h + 12 && r.top > below;
+      pop.classList.toggle("is-up", up);
+      pop.style.top = (up ? Math.max(8, r.top - h - 6) : r.bottom + 6) + "px";
+    }
+    function mark(i) {
+      var rows = pop.children;
+      active = i;
+      [].forEach.call(rows, function (row, n) { row.setAttribute("aria-selected", n === i ? "true" : "false"); });
+      if (field && rows[i]) field.setAttribute("aria-activedescendant", rows[i].id);
+      else if (field) field.removeAttribute("aria-activedescendant");
+    }
+    function close() {
+      if (!field) return;
+      field.setAttribute("aria-expanded", "false");
+      field.removeAttribute("aria-activedescendant");
+      pop.hidden = true;
+      pop.innerHTML = "";
+      field = null;
+      active = -1;
+    }
+    function show(el) {
+      var list = matches(el);
+      if (!list.length) { if (field === el) close(); return; }
+      var opening = field !== el;
+      if (opening) close();
+      field = el;
+      pop.innerHTML = "";
+      list.forEach(function (text) {
+        var li = document.createElement("li");
+        li.id = "sg-o" + (++uid);
+        li.setAttribute("role", "option");
+        li.dataset.value = text;
+        li.title = text;
+        li.appendChild(label(text, el));
+        pop.appendChild(li);
+      });
+      mark(-1);
+      el.setAttribute("aria-expanded", "true");
+      if (opening) (el.closest("dialog[open]") || document.body).appendChild(pop);
+      pop.hidden = false;
+      place();
+    }
+    function pick(text) {
+      var el = field;
+      close();
+      el.value = text;
+      picking = true;
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+      picking = false;
+      el.focus();
+      try { el.setSelectionRange(text.length, text.length); } catch (err) { /* not a text box */ }
+    }
+
+    document.querySelectorAll("input[list]").forEach(ready);
+    document.addEventListener("focusin", function (e) { ready(e.target); });
+    document.addEventListener("input", function (e) {
+      if (!picking && ready(e.target)) show(e.target);
+    });
+    document.addEventListener("focusout", function (e) { if (e.target === field) close(); });
+    document.addEventListener("keydown", function (e) {
+      var el = e.target;
+      if (e.isComposing || !el || el.tagName !== "INPUT" || !el.dataset.suggest) return;
+      var open = field === el, n = pop.children.length;
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        if (e.altKey || e.ctrlKey || e.metaKey) return;
+        if (!open) {
+          if (e.key === "ArrowUp" || !el.value.trim()) return;
+          show(el);
+          if (field !== el) return;
+          n = pop.children.length;
+        }
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        // Past either end: back to what's typed.
+        var to = active + (e.key === "ArrowDown" ? 1 : -1);
+        mark(to < -1 ? n - 1 : to >= n ? -1 : to);
+      } else if (open && e.key === "Enter" && active >= 0) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        pick(pop.children[active].dataset.value);
+      } else if (open && e.key === "Escape") {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        close();
+      } else if (open && e.key === "Tab") {
+        close();
+      }
+    }, true);
+    // Pressing a suggestion keeps the box's focus (and a phone's keyboard).
+    pop.addEventListener("pointerdown", function (e) { e.preventDefault(); });
+    pop.addEventListener("click", function (e) {
+      var li = e.target.closest('[role="option"]');
+      if (li && field) pick(li.dataset.value);
+    });
+    pop.addEventListener("pointermove", function (e) {
+      var li = e.target.closest('[role="option"]');
+      if (li) mark([].indexOf.call(pop.children, li));
+    });
+    document.addEventListener("pointerdown", function (e) {
+      if (field && !pop.contains(e.target) && e.target !== field) close();
+    }, true);
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", function (e) { if (!pop.contains(e.target)) place(); }, true);
+    // A box in a window still sliding in: placed again where it stops.
+    document.addEventListener("animationend", function (e) { if (!pop.contains(e.target)) place(); }, true);
+  }
+
   // ------------------------------------------------------------ idle
   // While the timer runs, a stretch with no pointer or key activity on any
   // STM page is noticed when activity comes back; past the wait set in
@@ -3027,6 +3216,7 @@
     initNotifySetting();
     initIdle();
     initPickers();
+    initSuggest();
     initBoards();
     initAutosave();
     initSlideOrder();

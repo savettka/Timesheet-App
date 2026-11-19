@@ -442,9 +442,10 @@ def days_to_fill(user_id, now, today, days=7):
     return out
 
 
-def recent_texts(user_id, day, limit=15):
-    """What was written on recent Timesheet lines, latest first: offered as
-    suggestions while typing a line, so a task done again is a tap away."""
+def recent_texts(user_id, day, limit=50):
+    """What was written on Timesheet lines in the last 60 days, latest first:
+    searched while typing a task (three suggestions show at a time), so a
+    task done again is a tap away."""
     rows = (db.session.query(WorkBlock.text)
             .filter(WorkBlock.user_id == user_id, WorkBlock.text != "",
                     WorkBlock.date <= day, WorkBlock.date >= day - timedelta(days=60))
@@ -896,7 +897,7 @@ def inject_timer_bar():
     return {"bar": SimpleNamespace(
         state=state, word=PUNCH_WORDS[state], timer=timer,
         can_time=state == "working", stale_day=entry.date if state == "stale" else None,
-        recent=recent_texts(current_user.id, logic.work_day(entry if state != "done" else None, now))[:10],
+        recent=recent_texts(current_user.id, logic.work_day(entry if state != "done" else None, now)),
         # The idle prompt's wait in minutes, while a timer runs on a shift.
         idle=idle["minutes"] if idle["on"] and timer is not None and state == "working" else None,
     )}

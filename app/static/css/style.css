@@ -2264,6 +2264,28 @@ input[type="time"][readonly], input[type="date"][readonly] { caret-color: transp
 .pk-list li.is-on { background: var(--accent-soft); color: var(--accent-text); font-weight: 700; }
 @media (pointer: coarse) { .pk-list li { min-height: 44px; } }
 
+/* A task box's suggestions: three at most, under the box (over it when
+   there's no room below). */
+.sg-pop {
+  position: fixed; z-index: 80; list-style: none; margin: 0; padding: 4px;
+  border: 1px solid var(--card-border); border-radius: var(--r-md);
+  background: var(--surface); color: var(--text); box-shadow: var(--shadow-lg);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sg-pop:not([hidden]) { animation: stm-drop-in .16s var(--ease-out); }
+  .sg-pop.is-up:not([hidden]) { animation-name: stm-rise-in; }
+}
+@keyframes stm-rise-in { from { transform: translateY(10px); } }
+.sg-pop li {
+  display: block; min-height: 40px; padding: 10px var(--s3); border-radius: var(--r-sm);
+  font-size: 15px; line-height: 20px; color: var(--text-2); cursor: pointer;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.sg-pop li b { font-weight: 700; color: var(--text); }
+.sg-pop li[aria-selected="true"] { background: var(--accent-soft); color: var(--accent-text); }
+.sg-pop li[aria-selected="true"] b { color: inherit; }
+@media (pointer: coarse) { .sg-pop li { min-height: 44px; padding-block: 12px; } }
+
 /* A month, for a date. */
 .pk-month { display: flex; align-items: center; justify-content: space-between; padding: 6px; }
 .pk-title { font-weight: 700; }
