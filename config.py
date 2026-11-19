@@ -59,3 +59,7 @@ class Config:
     # That domain's address (https://...): pages opened at this server's own
     # address go on there. Left unset, they stay.
     PUBLIC_URL = os.environ.get("STM_PUBLIC_URL")
+
+    # Who to email for an account, shown on the landing page. Left unset,
+    # the page says STM is free and leaves the address out.
+    CONTACT_EMAIL = os.environ.get("STM_CONTACT_EMAIL")

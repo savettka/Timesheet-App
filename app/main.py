@@ -422,7 +422,7 @@ def index():
     Sign in leading to the sign-in page (or first-run setup)."""
     if current_user.is_authenticated:
         return redirect(url_for("main.dashboard"))
-    return render_template("landing.html")
+    return render_template("landing.html", contact=current_app.config.get("CONTACT_EMAIL"))
 
 
 def days_to_fill(user_id, now, today, days=7):
