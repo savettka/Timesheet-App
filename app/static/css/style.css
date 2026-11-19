@@ -1079,8 +1079,9 @@ a.ds-day:active { transform: scale(0.97); }
 }
 .cg-col.is-today { background-color: color-mix(in srgb, var(--accent-soft) 45%, transparent); }
 .cg-block {
-  position: absolute; left: 2px; right: 2px;
-  top: calc(var(--s) * var(--ppm) + 1px); height: calc(var(--l) * var(--ppm) - 2px);
+  /* A little air round each line: 6px between one and the next. */
+  position: absolute; left: 4px; right: 4px;
+  top: calc(var(--s) * var(--ppm) + 3px); height: calc(var(--l) * var(--ppm) - 6px);
   min-height: 18px; overflow: hidden;
   display: flex; flex-direction: column; gap: 0; padding: 3px 8px;
   border-radius: 8px; text-decoration: none;

@@ -142,7 +142,7 @@
       ('Track', [
           ('main.dashboard', 'Home', 'home', ['main.dashboard']),
           ('main.timesheet', 'Timesheet', 'clipboard', ['main.timesheet', 'main.timesheet_week', 'main.timesheet_all']),
-          ('main.calendar', 'Calendar', 'calendar', ['main.calendar', 'main.calendar_week', 'main.calendar_day']),
+          ('main.calendar_week', 'Calendar', 'calendar', ['main.calendar', 'main.calendar_week', 'main.calendar_day']),
           ('main.boards', 'Boards', 'board', ['main.boards']),
       ]),
       ('Analyse', [
@@ -154,9 +154,10 @@
       ]),
   ] %}
   {% set nav_items = nav_sections|map(attribute=1)|sum(start=[]) %}
-  {# Phones: four pages under the thumb, the rest behind More. #}
-  {% set tab_items = nav_items|selectattr(0, 'in', ['main.dashboard', 'main.timesheet', 'main.calendar', 'main.reports'])|list %}
-  {% set more_items = nav_items|rejectattr(0, 'in', ['main.dashboard', 'main.timesheet', 'main.calendar', 'main.reports'])|list
+  {# Phones: four pages under the thumb, the rest behind More. The Calendar
+     opens on its week; a phone's tab opens the day, as the week doesn't fit. #}
+  {% set tab_items = nav_items|selectattr(0, 'in', ['main.dashboard', 'main.timesheet', 'main.calendar_week', 'main.reports'])|list %}
+  {% set more_items = nav_items|rejectattr(0, 'in', ['main.dashboard', 'main.timesheet', 'main.calendar_week', 'main.reports'])|list
       + [('main.holidays_page', 'Holidays', 'flag', ['main.holidays_page'])] %}
   {% set here = namespace(more=false) %}
   {% for item in more_items if request.endpoint in item[3] %}{% set here.more = true %}{% endfor %}
@@ -220,7 +221,7 @@
        has to be opened first. #}
     <nav class="tab-bar" aria-label="Main">
       {% for endpoint, label, icon_name, active_on in tab_items %}
-        <a href="{{ url_for(endpoint) }}" class="tab-link"
+        <a href="{{ url_for('main.calendar_day' if endpoint == 'main.calendar_week' else endpoint) }}" class="tab-link"
            {% if request.endpoint in active_on %}aria-current="page"{% endif %}>
           {{ icon(icon_name) }}<span>{{ label }}</span>
         </a>
