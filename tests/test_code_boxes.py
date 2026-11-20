@@ -25,6 +25,8 @@ def test_one_real_box_marked_for_six(app, user_id):
     page = waiting_for_a_code(app, user_id).get("/login/verify").get_data(as_text=True)
     assert 'data-code-boxes="6"' in page and 'autocomplete="one-time-code"' in page
     assert page.count('name="code"') == 1
+    # The button stays for a browser without the script; app.js hides it.
+    assert 'class="btn btn-primary btn-block btn-lg code-submit"' in page
 
 
 def test_a_pasted_code_with_a_dash_signs_in(app, user_id):

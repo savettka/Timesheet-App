@@ -1404,6 +1404,7 @@ input[type="number"] { -moz-appearance: textfield; }
   cursor: text;
 }
 .code-boxes .code-input.is-boxed::selection { background: transparent; }
+.is-auto .code-submit { display: none; }
 
 /* ==========================================================================
    Phones and small tablets

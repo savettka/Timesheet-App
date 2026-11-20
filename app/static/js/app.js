@@ -2228,12 +2228,15 @@
   // ------------------------------------------------------------ code boxes
   // The emailed sign-in code as six boxes. The one real box sits unseen over
   // them, so typing, pasting ("123 456" too), the phone's code suggestion and
-  // screen readers all work as with a single box. Without the script it is
-  // that single box.
+  // screen readers all work as with a single box. The sixth digit signs in
+  // by itself, so there's no button to press. Without the script it is that
+  // single box and its Sign in button.
   function initCodeBoxes() {
     var input = document.querySelector("input[data-code-boxes]");
     if (!input) return;
     var size = parseInt(input.dataset.codeBoxes, 10) || 6;
+    var form = input.form, sent = "";
+    if (form) form.classList.add("is-auto");
     var wrap = document.createElement("div");
     wrap.className = "code-boxes";
     input.parentNode.insertBefore(wrap, input);
@@ -2265,7 +2268,17 @@
       });
       wrap.classList.toggle("is-full", digits.length === size);
     }
-    input.addEventListener("input", function () { draw(); toEnd(); });
+    // A beat to see the last box fill (and turn green), then off it goes --
+    // once per code, so a wrong one isn't sent again and again.
+    function sendWhenFull() {
+      if (!form || input.value.length !== size || input.value === sent) return;
+      sent = input.value;
+      setTimeout(function () {
+        if (input.value !== sent) return;
+        if (form.requestSubmit) form.requestSubmit(); else form.submit();
+      }, 150);
+    }
+    input.addEventListener("input", function () { draw(); toEnd(); sendWhenFull(); });
     input.addEventListener("focus", function () { draw(); setTimeout(toEnd, 0); });
     input.addEventListener("blur", draw);
     // The boxes fill left to right: a click or arrow anywhere puts the caret
