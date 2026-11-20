@@ -11,7 +11,7 @@
   <a href="{{ url_for('main.reports', range=key) }}"{{ ' aria-current="page"'|safe if key == name }}>{{ label }}</a>
   {% endfor %}
 </nav>
-<p class="rp-period">{{ first.strftime('%a %d %b') }} – {{ last.strftime('%a %d %b %Y') }} · <a class="link" href="{{ url_for('main.history', year=first.year, month=first.month) }}">Every day</a></p>
+<p class="rp-period">{{ first.strftime('%a %d %b') }} – {{ last.strftime('%a %d %b %Y') }} <a class="link" href="{{ url_for('main.history', year=first.year, month=first.month) }}">Every day</a></p>
 
 <dl class="rp-stats">
   <div class="rp-stat"><dt>Worked</dt><dd>{{ fmt_hours(worked) }}</dd></div>

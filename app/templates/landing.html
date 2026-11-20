@@ -175,9 +175,12 @@
              set on the server, so it stays out of the code. #}
           <p class="lp-note">I made STM for my own timesheets, and anyone can use it for free.
             There's no sign-up page: I add people myself.
-            {%- if contact %} Email <a href="mailto:{{ contact }}?subject=STM%20account">{{ contact }}</a> with the username you'd like.{% endif %}</p>
+            {%- if contact %} Email me with the username you'd like.{% endif %}</p>
         </div>
-        <a class="btn btn-lg lp-close-btn" href="{{ sign_in }}">Sign in</a>
+        <div class="lp-close-acts">
+          <a class="btn btn-lg lp-close-btn" href="{{ sign_in }}">Sign in</a>
+          {% if contact %}<a class="btn btn-lg lp-mail-btn" href="mailto:{{ contact }}?subject=STM%20account">{{ icon('mail') }}{{ contact }}</a>{% endif %}
+        </div>
       </div>
     </div>
   </section>

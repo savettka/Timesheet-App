@@ -228,7 +228,7 @@
       <p class="mail-to">
         {%- if not mail_ready %}{{ icon('alert', 'icon icon-inline') }}Email isn't set up on this server
         {%- elif user.email %}{{ icon('check', 'icon icon-inline') }}To {{ user.email }}
-        {%- else %}{{ icon('alert', 'icon icon-inline') }}<button type="button" class="link-btn" data-profile-open="edit">Add your email address</button>
+        {%- else %}{{ icon('alert', 'icon icon-inline') }}<button type="button" class="link" data-profile-open="edit">Add your email address</button>
         {%- endif %}</p>
       <div class="form-actions">
         <button type="submit" class="btn btn-primary">Save</button>

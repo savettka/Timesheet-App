@@ -329,9 +329,8 @@
         </div>
       {% else %}
         <div class="banner banner-muted" id="saturday-banner">
-          About {{ fmt_hours(saturday.remaining_hours) }} left for Saturday if the rest of the week goes to plan.
-          <a href="{{ url_for('main.settings') }}" class="link">Set your usual Saturday login time</a> in Settings
-          to see an exact logout time here.
+          <p>About {{ fmt_hours(saturday.remaining_hours) }} left for Saturday if the rest of the week goes to plan.</p>
+          <a href="{{ url_for('main.settings') }}" class="link banner-act">Set your Saturday login time</a>
         </div>
       {% endif %}
     {% endif %}

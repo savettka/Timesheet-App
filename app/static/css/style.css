@@ -219,14 +219,20 @@ input, textarea { caret-color: var(--accent); }
 }
 .skip-link:focus { top: var(--s4); }
 
+/* A small soft-blue button for the lesser ways on (Jump to today, Every
+   day, Use a password): links or buttons, never underlined text. */
 .link {
-  color: var(--accent-text);
-  font-weight: 600;
-  text-decoration: underline;
-  text-decoration-thickness: 1.5px;
-  text-underline-offset: 3px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 40px; padding: 0 14px; vertical-align: middle;
+  border: 0; border-radius: var(--r-md);
+  background: var(--accent-soft); color: var(--accent-text);
+  font: inherit; font-size: 15px; font-weight: 600; line-height: 1.2;
+  text-decoration: none; white-space: nowrap; cursor: pointer;
+  transition: background-color .15s ease;
 }
-.link:hover { text-decoration-thickness: 2.5px; }
+.link:hover { background: color-mix(in srgb, var(--accent-soft) 78%, var(--accent)); }
+.link .icon-inline { width: 16px; height: 16px; }
+@media (pointer: coarse) { .link { min-height: 44px; } }
 
 .hint { color: var(--text-3); font-size: 14px; line-height: 1.45; }
 .optional { font-weight: 400; color: var(--text-3); }
@@ -600,6 +606,7 @@ input, textarea { caret-color: var(--accent); }
   font-size: 16px; line-height: 1.5;
 }
 .banner + .banner { margin-top: var(--s3); }
+.banner .banner-act { margin-top: var(--s2); }
 .banner-info { background: var(--info-bg); color: var(--info-text); }
 .banner-success { background: var(--success-bg); color: var(--success-text); }
 .banner strong { font-weight: 700; }
@@ -820,7 +827,7 @@ input, textarea { caret-color: var(--accent); }
 .tw-copy.is-copied { color: var(--success-text); border-color: currentColor; }
 
 /* Reports */
-.rp-period { text-align: center; color: var(--text-2); margin: calc(var(--s2) * -1) 0 var(--s4); }
+.rp-period { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--s2) var(--s3); color: var(--text-2); margin: calc(var(--s2) * -1) 0 var(--s4); }
 .rp-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s3); margin: 0 0 var(--s4); }
 @media (min-width: 720px) { .rp-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .rp-stat { background: var(--surface); border: 1px solid var(--card-border); border-radius: var(--r-lg); box-shadow: var(--shadow); padding: var(--s3) var(--s4); }
@@ -1371,8 +1378,7 @@ input[type="number"] { -moz-appearance: textfield; }
 .auth-brand { text-align: center; margin-bottom: var(--s5); }
 .auth-brand h1 { font-size: 26px; font-weight: 700; }
 .auth-brand p { margin-top: var(--s2); color: var(--text-2); }
-.auth-alt { margin-top: var(--s5); text-align: center; }
-.auth-alt-sep { margin: 0 var(--s2); color: var(--text-3); }
+.auth-alt { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--s2); margin-top: var(--s5); }
 .code-input { text-align: center; font-size: 28px !important; font-weight: 700; letter-spacing: 0.3em; text-indent: 0.3em; }
 
 /* The code as six boxes (app.js): the real box lies unseen over them, its
@@ -1586,9 +1592,13 @@ select {
 .pay-fig.is-overtime .pay-fig-value { color: var(--success-text); }
 .pay-fig-note { font-size: 13px; color: var(--text-2); font-variant-numeric: tabular-nums; }
 
-.cal-pay { color: inherit; text-decoration: none; }
-.cal-pay strong { color: var(--ahead); }
-.cal-pay:hover { text-decoration: underline; }
+.cal-pay {
+  display: inline-flex; align-items: center; gap: 4px; min-height: 32px; padding: 0 12px;
+  border-radius: 99px; background: var(--success-bg); color: var(--success-text);
+  font-weight: 600; text-decoration: none; transition: background-color .15s ease;
+}
+.cal-pay strong { color: inherit; }
+.cal-pay:hover { background: color-mix(in srgb, var(--success-bg) 80%, var(--go)); }
 
 .pay-salaries { list-style: none; display: flex; flex-direction: column; gap: var(--s2); margin-bottom: var(--s5); }
 .pay-salaries li {
@@ -2377,10 +2387,6 @@ input[type="time"][readonly], input[type="date"][readonly] { caret-color: transp
 /* The weekly email: its switch in Settings, and Preview / Send now on Reports. */
 .mail-to { display: flex; align-items: center; gap: 6px; margin-top: var(--s2); font-size: 15px; color: var(--text-2); }
 .mail-to .icon { color: var(--text-3); }
-.link-btn {
-  min-height: 44px; padding: 0; border: 0; background: none; font: inherit; font-weight: 600;
-  color: var(--accent-text); text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
-}
 .content > .rp-mail { margin-top: var(--s4); display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s3); }
 .rp-mail-text { flex: 1 1 12rem; }
 .rp-mail-text .card-title { margin: 0; }
@@ -2394,7 +2400,7 @@ input[type="time"][readonly], input[type="date"][readonly] { caret-color: transp
 }
 .rm-item .icon { flex: none; }
 .rm-item a { flex: 1; min-width: 0; min-height: 44px; display: flex; align-items: center; color: inherit; font-weight: 600; text-decoration: none; }
-.rm-item a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.rm-item a:hover { color: var(--accent-text); }
 .rm-item button { flex: none; width: 44px; height: 44px; min-height: 44px; padding: 0; border: 0; border-radius: var(--r-sm); background: transparent; color: inherit; cursor: pointer; }
 .rm-item button:hover { background: color-mix(in srgb, var(--warn-text) 12%, transparent); }
 .notify-row { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); min-height: 48px; margin-top: var(--s2); padding-top: var(--s2); border-top: 1px solid var(--line); }
@@ -2577,7 +2583,9 @@ button.tab-link { border: 0; background: transparent; font: inherit; font-size: 
 .lp-lead { margin-top: var(--s4); max-width: 34ch; font-size: 19px; line-height: 1.45; color: var(--text-2); text-wrap: pretty; }
 .lp-cta { margin-top: var(--s5); padding-inline: 32px; }
 .lp-note { max-width: 52ch; margin-top: var(--s3); font-size: 17px; line-height: 1.55; text-wrap: pretty; }
-.lp-note a { color: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; overflow-wrap: anywhere; }
+.lp-close-acts { display: flex; flex-wrap: wrap; gap: var(--s3); }
+.lp-mail-btn { padding-inline: 24px; border: 1.5px solid color-mix(in srgb, var(--on-pill) 45%, transparent); background: transparent; color: var(--on-pill); overflow-wrap: anywhere; }
+.lp-mail-btn:hover { background: color-mix(in srgb, var(--on-pill) 12%, transparent); }
 .lp-hero-art { padding: clamp(20px, 4vw, 44px); border-radius: 28px; background: var(--info-bg); }
 
 .lp-card { padding: var(--s5); border: 1px solid var(--card-border); border-radius: 20px; background: var(--surface); box-shadow: var(--shadow-lg); }
