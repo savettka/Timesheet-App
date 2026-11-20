@@ -175,6 +175,13 @@ def heatmap_view(user, today, now, entries=None):
                 hm["today_label"] = day["label"]
     hm["today"] = today
     hm["total"] = logic.fmt_duration(hm["worked_hours"])
+    # Each month's name opens that month in History: the squares are a
+    # picture, too small to tap one.
+    hm["month_links"] = []
+    for col, name in hm["months"]:
+        column = hm["columns"][col]
+        first = next((d["date"] for d in column if d["date"].day == 1), column[0]["date"])
+        hm["month_links"].append((col, name, first))
     return hm
 
 

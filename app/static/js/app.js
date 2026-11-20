@@ -2397,40 +2397,21 @@
   }
 
   // ------------------------------------------------------------ the year
-  // The heatmap: scrolled to now on a narrow screen; the day under the
-  // pointer (or focused) in words below it; and one stop for Tab, with the
-  // arrow keys moving a day (Up, Down) or a week (Left, Right).
+  // The heatmap: scrolled to now on a narrow screen, and the day under the
+  // pointer in words below it. The squares are a picture; the month names
+  // are the links.
   function initHeatmap() {
     document.querySelectorAll("[data-hm]").forEach(function (grid) {
       var card = grid.closest(".hm-card");
       var read = card.querySelector(".hm-read");
       var scroll = card.querySelector(".hm-scroll");
-      var cells = [].slice.call(grid.children);
       if (scroll) scroll.scrollLeft = scroll.scrollWidth;
-      function show(e) {
-        var day = e.target.closest && e.target.closest("a.hm-day");
-        if (day && read) read.textContent = day.getAttribute("aria-label");
-      }
-      grid.addEventListener("mouseover", show);
-      grid.addEventListener("focusin", show);
-      grid.addEventListener("mouseleave", function () {
-        if (read && !grid.contains(document.activeElement)) read.textContent = read.dataset.rest;
+      grid.addEventListener("mouseover", function (e) {
+        var day = e.target.closest && e.target.closest(".hm-day[data-label]");
+        if (day && read) read.textContent = day.dataset.label;
       });
-      grid.addEventListener("keydown", function (e) {
-        var steps = { ArrowUp: -1, ArrowDown: 1, ArrowLeft: -7, ArrowRight: 7 };
-        var at = cells.indexOf(e.target);
-        if (at < 0) return;
-        var to = null;
-        if (e.key in steps) to = cells[at + steps[e.key]];
-        else if (e.key === "Home") to = grid.querySelector("a.hm-day");
-        else if (e.key === "End") to = [].slice.call(grid.querySelectorAll("a.hm-day")).pop();
-        else return;
-        e.preventDefault();
-        // The edge, a day not reached, or one hidden (a phone's shorter year).
-        if (!to || to.tagName !== "A" || !to.offsetParent) return;
-        e.target.tabIndex = -1;
-        to.tabIndex = 0;
-        to.focus();
+      grid.addEventListener("mouseleave", function () {
+        if (read) read.textContent = read.dataset.rest;
       });
     });
   }

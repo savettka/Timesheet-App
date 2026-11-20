@@ -1,6 +1,7 @@
 """5.1 The year heatmap: a square a day for the last 12 months on Home and
 Reports, shaded by hours against the day's target, leave striped, each
-square opening its day -- built from one query by logic.year_heatmap."""
+month's name opening it in History -- built from one query by
+logic.year_heatmap."""
 import datetime as dt
 
 import pytest
@@ -93,9 +94,10 @@ def test_on_home_and_reports(client, year):
     for page in ("/dashboard", "/reports"):
         html = client.get(page).get_data(as_text=True)
         assert 'class="card hm-card"' in html
-        assert 'href="/timesheet/2026-11-11"' in html
-        assert 'aria-label="Wed 11 Nov 2026: 8h of 8h"' in html
-        assert 'aria-label="Tue 10 Nov 2026: leave"' in html and "is-leave" in html
-        # Today is the one stop for Tab, and opens plain /timesheet.
-        assert 'href="/timesheet"\n           aria-label="Thu 12 Nov 2026: nothing yet" tabindex="0"' in html
-        assert html.count('tabindex="0"></a>') >= 1
+        # A picture: the squares are too small to tap, so they aren't links ...
+        assert '<a class="hm-day' not in html
+        assert 'data-label="Wed 11 Nov 2026: 8h of 8h"' in html
+        assert 'data-label="Tue 10 Nov 2026: leave"' in html and "is-leave" in html
+        # ... and each month's name opens that month in History.
+        assert 'href="/history/2026/11"' in html and 'aria-label="November 2026 in History"' in html
+        assert 'href="/history/2025/12"' in html
