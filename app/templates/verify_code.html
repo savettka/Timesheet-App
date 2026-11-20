@@ -12,9 +12,11 @@
   <form method="post" class="form">
     <div class="field">
       <label for="code">6-digit code</label>
+      {# One real box; app.js draws six over it (data-code-boxes), so paste,
+         the phone's code suggestion and screen readers work as with one. #}
       <input type="text" id="code" name="code" required autofocus class="code-input"
-             inputmode="numeric" autocomplete="one-time-code"
-             pattern="[0-9 ]*" maxlength="7" placeholder="000000">
+             inputmode="numeric" autocomplete="one-time-code" data-code-boxes="6"
+             pattern="[0-9 \-]*" maxlength="9" placeholder="000000">
     </div>
     <button type="submit" class="btn btn-primary btn-block btn-lg">Sign in</button>
   </form>

@@ -2225,6 +2225,58 @@
     document.addEventListener("animationend", function (e) { if (!pop.contains(e.target)) place(); }, true);
   }
 
+  // ------------------------------------------------------------ code boxes
+  // The emailed sign-in code as six boxes. The one real box sits unseen over
+  // them, so typing, pasting ("123 456" too), the phone's code suggestion and
+  // screen readers all work as with a single box. Without the script it is
+  // that single box.
+  function initCodeBoxes() {
+    var input = document.querySelector("input[data-code-boxes]");
+    if (!input) return;
+    var size = parseInt(input.dataset.codeBoxes, 10) || 6;
+    var wrap = document.createElement("div");
+    wrap.className = "code-boxes";
+    input.parentNode.insertBefore(wrap, input);
+    var boxes = [];
+    for (var i = 0; i < size; i++) {
+      var box = document.createElement("span");
+      box.className = "code-box";
+      box.setAttribute("aria-hidden", "true");
+      wrap.appendChild(box);
+      boxes.push(box);
+    }
+    wrap.appendChild(input);
+    input.classList.add("is-boxed");
+    input.removeAttribute("maxlength");
+    input.removeAttribute("placeholder");
+
+    function toEnd() {
+      var n = input.value.length;
+      try { input.setSelectionRange(n, n); } catch (err) { /* not focused yet */ }
+    }
+    function draw() {
+      var digits = input.value.replace(/\D/g, "").slice(0, size);
+      if (digits !== input.value) input.value = digits;
+      var here = document.activeElement === input ? Math.min(digits.length, size - 1) : -1;
+      boxes.forEach(function (b, n) {
+        b.textContent = digits.charAt(n);
+        b.classList.toggle("is-filled", n < digits.length);
+        b.classList.toggle("is-here", n === here);
+      });
+      wrap.classList.toggle("is-full", digits.length === size);
+    }
+    input.addEventListener("input", function () { draw(); toEnd(); });
+    input.addEventListener("focus", function () { draw(); setTimeout(toEnd, 0); });
+    input.addEventListener("blur", draw);
+    // The boxes fill left to right: a click or arrow anywhere puts the caret
+    // after the last digit.
+    input.addEventListener("click", toEnd);
+    input.addEventListener("keyup", function (e) {
+      if (/^(Arrow|Home|End)/.test(e.key)) toEnd();
+    });
+    draw();
+  }
+
   // ------------------------------------------------------------ landing page
   // Each part slides up into place as it comes into view (never a fade).
   // Without the script, or with reduced motion, everything just sits there.
@@ -3240,6 +3292,7 @@
     initIdle();
     initPickers();
     initSuggest();
+    initCodeBoxes();
     initLanding();
     initBoards();
     initAutosave();

@@ -228,7 +228,8 @@ def verify_code():
         return redirect(url_for("auth.request_code"))
 
     if request.method == "POST":
-        submitted = (request.form.get("code") or "").strip().replace(" ", "")
+        # Digits only: a code pasted as "123 456" or "123-456" still counts.
+        submitted = "".join(ch for ch in (request.form.get("code") or "") if ch.isdigit())
         user = User.query.filter_by(email=email).first()
 
         record = None
