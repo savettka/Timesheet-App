@@ -216,6 +216,19 @@ Google Account → Security → App passwords. Gmail is the default host because
 PythonAnywhere's free tier only permits outbound mail to Google's servers; on a paid
 plan set `SMTP_HOST` / `SMTP_PORT` (and `SMTP_USE_SSL=1` for port 465) for any provider.
 
+**From your own domain, on the free tier:** Resend's web API is reachable from a free
+PythonAnywhere account, so mail can come from an address on a domain you own. Verify the
+domain in Resend, make an API key with sending access, and set:
+
+```
+RESEND_API_KEY = re_...
+MAIL_FROM      = STM <stm@your-domain>
+MAIL_REPLY_TO  = you@your-domain          # optional: where replies go
+```
+
+With a Resend key set, STM sends through Resend; without one, through SMTP as above.
+The sign-in codes and the weekly report both go the same way.
+
 Each user needs their email address filled in under **Settings → Profile** before they
 can receive a code.
 

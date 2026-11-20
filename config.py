@@ -46,6 +46,11 @@ class Config:
     SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD")
     SMTP_USE_SSL = os.environ.get("SMTP_USE_SSL", "").lower() in {"1", "true", "yes"}
     MAIL_FROM = os.environ.get("MAIL_FROM")
+    # Or send through Resend's web API, which the free tier allows: its key,
+    # with MAIL_FROM an address on a domain verified there. Replies go to
+    # MAIL_REPLY_TO when set.
+    RESEND_API_KEY = os.environ.get("RESEND_API_KEY")
+    MAIL_REPLY_TO = os.environ.get("MAIL_REPLY_TO")
 
     # Updates from GitHub (app/deploy.py): the webhook's shared secret, and
     # the branch the site runs. Left unset, /deploy/github doesn't exist.
