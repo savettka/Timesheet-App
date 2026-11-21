@@ -906,13 +906,14 @@
   }
 
   // ----------------------------------------------------- timesheet picture
-  // "Download PNG": the day as a picture in STM's pastels -- the lavender
-  // band with the mark, then every line with words in it -- drawn from the
-  // boxes as they are, saved or not.
+  // "Download PNG": the day as a plain picture -- the date and whose it is,
+  // then every line with words in it -- drawn from the boxes as they are,
+  // saved or not. Black and grey on white, one light blue behind the header
+  // row, and no logo or app name.
   var PNG = {
     width: 1080, pad: 56, scale: 2,
-    band: "#eef0ff", brandText: "#3f3697", brandMuted: "#57519f", ink: "#151823", ink2: "#3d4354",
-    ink3: "#555c6f", hair: "#e6e8ee", breakFill: "#fdefd2", breakText: "#7a4a00", font: "Figtree, system-ui, sans-serif",
+    light: "#eaf2fb", ink: "#151823", ink2: "#3d4354", ink3: "#555c6f", hair: "#e6e8ee",
+    font: "Figtree, system-ui, sans-serif",
   };
 
   function clock12(hhmm) {
@@ -949,25 +950,15 @@
     return lines;
   }
 
-  function roundRect(ctx, x, y, w, h, r) {
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.arcTo(x + w, y, x + w, y + h, r);
-    ctx.arcTo(x + w, y + h, x, y + h, r);
-    ctx.arcTo(x, y + h, x, y, r);
-    ctx.arcTo(x, y, x + w, y, r);
-    ctx.closePath();
-  }
-
-  function drawTimesheet(info, rows, logo) {
+  function drawTimesheet(info, rows) {
     var W = PNG.width, pad = PNG.pad, timeW = 250, gap = 28;
-    var textW = W - 2 * pad - timeW - gap - 32;
+    var textW = W - 2 * pad - timeW - gap - 12;
     var canvas = document.createElement("canvas");
     var ctx = canvas.getContext("2d");
     ctx.font = "400 21px " + PNG.font;
     rows.forEach(function (row) { row.wrapped = wrapWords(ctx, row.text, textW); });
 
-    var bandH = 140, top = bandH + (info.summary ? 76 : 40), headH = 46, lineH = 31;
+    var top = 136, headH = 46, lineH = 31;
     var bodyH = rows.reduce(function (sum, row) { return sum + Math.max(1, row.wrapped.length) * lineH + 30; }, 0);
     var H = top + headH + bodyH + 96;
     canvas.width = W * PNG.scale;
@@ -977,54 +968,30 @@
 
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, W, H);
-    ctx.fillStyle = PNG.band;
-    ctx.fillRect(0, 0, W, bandH);
-    var textX = pad;
-    if (logo) {
-      ctx.drawImage(logo, pad - 6, 38, 64, 64);
-      textX = pad + 70;
-    }
-    ctx.fillStyle = PNG.brandText;
-    ctx.font = "700 34px " + PNG.font;
-    ctx.fillText("STM", textX, 72);
-    ctx.fillStyle = PNG.brandMuted;
-    ctx.font = "400 18px " + PNG.font;
-    ctx.fillText("Simple Time Manager", textX, 100);
-    ctx.textAlign = "right";
+    // The date, then whose day it is with its span and hours.
     ctx.fillStyle = PNG.ink;
-    ctx.font = "700 27px " + PNG.font;
-    ctx.fillText(info.day, W - pad, 70);
-    ctx.fillStyle = PNG.brandMuted;
-    ctx.font = "400 18px " + PNG.font;
-    ctx.fillText("Timesheet · " + info.who, W - pad, 100);
-    ctx.textAlign = "left";
+    ctx.font = "700 30px " + PNG.font;
+    ctx.fillText(info.day, pad, 76);
+    ctx.fillStyle = PNG.ink3;
+    ctx.font = "400 19px " + PNG.font;
+    ctx.fillText([info.who, info.summary].filter(Boolean).join(" · "), pad, 108);
 
-    if (info.summary) {
-      ctx.fillStyle = PNG.ink2;
-      ctx.font = "600 20px " + PNG.font;
-      ctx.fillText(info.summary, pad, bandH + 46);
-    }
-
-    var y = top;
-    ctx.fillStyle = PNG.band;
-    roundRect(ctx, pad - 12, y, W - 2 * pad + 24, headH, 10);
-    ctx.fill();
-    ctx.fillStyle = PNG.brandText;
+    var y = top, left = pad - 12, full = W - 2 * pad + 24;
+    ctx.fillStyle = PNG.light;
+    ctx.fillRect(left, y, full, headH);
+    ctx.fillStyle = PNG.ink;
     ctx.font = "700 17px " + PNG.font;
-    ctx.fillText("Time", pad + 4, y + 29);
+    ctx.fillText("Time", pad, y + 29);
     ctx.fillText("What I worked on", pad + timeW + gap, y + 29);
     y += headH;
 
+    // A break is the same row in grey.
     rows.forEach(function (row, i) {
       var h = Math.max(1, row.wrapped.length) * lineH + 30;
-      if (row.isBreak) {
-        ctx.fillStyle = PNG.breakFill;
-        ctx.fillRect(pad - 12, y, W - 2 * pad + 24, h);
-      }
-      ctx.fillStyle = row.isBreak ? PNG.breakText : PNG.ink;
+      ctx.fillStyle = row.isBreak ? PNG.ink3 : PNG.ink;
       ctx.font = "600 21px " + PNG.font;
-      ctx.fillText(row.span, pad + 4, y + 15 + 23);
-      ctx.fillStyle = row.isBreak ? PNG.breakText : PNG.ink2;
+      ctx.fillText(row.span, pad, y + 15 + 23);
+      ctx.fillStyle = row.isBreak ? PNG.ink3 : PNG.ink2;
       ctx.font = "400 21px " + PNG.font;
       row.wrapped.forEach(function (text, n) {
         ctx.fillText(text, pad + timeW + gap, y + 15 + 23 + n * lineH);
@@ -1032,29 +999,14 @@
       y += h;
       if (i < rows.length - 1) {
         ctx.fillStyle = PNG.hair;
-        ctx.fillRect(pad - 12, y - 0.5, W - 2 * pad + 24, 1);
+        ctx.fillRect(left, y - 0.5, full, 1);
       }
     });
 
     ctx.fillStyle = PNG.ink3;
     ctx.font = "400 16px " + PNG.font;
     ctx.fillText("Generated " + info.stamp, pad, H - 40);
-    ctx.textAlign = "right";
-    ctx.fillStyle = PNG.brandText;
-    ctx.font = "700 16px " + PNG.font;
-    ctx.fillText("STM · Simple Time Manager", W - pad, H - 40);
     return canvas;
-  }
-
-  function loadLogo() {
-    var icon = document.querySelector('link[rel="icon"]');
-    return new Promise(function (resolve) {
-      if (!icon) return resolve(null);
-      var img = new Image();
-      img.onload = function () { resolve(img); };
-      img.onerror = function () { resolve(null); };  // the words still make the picture
-      img.src = icon.href;
-    });
   }
 
   function initTimesheetPng() {
@@ -1084,17 +1036,16 @@
       }
       button.setAttribute("aria-disabled", "true");
       var fonts = document.fonts && document.fonts.load ? document.fonts.load("600 21px Figtree") : Promise.resolve();
-      Promise.all([fonts.catch(function () {}), loadLogo()]).then(function (ready) {
+      fonts.catch(function () {}).then(function () {
         var d = form.dataset;
-        var canvas = drawTimesheet({ day: d.pngDay, who: d.pngWho, summary: d.pngSummary, stamp: d.pngStamp },
-                                   rows, ready[1]);
+        var canvas = drawTimesheet({ day: d.pngDay, who: d.pngWho, summary: d.pngSummary, stamp: d.pngStamp }, rows);
         canvas.toBlob(function (blob) {
           button.removeAttribute("aria-disabled");
           if (!blob) return;
           var url = URL.createObjectURL(blob);
           var link = document.createElement("a");
           link.href = url;
-          link.download = d.pngName || "STM timesheet.png";
+          link.download = d.pngName || "Timesheet.png";
           document.body.appendChild(link);
           link.click();
           link.remove();

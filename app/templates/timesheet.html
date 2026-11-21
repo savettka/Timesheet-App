@@ -78,7 +78,7 @@
   {# Always to this page's own date, so a page left open past midnight still
      saves to the day it shows. #}
   <form method="post" class="ts-form js-once" action="{{ url_for('main.timesheet', date_str=day.isoformat()) }}"
-        data-png-name="STM timesheet {{ day.isoformat() }}.png" data-png-day="{{ day.strftime('%A %d %B %Y') }}"
+        data-png-name="Timesheet {{ day.isoformat() }}.png" data-png-day="{{ day.strftime('%A %d %B %Y') }}"
         data-png-who="{{ who }}" data-png-summary="{{ summary }}" data-png-stamp="{{ stamp }}"
         data-mark-url="{{ url_for('main.timesheet_mark') }}"
         {%- if night is not none %} data-night="{{ night }}" data-login="{{ login_at }}"{% endif %}

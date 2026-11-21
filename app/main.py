@@ -1921,7 +1921,7 @@ def reports_csv():
         sheet.writerow([d.isoformat(), logic.minutes_clock(a).strftime("%H:%M"), logic.minutes_clock(b).strftime("%H:%M"),
                         f"{(b - a) / 60:.2f}", block.text, "Yes" if block.is_copied else ""])
     response = current_app.response_class(out.getvalue(), mimetype="text/csv")
-    response.headers["Content-Disposition"] = f'attachment; filename="STM lines {first.isoformat()} to {last.isoformat()}.csv"'
+    response.headers["Content-Disposition"] = f'attachment; filename="Timesheet lines {first.isoformat()} to {last.isoformat()}.csv"'
     return response
 
 
@@ -2365,7 +2365,7 @@ def export_month(year, month, kind):
         BytesIO(data),
         mimetype=mimetype,
         as_attachment=True,
-        download_name=f"STM timesheet {page['month_name']} {year}.{kind}",
+        download_name=f"Timesheet {page['month_name']} {year}.{kind}",
     )
     # Someone's hours: never kept by a shared cache or proxy.
     response.headers["Cache-Control"] = "no-store"
