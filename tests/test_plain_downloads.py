@@ -1,5 +1,6 @@
-"""Everything downloaded is plain: no logo, no app name in the file or its
-name, and one light colour."""
+"""Everything downloaded is plain, like a sheet typed into a spreadsheet:
+no logo, no app name in the file or its name, no "generated" stamp, and one
+light colour."""
 
 import io
 import pathlib
@@ -27,8 +28,10 @@ def test_pdf_is_plain(client, monkeypatch):
     assert 'filename="Timesheet November 2026.pdf"' in r.headers["Content-Disposition"]
     text = r.data.decode("latin-1")
     assert not any(b in text for b in BRANDS)
+    assert "(Generated" not in text  # no stamp drawn on the page
     assert len(re.findall(r"/Type /Page[^s]", text)) == 1
-    assert "(November 2026)" in text and "(Total)" in text
+    assert "(Name:)" in text and "(November 2026)" in text and "(Total)" in text
+    assert "(10/11/2026)" in text and "(8:00)" in text  # dd/mm/yyyy and h:mm, as a spreadsheet shows them
 
 
 def test_excel_is_plain(client):
@@ -59,5 +62,7 @@ def test_png_is_drawn_plain():
     body = js[start:js.index("function initTimesheetPng")]
     assert not any(b in body for b in BRANDS)
     assert "drawImage" not in body  # no logo
+    assert "Generated" not in body
+    assert all(word in js for word in ('"Name:"', '"Date:"', '"Start"', '"End"', '"Hours"', '"Task"', '"Total"'))
     page = (ROOT / "app" / "templates" / "timesheet.html").read_text(encoding="utf-8")
     assert 'data-png-name="Timesheet {{ day.isoformat() }}.png"' in page

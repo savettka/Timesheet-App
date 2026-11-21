@@ -906,14 +906,18 @@
   }
 
   // ----------------------------------------------------- timesheet picture
-  // "Download PNG": the day as a plain picture -- the date and whose it is,
-  // then every line with words in it -- drawn from the boxes as they are,
-  // saved or not. Black and grey on white, one light blue behind the header
-  // row, and no logo or app name.
+  // "Download PNG": the day as a plain sheet, as if typed into Excel -- Name
+  // and Date at the top, then Start, End, Hours and Task in a grid with a
+  // Total -- drawn from the boxes as they are, saved or not. Black on white
+  // in a spreadsheet font, one light blue header row, nothing else.
   var PNG = {
-    width: 1080, pad: 56, scale: 2,
-    light: "#eaf2fb", ink: "#151823", ink2: "#3d4354", ink3: "#555c6f", hair: "#e6e8ee",
-    font: "Figtree, system-ui, sans-serif",
+    scale: 2, pad: 20, cellX: 6, rowH: 21, lineH: 18,
+    font: "Calibri, Carlito, Arial, sans-serif", size: 15,
+    light: "#eaf2fb", ink: "#000000", grey: "#595959", grid: "#bfbfbf",
+    // A figure sits at the right of its cell and words at the left, as
+    // Excel puts them; the headings are words.
+    cols: [{ name: "Start", w: 92, num: true }, { name: "End", w: 92, num: true },
+           { name: "Hours", w: 62, num: true }, { name: "Task", w: 500 }],
   };
 
   function clock12(hhmm) {
@@ -921,11 +925,15 @@
     return (h % 12 || 12) + ":" + parts[1] + " " + (h < 12 ? "AM" : "PM");
   }
 
-  // 12:47 – 2:00 PM, 11:30 AM – 12:30 PM: the line's time, as the app says it.
-  function spanWords(from, to) {
-    if (!from || !to) return (from ? clock12(from) : "?") + " – " + (to ? clock12(to) : "?");
-    var a = clock12(from), b = clock12(to);
-    return (a.slice(-2) === b.slice(-2) && to !== "00:00" ? a.slice(0, -3) : a) + " – " + b;
+  function clockMinutesOf(hhmm) {
+    if (!hhmm) return null;
+    var parts = hhmm.split(":");
+    return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+  }
+
+  // 1:05, 0:46, 12:30 -- hours as Excel's h:mm shows them.
+  function hoursMinutes(minutes) {
+    return Math.floor(minutes / 60) + ":" + ("0" + (minutes % 60)).slice(-2);
   }
 
   function wrapWords(ctx, text, width) {
@@ -951,61 +959,82 @@
   }
 
   function drawTimesheet(info, rows) {
-    var W = PNG.width, pad = PNG.pad, timeW = 250, gap = 28;
-    var textW = W - 2 * pad - timeW - gap - 12;
+    var cols = PNG.cols, pad = PNG.pad, cellX = PNG.cellX, rowH = PNG.rowH;
+    var regular = "400 " + PNG.size + "px " + PNG.font, bold = "700 " + PNG.size + "px " + PNG.font;
+    var xs = [pad];
+    cols.forEach(function (col) { xs.push(xs[xs.length - 1] + col.w); });
+    var W = xs[xs.length - 1] + pad;
     var canvas = document.createElement("canvas");
     var ctx = canvas.getContext("2d");
-    ctx.font = "400 21px " + PNG.font;
-    rows.forEach(function (row) { row.wrapped = wrapWords(ctx, row.text, textW); });
 
-    var top = 136, headH = 46, lineH = 31;
-    var bodyH = rows.reduce(function (sum, row) { return sum + Math.max(1, row.wrapped.length) * lineH + 30; }, 0);
-    var H = top + headH + bodyH + 96;
+    // Each line's hours (none for a break) and its height once wrapped.
+    var total = 0;
+    ctx.font = regular;
+    rows.forEach(function (row) {
+      row.wrapped = wrapWords(ctx, row.text, cols[3].w - 2 * cellX);
+      row.h = Math.max(rowH, row.wrapped.length * PNG.lineH + 4);
+      var a = clockMinutesOf(row.start), b = clockMinutesOf(row.end);
+      row.minutes = null;
+      if (!row.isBreak && a !== null && b !== null) {
+        row.minutes = b > a ? b - a : b + 1440 - a;  // past midnight
+        total += row.minutes;
+      }
+    });
+
+    var top = pad + 3 * rowH;  // Name, Date, an empty row
+    var bodyH = rows.reduce(function (sum, row) { return sum + row.h; }, 0);
+    var H = top + rowH + bodyH + rowH + pad;
     canvas.width = W * PNG.scale;
     canvas.height = H * PNG.scale;
     ctx.scale(PNG.scale, PNG.scale);
     ctx.textBaseline = "alphabetic";
-
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, W, H);
-    // The date, then whose day it is with its span and hours.
-    ctx.fillStyle = PNG.ink;
-    ctx.font = "700 30px " + PNG.font;
-    ctx.fillText(info.day, pad, 76);
-    ctx.fillStyle = PNG.ink3;
-    ctx.font = "400 19px " + PNG.font;
-    ctx.fillText([info.who, info.summary].filter(Boolean).join(" · "), pad, 108);
 
-    var y = top, left = pad - 12, full = W - 2 * pad + 24;
+    // Words sit at the foot of their cell, as Excel puts them.
+    function put(i, y, h, text, font, color, right) {
+      ctx.font = font;
+      ctx.fillStyle = color;
+      ctx.textAlign = right ? "right" : "left";
+      ctx.fillText(text, right ? xs[i + 1] - cellX : xs[i] + cellX, y + h - 5);
+      ctx.textAlign = "left";
+    }
+
+    put(0, pad, rowH, "Name:", bold, PNG.ink);
+    put(1, pad, rowH, info.who, regular, PNG.ink);
+    put(0, pad + rowH, rowH, "Date:", bold, PNG.ink);
+    put(1, pad + rowH, rowH, info.day, regular, PNG.ink);
+
+    var y = top, edges = [y];
     ctx.fillStyle = PNG.light;
-    ctx.fillRect(left, y, full, headH);
-    ctx.fillStyle = PNG.ink;
-    ctx.font = "700 17px " + PNG.font;
-    ctx.fillText("Time", pad, y + 29);
-    ctx.fillText("What I worked on", pad + timeW + gap, y + 29);
-    y += headH;
+    ctx.fillRect(xs[0], y, xs[xs.length - 1] - xs[0], rowH);
+    cols.forEach(function (col, i) { put(i, y, rowH, col.name, bold, PNG.ink); });
+    y += rowH;
+    edges.push(y);
 
-    // A break is the same row in grey.
-    rows.forEach(function (row, i) {
-      var h = Math.max(1, row.wrapped.length) * lineH + 30;
-      ctx.fillStyle = row.isBreak ? PNG.ink3 : PNG.ink;
-      ctx.font = "600 21px " + PNG.font;
-      ctx.fillText(row.span, pad, y + 15 + 23);
-      ctx.fillStyle = row.isBreak ? PNG.ink3 : PNG.ink2;
-      ctx.font = "400 21px " + PNG.font;
+    // A break is a row in grey, with no hours.
+    rows.forEach(function (row) {
+      var color = row.isBreak ? PNG.grey : PNG.ink;
+      put(0, y, row.h, row.start ? clock12(row.start) : "", regular, color, true);
+      put(1, y, row.h, row.end ? clock12(row.end) : "", regular, color, true);
+      put(2, y, row.h, row.minutes === null ? "" : hoursMinutes(row.minutes), regular, color, true);
+      var last = row.wrapped.length - 1;
       row.wrapped.forEach(function (text, n) {
-        ctx.fillText(text, pad + timeW + gap, y + 15 + 23 + n * lineH);
+        put(3, y - (last - n) * PNG.lineH, row.h, text, regular, color);
       });
-      y += h;
-      if (i < rows.length - 1) {
-        ctx.fillStyle = PNG.hair;
-        ctx.fillRect(left, y - 0.5, full, 1);
-      }
+      y += row.h;
+      edges.push(y);
     });
 
-    ctx.fillStyle = PNG.ink3;
-    ctx.font = "400 16px " + PNG.font;
-    ctx.fillText("Generated " + info.stamp, pad, H - 40);
+    put(1, y, rowH, "Total", bold, PNG.ink);
+    put(2, y, rowH, hoursMinutes(total), bold, PNG.ink, true);
+    y += rowH;
+    edges.push(y);
+
+    // The grid: every cell bordered, from the headings to the total.
+    ctx.fillStyle = PNG.grid;
+    edges.forEach(function (e) { ctx.fillRect(xs[0], e - 0.5, xs[xs.length - 1] - xs[0], 1); });
+    xs.forEach(function (x) { ctx.fillRect(x - 0.5, top, 1, y - top); });
     return canvas;
   }
 
@@ -1024,7 +1053,7 @@
         var text = line.querySelector('[name="text"]').value.trim();
         if (!text || line.classList.contains("is-squeezed")) return;
         rows.push({
-          span: spanWords(line.querySelector('[name="start"]').value, line.querySelector('[name="end"]').value),
+          start: line.querySelector('[name="start"]').value, end: line.querySelector('[name="end"]').value,
           text: text, isBreak: line.classList.contains("is-break"),
         });
       });
@@ -1035,10 +1064,9 @@
         return;
       }
       button.setAttribute("aria-disabled", "true");
-      var fonts = document.fonts && document.fonts.load ? document.fonts.load("600 21px Figtree") : Promise.resolve();
-      fonts.catch(function () {}).then(function () {
+      Promise.resolve().then(function () {
         var d = form.dataset;
-        var canvas = drawTimesheet({ day: d.pngDay, who: d.pngWho, summary: d.pngSummary, stamp: d.pngStamp }, rows);
+        var canvas = drawTimesheet({ day: d.pngDay, who: d.pngWho }, rows);
         canvas.toBlob(function (blob) {
           button.removeAttribute("aria-disabled");
           if (!blob) return;

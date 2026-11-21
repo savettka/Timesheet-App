@@ -2491,14 +2491,12 @@ def timesheet(date_str=None):
     can_time = open_entry is not None and not open_entry.open_break() and not logic.is_stale_shift(open_entry, now)
 
     def show(views):
-        # The day at the top of the page, and above the lines in its picture
-        # (Download PNG): 1:00 PM – 6:00 PM · 4h 30m worked.
-        day_span = summary = worked = ""
+        # The day at the top of the page: 1:00 PM – 6:00 PM · 4h 30m worked.
+        day_span = worked = ""
         if entry is not None and entry.login_time is not None:
             until = logic.fmt_time(entry.logout_time) if entry.logout_time else "now"
             worked = logic.fmt_hours(logic.entry_total_hours(entry, now=now))
             day_span = f"{logic.fmt_time(entry.login_time)} – {until}"
-            summary = f"{day_span} · {worked} worked"
         return render_template(
             "timesheet.html",
             day=day,
@@ -2512,10 +2510,8 @@ def timesheet(date_str=None):
             lines=views,
             max_length=WorkBlock.MAX_LENGTH,
             who=current_user.display_name or current_user.username,
-            summary=summary,
             day_span=day_span,
             day_worked=worked,
-            stamp=f"{now:%a %d %b %Y}, {logic.fmt_time(now.time())}",
             logout_label=logic.fmt_time(entry.logout_time) if logout_at is not None else "",
             recent=recent_texts(current_user.id, day),
             timer=timer_view(current_user, now) if day == today else None,
