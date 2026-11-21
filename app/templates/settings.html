@@ -24,10 +24,10 @@
     {% set full_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] %}
     {% set now_hours = user.day_hours_on(today) %}
     {% set longest = now_hours|max %}
-    <form method="post" class="form" autocomplete="off">
+    <form method="post" class="form hours-form" autocomplete="off">
       <input type="hidden" name="form_type" value="hours">
       <fieldset class="fieldset">
-        <legend>Hours each day</legend>
+        <legend class="hours-legend">Hours each day <span class="hours-total"><b data-hours-total>{{ '%g'|format(now_hours|sum) }}h</b> a week</span></legend>
         {# A week strip: a tile a day, its hours large; a tap opens the hours
            list. Green a full day, amber a shorter one, grey a day off. #}
         <div class="hours-week" data-hours-week>
@@ -44,11 +44,10 @@
         </div>
       </fieldset>
       <div class="hours-foot">
-        <p class="hours-total"><b data-hours-total>{{ '%g'|format(now_hours|sum) }}h</b> a week</p>
-        <div class="field hours-from">
-          <label for="hours-starts">From</label>
+        <label class="hours-from" for="hours-starts">
+          <span class="hours-from-word">From</span>
           <input type="date" id="hours-starts" name="starts" value="{{ today.isoformat() }}" required>
-        </div>
+        </label>
         <button type="submit" class="btn btn-primary">Save hours</button>
       </div>
     </form>

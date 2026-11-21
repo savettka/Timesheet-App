@@ -1647,10 +1647,25 @@ select {
 .hours-tile-off { position: absolute; left: 0; right: 0; bottom: 14px; display: none; text-align: center; font-size: 17px; font-weight: 700; pointer-events: none; }
 .hours-tile.is-off input { color: transparent; }
 .hours-tile.is-off .hours-tile-off { display: block; }
-.hours-foot { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--s3); margin-top: var(--s4); }
-.hours-total { display: flex; align-items: center; gap: 6px; margin: 0; padding: 0 var(--s4); min-height: 50px; border-radius: var(--r-md); background: var(--info-bg); color: var(--info-text); font-size: 15px; }
-.hours-total b { font-size: 18px; font-variant-numeric: tabular-nums; }
-.hours-from { flex: 1 1 12rem; max-width: 16rem; margin: 0; }
+/* The week's total sits on the legend's line; under the strip, one row of
+   two, both 50px tall: the date the hours start from (its word inside the
+   box) and Save. */
+.hours-form { gap: var(--s3); }
+.hours-legend { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); width: 100%; }
+.hours-total { display: inline-flex; align-items: baseline; gap: 5px; padding: 3px 10px; border-radius: var(--r-sm); background: var(--info-bg); color: var(--info-text); font-size: 14px; font-weight: 500; white-space: nowrap; }
+.hours-total b { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.hours-foot { display: flex; flex-wrap: wrap; align-items: stretch; gap: var(--s2); }
+.hours-from {
+  flex: 1 1 13rem; display: flex; align-items: center; min-height: 50px; margin: 0; padding-left: var(--s4);
+  border: 1.5px solid var(--line-strong); border-radius: var(--r-md); background: var(--surface); cursor: pointer; user-select: none;
+}
+.hours-from:hover { border-color: var(--text-2); }
+.hours-from:focus-within, .hours-from:has([aria-expanded="true"]) { border-color: var(--focus); box-shadow: 0 0 0 4px var(--focus-ring); }
+.hours-from-word { flex: none; font-size: 14px; font-weight: 600; color: var(--text-3); }
+.hours-from input[type="date"] { flex: 1; min-width: 0; min-height: 46px; border: 0; box-shadow: none; background-color: transparent; padding-left: var(--s2); }
+.hours-from input[type="date"]:focus { box-shadow: none; }
+.hours-foot .btn { min-height: 50px; }
+@media (max-width: 899px) { .hours-foot .btn { flex: 1 1 100%; } }
 .hours-plans { margin: var(--s4) 0 0; }
 .hours-plan-days { display: block; margin-top: 2px; font-size: 14px; color: var(--text-3); }
 .hours-breaks { margin-top: var(--s5); padding-top: var(--s5); border-top: 1px solid var(--line); }

@@ -1963,6 +1963,13 @@
 
     document.addEventListener("click", function (e) {
       var el = e.target.closest && e.target.closest('input[type="time"], input[type="date"], input[data-options], .pk-select');
+      // A box's label opens its picker too, but without the label's usual
+      // focusing of the box (and the browser's blue highlight with it).
+      var lab = !el && e.target.closest && e.target.closest("label");
+      if (lab && lab.control && lab.control.matches('input[type="time"], input[type="date"], input[data-options]') && pickable(lab.control)) {
+        e.preventDefault();
+        el = lab.control;
+      }
       if (el && (el.pkSelect || pickable(el))) {
         readyBox(el);
         if (el.pkSelect && field === el) { close(true); return; }
