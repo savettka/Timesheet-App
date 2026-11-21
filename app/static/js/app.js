@@ -2873,6 +2873,7 @@
     var status = document.getElementById("cp-status");
     var here = window.location.pathname + window.location.search;
     var data = null, items = [], active = 0, spoken = null;
+    var longHint = input.placeholder;
 
     var pages = [].map.call(document.querySelectorAll(".side-nav a.nav-link"), function (a) {
       return { label: a.textContent.trim(), url: a.getAttribute("href") };
@@ -2902,8 +2903,13 @@
       };
     }
 
+    // On a phone with nothing typed yet, a short list: what can be done now,
+    // then the pages the tab bar doesn't hold. Typing finds everything.
+    var PHONE_PAGES = ["/boards", "/history", "/pay", "/settings"];
+
     function options(text) {
       var q = text.trim(), out = [];
+      var short = !q && onPhone();
       var words = q.toLowerCase().split(/\s+/).filter(Boolean);
       function add(kind, label, run, also) {
         var hay = (label + " " + kind + " " + (also || "")).toLowerCase();
@@ -2923,16 +2929,21 @@
         if (data.fix_url) add("Punch", "Put in the missing logout", go(data.fix_url));
         if (data.timer) add("Timer", "Stop the timer: " + data.timer.text, post(data.stop_url, { back: here }));
         if (data.can_time) {
-          data.recent.forEach(function (task) {
-            if (!data.timer || task !== data.timer.text) add("Task", "Start again: " + task, post(data.start_url, { text: task, back: here }));
-          });
+          data.recent.filter(function (task) { return !data.timer || task !== data.timer.text; })
+            .slice(0, short ? 3 : undefined).forEach(function (task) {
+              add("Task", "Start again: " + task, post(data.start_url, { text: task, back: here }));
+            });
         }
       }
-      pages.forEach(function (p) { add("Page", p.label, go(p.url)); });
-      add("Setting", currentTheme() === "dark" ? "Light mode" : "Dark mode", function () {
-        var toggle = document.querySelector(".js-theme-toggle");
-        if (toggle) toggle.click();
-      }, "dark light theme");
+      pages.forEach(function (p) {
+        if (!short || PHONE_PAGES.indexOf(p.url) >= 0) add("Page", p.label, go(p.url));
+      });
+      if (!short) {
+        add("Setting", currentTheme() === "dark" ? "Light mode" : "Dark mode", function () {
+          var toggle = document.querySelector(".js-theme-toggle");
+          if (toggle) toggle.click();
+        }, "dark light theme");
+      }
       out = out.slice(0, 40);
       // Words that aren't a place or a task yet: a new task to time, last.
       if (data && data.can_time && q && data.recent.indexOf(q) < 0 && (!data.timer || data.timer.text !== q)) {
@@ -2964,11 +2975,14 @@
         var label = document.createElement("span");
         label.className = "cp-label";
         label.textContent = item.label;
-        var kind = document.createElement("span");
-        kind.className = "cp-kind";
-        kind.textContent = item.kind;
         row.appendChild(label);
-        row.appendChild(kind);
+        // A page needs no tag on a phone: only what it does is marked.
+        if (!(item.kind === "Page" && onPhone())) {
+          var kind = document.createElement("span");
+          kind.className = "cp-kind";
+          kind.textContent = item.kind;
+          row.appendChild(kind);
+        }
         row.addEventListener("pointermove", function () { if (active !== i) select(i); });
         row.addEventListener("click", function () { choose(i); });
         list.appendChild(row);
@@ -2985,6 +2999,7 @@
     function open() {
       if (dialog.open || document.querySelector("dialog[open]")) return;
       input.value = "";
+      input.placeholder = onPhone() ? "Page, date or task" : longHint;
       render();
       dialog.showModal();
       input.focus();

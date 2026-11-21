@@ -91,6 +91,21 @@ def test_the_phone_pill_and_sheet(client, logged_in, clock):
     assert "Stop the timer: Emails" in sheet and "Switch to" in sheet
 
 
+def test_the_phone_pill_is_only_play_or_pause(client, logged_in, clock):
+    def pill():
+        page = client.get("/reports").get_data(as_text=True)
+        return re.search(r'<button type="button" class="tb-pill".*?</button>', page, re.S).group(0)
+
+    clock.set(2026, 11, 12, 10, 0)
+    idle = pill()
+    assert "tb-dot" not in idle and "timer-clock" not in idle
+    assert 'd="M8 5.5v13' in idle  # play
+    client.post("/timer/start", data={"text": "Emails"})
+    running = pill()
+    assert "tb-dot" not in running and "timer-clock" not in running
+    assert '<rect x="7" y="6"' in running and 'd="M8 5.5v13' not in running  # pause
+
+
 def test_status_carries_the_timer(client, logged_in, clock):
     clock.set(2026, 11, 12, 10, 0)
     client.post("/timer/start", data={"text": "Emails"})

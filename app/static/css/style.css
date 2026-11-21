@@ -1858,13 +1858,13 @@ select {
     right: max(var(--s4), env(safe-area-inset-right));
     bottom: calc(var(--tab-h) + env(safe-area-inset-bottom) + var(--s3));
     display: inline-flex; align-items: center; justify-content: center; gap: var(--s2);
-    min-width: 48px; min-height: 48px; padding: 0 var(--s4);
+    width: 52px; height: 52px; padding: 0;
     border: 1px solid var(--card-border); border-radius: 999px;
     background: var(--surface); color: var(--text); box-shadow: var(--shadow-lg);
     font: inherit; font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; cursor: pointer;
   }
   .tb-pill[data-state="working"] { border-color: color-mix(in srgb, var(--go) 45%, var(--card-border)); }
-  .tb-pill .icon { width: 18px; height: 18px; }
+  .tb-pill .icon { width: 20px; height: 20px; }
   .tb-modal { display: revert; }
   .tb-modal:not([open]) { display: none; }
   .content { padding-bottom: calc(var(--tab-h) + 88px + env(safe-area-inset-bottom)); }
@@ -1924,6 +1924,9 @@ select {
 @media (max-width: 899px) {
   .cp { inset: max(var(--s4), env(safe-area-inset-top)) 0 auto 0; max-height: 80vh; }
   .cp-inner { max-height: 80vh; }
+  /* About six rows, then it scrolls. */
+  .cp-search input { min-height: 52px; font-size: 16px; }
+  .cp-list { max-height: 296px; }
 }
 
 /* ==========================================================================

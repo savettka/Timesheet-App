@@ -281,13 +281,11 @@
     </div>
   </dialog>
 
-  {# On a phone: the timer as a pill above the tabs -- its clock while one
-     runs -- opening the whole bar in a sheet. #}
+  {# On a phone: the timer as a round button above the tabs -- pause while
+     one runs, play when none does -- opening the whole bar in a sheet. #}
   <button type="button" class="tb-pill" data-state="{{ bar.state }}" aria-haspopup="dialog" aria-controls="tb-sheet"
           aria-label="Timer{{ ': ' ~ bar.timer.text if bar.timer else '' }}, {{ bar.word }}">
-    <span class="tb-dot" aria-hidden="true"></span>
-    {%- if bar.timer %}<span class="timer-clock" aria-hidden="true">{{ bar.timer.clock }}</span>
-    {%- else %}{{ icon('play') }}{% endif %}
+    {{- icon('pause' if bar.timer else 'play') -}}
   </button>
   <dialog class="pf-pop tb-modal" id="tb-sheet" aria-labelledby="tb-sheet-title">
     <div class="pf-inner">
