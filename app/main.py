@@ -518,23 +518,48 @@ def dashboard_layout_save():
     return redirect(url_for("main.dashboard"))
 
 
+def month_now(ctx):
+    """This month as Home shows it -- overtime by the week, live -- and its
+    pay; also what the status poll sends, so the page and its refresh agree."""
+    today = ctx["today"]
+    first_day = today.replace(day=1)
+    last_day = today.replace(day=calendar.monthrange(today.year, today.month)[1])
+    month_entries = get_entries_for_range(current_user.id, first_day, last_day)
+    month = logic.adjusted_month_summary(
+        current_user, month_entries, today.year, today.month, today,
+        adjustments_between(current_user.id, first_day, last_day), now=ctx["now"]
+    )
+    return month, pay_for(current_user, today.year, today.month, month["balance_hours"])
+
+
+def month_live(month, pay):
+    """The month card's figures as words, for the live refresh (app.js)."""
+    minutes = round(month["balance_hours"] * 60)
+    out = {
+        "balance": logic.fmt_balance(month["balance_hours"]),
+        "tone": "is-ahead" if minutes > 0 else ("is-behind" if minutes < 0 else ""),
+        "label": "ahead of target" if minutes > 0 else ("behind target" if minutes < 0 else "right on target"),
+        "note": f"{logic.fmt_hours(month['worked_hours'])} worked of {logic.fmt_hours(month['target_hours'])} due so far",
+    }
+    if pay:
+        out.update({
+            "overtime_pay": money_filter(pay["overtime_pay"]),
+            "overtime_note": f"{logic.fmt_hours(pay['overtime_hours'])} at {money_filter(pay['rate'], exact=True)}/h",
+            "total": money_filter(pay["total"]),
+        })
+    return out
+
+
 @main_bp.route("/dashboard")
 @login_required
 def dashboard():
     ctx = build_dashboard_context()
     today = ctx["today"]
-    first_day = today.replace(day=1)
-    last_day = today.replace(day=calendar.monthrange(today.year, today.month)[1])
-    month_entries = get_entries_for_range(current_user.id, first_day, last_day)
-    ctx["month"] = logic.adjusted_month_summary(
-        current_user, month_entries, today.year, today.month, today,
-        adjustments_between(current_user.id, first_day, last_day), now=ctx["now"]
-    )
+    ctx["month"], ctx["pay"] = month_now(ctx)
     ctx["to_fill"] = days_to_fill(current_user.id, ctx["now"], today)
     ctx["timer"] = timer_view(current_user, ctx["now"])
     ctx["can_time"] = ctx["day_state"] == "working"
     ctx["recent"] = recent_texts(current_user.id, today)
-    ctx["pay"] = pay_for(current_user, today.year, today.month, ctx["month"]["balance_hours"])
     year = year_entries(current_user.id, today)
     ctx["heatmap"] = heatmap_view(current_user, today, ctx["now"], entries=year)
     ctx["goals"] = goals_view(current_user, today, ctx["now"], year)
@@ -648,6 +673,8 @@ def api_status():
             else None
         ),
         "server_time": now.strftime("%H:%M:%S"),
+        # Home's month card, overtime and pay as they stand this minute.
+        "month": month_live(*month_now(ctx)),
     }
     return jsonify(payload)
 
@@ -1814,19 +1841,27 @@ def reports():
         name = "week"
     first, last = report_range(name, today)
     _, entries = written_lines(current_user.id, first, min(last, today), now)
-    days = []
+    # Overtime by the week, as History and Home count it (logic.settle_weeks).
+    rows = []
     d = first
     while d <= last:
         entry = entries.get(d)
-        target = logic.target_hours_for(current_user, d, entry) if (entry is not None or d <= today) else 0.0
-        worked = logic.entry_total_hours(entry, now=now) if entry is not None and entry.login_time else 0.0
-        due = logic.accrued_target_hours(target, entry, d, today, now=now)
-        days.append(SimpleNamespace(
-            date=d, entry=entry, worked=worked, target=target, due=due, balance=worked - due,
-            breaks=logic.entry_break_hours(entry, now=now) if entry is not None and entry.login_time else 0.0,
-            future=d > today, is_today=d == today,
-        ))
+        rows.append({
+            "date": d, "entry": entry,
+            "full_target": logic.target_hours_for(current_user, d, entry),
+            "worked_hours": (logic.entry_total_hours(entry, now=now)
+                             if entry is not None and entry.login_time else 0.0),
+        })
         d += timedelta(days=1)
+    logic.settle_weeks(rows, today, now=now)
+    days = [SimpleNamespace(
+        date=r["date"], entry=r["entry"], worked=r["worked_hours"],
+        target=r["full_target"] if (r["entry"] is not None or r["date"] <= today) else 0.0,
+        due=r["accrued_target_hours"], balance=r["balance_hours"], banked=r["banked_hours"],
+        week=r["settles"] and r["settled"],
+        breaks=logic.entry_break_hours(r["entry"], now=now) if r["entry"] is not None and r["entry"].login_time else 0.0,
+        future=r["date"] > today, is_today=r["date"] == today,
+    ) for r in rows]
     worked_days = [x for x in days if x.worked > 0]
     starts = [logic.clock_minutes(x.entry.login_time) for x in worked_days]
     # A logout after midnight is late, not early: 12:30 AM counts as 24:30.

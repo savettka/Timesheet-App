@@ -251,6 +251,21 @@
     }
   }
 
+  // Home's month card -- overtime by the week and its pay -- as it stands
+  // this minute, so the figures climb while you work.
+  function renderMonth(month) {
+    if (!month) return;
+    document.querySelectorAll("[data-month]").forEach(function (el) {
+      var key = el.dataset.month;
+      if (key === "tone") {
+        el.classList.remove("is-ahead", "is-behind");
+        if (month.tone) el.classList.add(month.tone);
+      } else if (month[key] != null && el.textContent !== month[key]) {
+        el.textContent = month[key];
+      }
+    });
+  }
+
   function initStatusPoll() {
     if (!window.STM_STATUS_URL) return;
     var card = document.getElementById("clock-card");
@@ -275,6 +290,7 @@
           }
           renderWeekly(data);
           renderSaturday(data.saturday);
+          renderMonth(data.month);
         })
         .catch(function () { /* offline for a moment - keep what's shown */ });
     }

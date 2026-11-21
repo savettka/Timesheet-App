@@ -151,25 +151,27 @@
       <h2 id="month-heading" class="card-title">{{ today.strftime('%B') }} so far</h2>
       <a class="link" href="{{ url_for('main.history') }}">Every day {{ icon('chevron-right', 'icon icon-inline') }}</a>
     </div>
-    <p class="big-balance {{ 'is-ahead' if month_minutes > 0 else ('is-behind' if month_minutes < 0 else '') }}">
-      <span class="big-balance-value">{{ fmt_balance(month.balance_hours) }}</span>
-      <span class="big-balance-label">
+    {# Overtime by the week, live: it climbs as you work and stays put at
+       logout (app.js refreshes these every 30 seconds). #}
+    <p class="big-balance {{ 'is-ahead' if month_minutes > 0 else ('is-behind' if month_minutes < 0 else '') }}" data-month="tone">
+      <span class="big-balance-value" data-month="balance">{{ fmt_balance(month.balance_hours) }}</span>
+      <span class="big-balance-label" data-month="label">
         {%- if month_minutes > 0 %}ahead of target{% elif month_minutes < 0 %}behind target{% else %}right on target{% endif -%}
       </span>
     </p>
-    <p class="card-note">{{ fmt_hours(month.worked_hours) }} worked of {{ fmt_hours(month.target_hours) }} due so far{% if month.today_in_progress %}<span class="explain"> &middot; today counts as you go</span>{% endif %}</p>
+    <p class="card-note" data-month="note">{{ fmt_hours(month.worked_hours) }} worked of {{ fmt_hours(month.target_hours) }} due so far</p>
     {% if pay %}
     {# What this month's overtime pays at its hourly rate, and the salary at
        month end with it -- moving as the hours do. #}
     <a class="pay-figs" href="{{ url_for('main.pay') }}" aria-label="{{ today.strftime('%B') }} pay: {{ pay.overtime_pay|money }} overtime, {{ pay.total|money }} at month end">
       <span class="pay-fig is-overtime">
         <span class="pay-fig-label">Overtime pay</span>
-        <span class="pay-fig-value">{{ pay.overtime_pay|money }}</span>
-        <span class="pay-fig-note">{{ fmt_hours(pay.overtime_hours) }} at {{ pay.rate|money(exact=True) }}/h</span>
+        <span class="pay-fig-value" data-month="overtime_pay">{{ pay.overtime_pay|money }}</span>
+        <span class="pay-fig-note" data-month="overtime_note">{{ fmt_hours(pay.overtime_hours) }} at {{ pay.rate|money(exact=True) }}/h</span>
       </span>
       <span class="pay-fig">
         <span class="pay-fig-label">Month end</span>
-        <span class="pay-fig-value">{{ pay.total|money }}</span>
+        <span class="pay-fig-value" data-month="total">{{ pay.total|money }}</span>
         <span class="pay-fig-note">{{ pay.salary|money }} + overtime</span>
       </span>
     </a>
@@ -183,23 +185,31 @@
       <h2 id="today-heading" class="card-title">Today</h2>
       <span class="card-sub">{{ today.strftime('%a %d %b') }}</span>
     </div>
+    {# Overtime by the week: a weekday banks its hours against its own
+       target; the day that settles the week owes what's left, and shows the
+       week's result once it has begun. #}
+    {% set trow = month.rows|selectattr('is_today')|first %}
+    {% set settles = trow and trow.settles %}
     <dl class="figures">
       <div class="figure">
         <dt>Worked</dt>
         <dd>{{ fmt_hours(today_worked) }}</dd>
       </div>
       <div class="figure">
-        <dt>Target</dt>
-        <dd>{{ fmt_hours(today_target) }}</dd>
+        <dt>{{ 'Left this week' if settles else 'Target' }}</dt>
+        <dd>{{ fmt_hours(trow.target_left if settles else today_target) }}</dd>
       </div>
       <div class="figure">
-        <dt>Balance</dt>
-        {%- set today_balance = today_worked - today_accrued_target %}
-        {%- set today_minutes = (today_balance * 60)|round|int %}
-        {%- if today_in_progress and today_minutes <= 0 %}
-        <dd class="is-pending">Still going</dd>
+        {%- if settles and trow.settled %}
+        {%- set week_minutes = (trow.balance_hours * 60)|round|int %}
+        <dt>Week</dt>
+        <dd class="{{ 'is-ahead' if week_minutes > 0 else ('is-behind' if week_minutes < 0 else '') }}">{{ fmt_balance(trow.balance_hours) }}</dd>
+        {%- elif today_worked > 0 and today_target > 0 %}
+        <dt>Banked</dt>
+        <dd class="is-banked">{{ fmt_balance(today_worked - today_target) }}</dd>
         {%- else %}
-        <dd class="{{ 'is-ahead' if today_minutes > 0 else ('is-behind' if today_minutes < 0 else '') }}">{{ fmt_balance(today_balance) }}</dd>
+        <dt>Balance</dt>
+        <dd class="is-pending">–</dd>
         {%- endif %}
       </div>
     </dl>

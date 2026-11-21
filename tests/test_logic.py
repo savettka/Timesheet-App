@@ -146,18 +146,24 @@ class TestMonthSummary:
         entries[THU] = day(THU, T(9, 0))
         got = logic.month_summary(a_user(), entries, 2026, 11, THU, now=now)
         assert got["worked_hours"] == pytest.approx(75.0)
-        assert got["target_hours"] == pytest.approx(67.0)
-        assert got["balance_hours"] == pytest.approx(8.0)
+        # Overtime by the week: 2-8 Nov settled on Saturday (45h of 40h, a
+        # day's leave off its 48h); this week's hours are banked until its
+        # Saturday, so they count as due as they're worked.
+        assert got["target_hours"] == pytest.approx(70.0)
+        assert got["balance_hours"] == pytest.approx(5.0)
         assert got["today_in_progress"] is True
         assert len(got["rows"]) == 30
         today = got["rows"][11]
         assert (today["is_today"], today["accrued_target_hours"], today["in_progress"]) == (True, pytest.approx(3.0), True)
+        assert today["banked_hours"] == pytest.approx(-5.0)
         assert all(r["target_hours"] == 0.0 and r["is_future"] for r in got["rows"][12:])
 
-    def test_a_missed_workday_is_owed(self):
+    def test_a_missed_workday_is_owed_when_its_week_settles(self):
         got = logic.month_summary(a_user(), {}, 2026, 11, D(2026, 11, 3), now=AT(2026, 11, 3, 8, 0))
-        assert got["worked_hours"] == 0.0
-        assert got["balance_hours"] == pytest.approx(-8.0)  # Monday the 2nd; Sunday the 1st is rest
+        assert got["worked_hours"] == 0.0 and got["balance_hours"] == 0.0
+        assert got["rows"][1]["banked_hours"] == pytest.approx(-8.0)  # Monday the 2nd, banked short
+        later = logic.month_summary(a_user(), {}, 2026, 11, D(2026, 11, 8), now=AT(2026, 11, 8, 8, 0))
+        assert later["balance_hours"] == pytest.approx(-48.0)  # Mon 2 to Sat 7, never logged
 
 
 # --------------------------------------------------------- suggested_logout

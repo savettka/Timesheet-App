@@ -46,14 +46,17 @@ def test_a_short_saturday_is_not_owed_once_it_is_the_standard(app, user_id, plan
     with app.app_context():
         user = me(user_id)
         entries = {}
-        for day in (D(2026, 11, 14), D(2026, 11, 21)):
-            entry = TimeEntry(user_id=user_id, date=day, login_time=T(9, 0), logout_time=T(13, 0))
+        # Two weeks of 8h Mon-Fri and 4h on Saturday: 44h each.
+        for day in list(range(9, 15)) + list(range(16, 22)):
+            d = D(2026, 11, day)
+            entry = TimeEntry(user_id=user_id, date=d, login_time=T(9, 0),
+                              logout_time=T(13, 0) if d.weekday() == 5 else T(17, 0))
             db.session.add(entry)
-            entries[day] = entry
+            entries[d] = entry
         db.session.commit()
         rows = {r["date"]: r for r in logic.month_summary(user, entries, 2026, 11, D(2026, 11, 25))["rows"]}
-        assert rows[D(2026, 11, 14)]["balance_hours"] == -4  # before the new hours: 4h of 8h
-        assert rows[D(2026, 11, 21)]["balance_hours"] == 0   # after: 4h of 4h
+        assert rows[D(2026, 11, 14)]["balance_hours"] == -4  # before the new hours: 44h of 48h
+        assert rows[D(2026, 11, 21)]["balance_hours"] == 0   # after: 44h of 44h
 
 
 def test_pay_rate_uses_the_month_s_real_hours(app, user_id, plan):

@@ -785,6 +785,15 @@ input, textarea { caret-color: var(--accent); }
 }
 .cal-hours { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .cal-bal { font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Overtime by the week: a weekday's hours banked (grey), the week's result
+   as a soft pill on the day it settles. */
+.cal-bal.is-banked, .c-bal.is-banked { color: var(--text-3); }
+.week-tag { display: inline-block; margin-right: 4px; padding: 1px 7px; border-radius: 99px; background: var(--surface-2); color: var(--text-2); font-size: 12px; font-weight: 700; vertical-align: 1px; }
+.c-week.is-ahead .week-tag { background: var(--success-bg); color: var(--success-text); }
+.c-week.is-behind .week-tag { background: var(--error-bg); color: var(--error-text); }
+.cal-bal.is-week { padding: 1px 6px; border-radius: 99px; font-weight: 700; }
+.cal-bal.is-week.is-ahead { background: var(--success-bg); }
+.cal-bal.is-week.is-behind { background: var(--error-bg); }
 
 .cal-day.is-today .cal-num { background: var(--accent); color: var(--on-accent); }
 .cal-day.is-future .cal-num,

@@ -14,6 +14,7 @@ Mirrors the rules from the user's original spreadsheet:
 """
 
 import calendar
+from collections import defaultdict
 from datetime import date, datetime, time, timedelta
 
 # A typed time may run a little ahead of the server's clock without being in
@@ -211,9 +212,67 @@ def accrued_target_hours(full_target, entry, entry_date, today, now=None):
     return min(full_target, worked)
 
 
+def settle_weeks(rows, today, now=None):
+    """Overtime counted by the week, the way the old spreadsheet did.
+
+    A week owes its target -- its days' hours, less any leave -- and only the
+    week as a whole is ahead or behind. Monday to Friday bank their hours;
+    the week's last workday (Saturday, or the last day with hours) owes
+    whatever is left, so a long week leaves a short Saturday. A week that
+    crosses a month end splits there, each month's part owing its own days.
+
+    The week settles on that last workday the moment it's logged into (or
+    once it's past): from then the week's overtime counts in full and climbs
+    as the day is worked, so logging out changes nothing. Days after it (a
+    worked Sunday) count on their own.
+
+    Each row needs date, entry, worked_hours and full_target (its own target,
+    overrides in); this adds accrued_target_hours and balance_hours (what the
+    row adds to the totals: nothing for a banked day, the week's result on
+    its settling day), banked_hours (a weekday's hours against its own target,
+    to show), settles, settled and target_left (what the settling day still
+    owes once the days before it are counted).
+    """
+    parts = defaultdict(list)
+    for r in rows:
+        d = r["date"]
+        parts[(d - timedelta(days=d.weekday()), d.year, d.month)].append(r)
+    for part in parts.values():
+        part.sort(key=lambda r: r["date"])
+        working = [r for r in part if r["full_target"] > 0]
+        settle_row = (working or part)[-1]
+        settle_day = settle_row["date"]
+        entry = settle_row["entry"]
+        settled = settle_day < today or (
+            settle_day == today and entry is not None and entry.login_time is not None)
+        part_target = sum(r["full_target"] for r in part if r["date"] <= settle_day)
+        before = sum(r["worked_hours"] for r in part if r["date"] < settle_day)
+        for r in part:
+            d = r["date"]
+            # A part with no workdays (a lone Sunday) has no week to show,
+            # though its hours still count.
+            r["settles"] = d == settle_day and bool(working)
+            r["settled"] = settled
+            r["banked_hours"] = None
+            r["target_left"] = None
+            if d < settle_day:
+                r["accrued_target_hours"] = r["worked_hours"]
+                if d <= today and (r["full_target"] > 0 or r["worked_hours"] > 0):
+                    r["banked_hours"] = r["worked_hours"] - r["full_target"]
+            elif d == settle_day:
+                r["target_left"] = max(0.0, part_target - before)
+                # Not floored at 0: a week already past its target before its
+                # last day keeps that overtime.
+                r["accrued_target_hours"] = part_target - before if settled else r["worked_hours"]
+            else:
+                r["accrued_target_hours"] = r["full_target"] if d <= today else 0.0
+            r["balance_hours"] = r["worked_hours"] - r["accrued_target_hours"]
+    return rows
+
+
 def month_summary(user, entries_by_date, year, month, today, now=None):
     """Every day of a month -- what it owes, what was worked -- and the
-    month's totals.
+    month's totals, overtime counted by the week (settle_weeks).
 
     History and the dashboard both read the month from here, so the balance
     in one place is always the balance in the other.
@@ -224,33 +283,26 @@ def month_summary(user, entries_by_date, year, month, today, now=None):
         d = first_day + timedelta(days=i)
         entry = entries_by_date.get(d)
         is_future = d > today
-        # A day you haven't reached yet can't owe hours. Leave booked ahead
-        # still shows its target, since it was set on purpose.
-        if entry is not None:
-            target = target_hours_for(user, d, entry)
-        elif is_future:
-            target = 0.0
-        else:
-            target = entry_target_hours(user, d)
+        full = target_hours_for(user, d, entry)
+        # A day you haven't reached yet shows no target. Leave booked ahead
+        # still shows its own, since it was set on purpose.
+        target = full if (entry is not None or not is_future) else 0.0
         worked = entry_total_hours(entry, now=now) if entry else 0.0
-        # Today is only part-way through, so only the slice of its target
-        # that has already come round counts against the balance.
-        accrued = accrued_target_hours(target, entry, d, today, now=now)
         rows.append(
             {
                 "date": d,
                 "entry": entry,
                 "target_hours": target,
-                "accrued_target_hours": accrued,
+                "full_target": full,
                 "worked_hours": worked,
-                "balance_hours": worked - accrued,
                 "is_future": is_future,
                 "is_today": d == today,
-                "in_progress": not is_future and accrued < target,
+                "in_progress": is_open_shift(entry) and not is_stale_shift(entry, now),
                 # Its hours count for nothing until the real logout is given.
                 "needs_logout": is_stale_shift(entry, now),
             }
         )
+    settle_weeks(rows, today, now=now)
 
     worked_total = sum(r["worked_hours"] for r in rows)
     target_total = sum(r["accrued_target_hours"] for r in rows)

@@ -39,10 +39,6 @@
   {% if summary.adjustments %}
   <p class="adj-note">{{ icon('sliders') }}Includes {{ fmt_balance(summary.adjusted_hours) }} of adjustments</p>
   {% endif %}
-  {% if summary.today_in_progress %}
-  <p class="card-note explain">Today is still running, so only the hours it has reached count so far &mdash;
-    the balance is your overtime as it stands right now.</p>
-  {% endif %}
   <div class="month-actions">
     <a class="btn btn-secondary" download
        href="{{ url_for('main.export_month', year=year, month=month, kind='xlsx') }}"
@@ -127,14 +123,23 @@
         <td role="cell" class="c-target" data-label="Target">
           {{ fmt_hours(row.target_hours) if (not row.is_future or is_leave) and not is_rest else '–' }}
         </td>
-        {% if row.in_progress and minutes <= 0 %}
-        <td class="c-bal" role="cell" data-label="Balance"><span class="pending">Still going</span></td>
-        {% elif row.is_future or is_rest or (not worked_any and minutes == 0) %}
-        <td class="c-bal is-empty" role="cell" data-label="Balance">–</td>
-        {% else %}
-        <td role="cell" class="c-bal {{ 'is-ahead' if minutes > 0 else ('is-behind' if minutes < 0 else '') }}" data-label="Balance">
+        {# Overtime by the week: weekdays bank their hours (grey); the week's
+           result shows on the day it settles, and before then what's left. #}
+        {% set week_day = row.settles and row.settled %}
+        {% if week_day %}
+        <td role="cell" class="c-bal c-week {{ 'is-ahead' if minutes > 0 else ('is-behind' if minutes < 0 else '') }}" data-label="Week">
+          <span class="week-tag">Week</span> {{ fmt_balance(row.balance_hours) }}
+        </td>
+        {% elif minutes != 0 %}
+        <td role="cell" class="c-bal {{ 'is-ahead' if minutes > 0 else 'is-behind' }}" data-label="Balance">
           {{ fmt_balance(row.balance_hours) }}
         </td>
+        {% elif row.settles and row.target_left and not row.is_future %}
+        <td class="c-bal" role="cell" data-label="Week"><span class="pending">{{ fmt_hours(row.target_left) }} left</span></td>
+        {% elif row.banked_hours %}
+        <td class="c-bal is-banked" role="cell" data-label="Banked">{{ fmt_balance(row.banked_hours) }}</td>
+        {% else %}
+        <td class="c-bal is-empty" role="cell" data-label="Balance">–</td>
         {% endif %}
         <td role="cell" class="c-go" aria-hidden="true">{{ icon('chevron-right') }}</td>
       </tr>

@@ -50,7 +50,7 @@
     <thead><tr><th scope="col">Day</th><th scope="col">In</th><th scope="col">Out</th><th scope="col">Breaks</th>
       <th scope="col" class="c-worked">Worked</th><th scope="col" class="c-bal">+/−</th></tr></thead>
     <tbody>
-      {% for d in days if not d.future and (d.entry or d.due) %}
+      {% for d in days if not d.future and (d.entry or d.target) %}
       {% set m = (d.balance * 60)|round|int %}
       <tr class="day-row{{ ' is-today' if d.is_today }}">
         <td class="c-day"><a class="day-link" href="{{ url_for('main.timesheet', date_str=d.date.isoformat()) }}">{{ d.date.strftime('%a %d %b') }}</a></td>
@@ -58,7 +58,15 @@
         <td class="c-out">{{ fmt_time(d.entry.logout_time) if d.entry and d.entry.logout_time else '–' }}</td>
         <td class="c-brk">{{ fmt_hours(d.breaks) if d.breaks else '–' }}</td>
         <td class="c-worked">{{ fmt_hours(d.worked) if d.worked else '–' }}</td>
-        <td class="c-bal {{ 'is-ahead' if m > 0 else ('is-behind' if m < 0 else '') }}">{{ fmt_balance(d.balance) }}</td>
+        {% if d.week %}
+        <td class="c-bal c-week {{ 'is-ahead' if m > 0 else ('is-behind' if m < 0 else '') }}"><span class="week-tag">Week</span> {{ fmt_balance(d.balance) }}</td>
+        {% elif m != 0 %}
+        <td class="c-bal {{ 'is-ahead' if m > 0 else 'is-behind' }}">{{ fmt_balance(d.balance) }}</td>
+        {% elif d.banked %}
+        <td class="c-bal is-banked">{{ fmt_balance(d.banked) }}</td>
+        {% else %}
+        <td class="c-bal">–</td>
+        {% endif %}
       </tr>
       {% else %}
       <tr><td colspan="6" class="c-none">Nothing logged in this period yet.</td></tr>

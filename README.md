@@ -23,6 +23,13 @@ This mirrors the logic in the original spreadsheet:
   Saturday, say), from a date you choose: days before that date keep the hours they had,
   so past months and pay don't change.
 - **Weekly target** = the week's days added up (48 hours, Mon–Sat × 8h, by default).
+- **Overtime is counted by the week.** Monday to Friday bank their hours; Saturday (the
+  week's last workday) owes whatever is left of the weekly target, so a long week leaves
+  a short Saturday. The week's overtime is its hours over the target.
+- The week settles the moment its Saturday is logged into (or once it has passed). From
+  then the overtime and its pay show what they'll be if you leave now, climbing as you
+  work, and logging out changes nothing. Home refreshes them every 30 seconds.
+- A week that crosses a month end splits there: each month's part owes its own days.
 - Once your running total for the week reaches the weekly target, STM tells you your
   target is complete — if you're still logged in, it shows a suggested logout time so
   you can leave early instead of working a full extra day.

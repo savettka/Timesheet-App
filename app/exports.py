@@ -112,12 +112,18 @@ def month_report(page, user, now):
         is_leave = bool(e and e.target_override is not None)
         is_rest = row["target_hours"] == 0 and not e and not row["is_future"]
         is_missing = not e and row["target_hours"] > 0 and not row["is_future"] and not row["is_today"]
-        balance = _minutes(row["balance_hours"])
-
-        # History's rules for the balance column.
-        still_going = row["in_progress"] and balance <= 0
-        if still_going or row["is_future"] or is_rest or (not worked_any and balance == 0):
-            balance = None
+        # Overtime counts by the week (logic.settle_weeks): a weekday banks
+        # its hours, shown beside it; the week's result sits on its last
+        # workday once that's begun. Each row's balance is what it adds to
+        # the month, so the columns still add up.
+        settles_now = bool(row.get("settles") and row.get("settled"))
+        contribution = _minutes(row["balance_hours"])
+        balance = contribution if settles_now or contribution else None
+        banked = row.get("banked_hours")
+        banked = _minutes(banked) if banked is not None and not settles_now else None
+        left = (_minutes(row["target_left"]) if row.get("settles") and not row.get("settled")
+                and not row["is_future"] else None)
+        still_going = False
 
         if row["needs_logout"]:
             status = "Logout missing"
@@ -133,6 +139,12 @@ def month_report(page, user, now):
             status = "Today"
         else:
             status = ""
+        if settles_now:
+            status = " · ".join(s for s in ("Week total", status) if s)
+        elif left:
+            status = " · ".join(s for s in (status, f"{fmt_minutes(left)} left this week") if s)
+        elif banked and not status:
+            status = f"Banked {fmt_signed(banked)}"
 
         days.append({
             "date": d,
@@ -144,6 +156,9 @@ def month_report(page, user, now):
             "target": (_minutes(row["target_hours"])
                        if (not row["is_future"] or is_leave) and not is_rest else None),
             "balance": balance,
+            "banked": banked,
+            "week": settles_now,
+            "left": left,
             "still_going": still_going,
             "status": status,
             "notes": (e.notes or "").strip() if e else "",
@@ -666,6 +681,9 @@ class _Pdf:
                 put(5, fmt_minutes(day["target"]), base, color=ink)
             if day["balance"] is not None:
                 balance(6, day["balance"], base, 9)
+            elif day["banked"] is not None:
+                # Banked toward the week, not overtime yet: quiet, no pill.
+                put(6, fmt_signed(day["banked"]), base, "Helvetica", 9, INK_3)
 
             # A forgotten logout is a tag in its own row, not a footnote; so
             # are times typed in by hand.
@@ -759,8 +777,13 @@ class _Pdf:
                     under = y + mid + 16
                     # With no balance to show: the leave it was, or "In progress".
                     extra = day["status"] if day["is_leave"] or (day["is_today"] and not day["logout"]) else None
-                if bal and not day["needs_logout"]:
+                if bal is not None and day["week"] and not day["needs_logout"]:
+                    self.text(x + pad, under, "Week " + fmt_signed_compact(bal), "Helvetica-Bold", 9,
+                              self.balance_color(bal))
+                elif bal and not day["needs_logout"]:
                     self.text(x + pad, under, fmt_signed_compact(bal), "Helvetica-Bold", 9, self.balance_color(bal))
+                elif day["banked"] and not day["needs_logout"]:
+                    self.text(x + pad, under, fmt_signed_compact(day["banked"]), "Helvetica", 9, INK_3)
                 elif extra:
                     self.text(x + pad, under, self.fit(extra, inner, *small), *small, color)
         self.footer(2, 2)
