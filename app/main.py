@@ -35,7 +35,8 @@ from app import holidays
 from app import mailer
 from app import reminders
 from app import weekly_report
-from app.models import BalanceAdjustment, BreakSegment, Goal, Holiday, PayRecord, Salary, TimeEntry, User, WeekTemplate, WorkBlock
+from app.models import (BalanceAdjustment, BreakSegment, Goal, Holiday, HoursPlan, PayRecord, Salary, TimeEntry, User,
+                        WeekTemplate, WorkBlock)
 
 main_bp = Blueprint("main", __name__)
 
@@ -134,10 +135,11 @@ def goal_rows(user):
     as the box shows it."""
     saved = {g.kind: g for g in user.goals}
     rows = []
+    hours = user.day_hours_on(date.today())
     for kind, name in Goal.KINDS.items():
         goal = saved.get(kind)
         value = goal.value if goal is not None else {
-            "daily_hours": user.daily_target_hours, "weekly_hours": user.weekly_target_hours,
+            "daily_hours": max(hours), "weekly_hours": logic.week_base_hours(user, date.today()),
             "timesheet_written": 100, "logout_by": GOAL_DEFAULT_LOGOUT}[kind]
         shown = (logic.minutes_clock(int(value)).strftime("%H:%M") if kind == "logout_by" else f"{value:g}")
         rows.append(SimpleNamespace(kind=kind, name=name, active=goal is not None and goal.active, value=shown,
@@ -1506,7 +1508,7 @@ def timesheet_week(date_str=None):
               else 0 for d in days]
     written = [sum(minutes[i] for _, minutes in rows) for i in range(7)]
     # The weekly target, as on Home: moved only by leave or a day's own target.
-    week_target = current_user.weekly_target_hours + sum(
+    week_target = logic.week_base_hours(current_user, days[0]) + sum(
         logic.target_hours_for(current_user, d, entries.get(d)) - logic.entry_target_hours(current_user, d) for d in days)
     copy = []
     for d in days:
@@ -3034,10 +3036,43 @@ def settings():
         # The profile pop-up posts here from any page, and goes back to it.
         back = local_path(request.form.get("next")) or url_for("main.settings")
 
-        if form_type == "targets":
+        if form_type == "hours":
+            # Each day's standard hours, Mon-Sun, from a date on.
             try:
-                daily = float(request.form.get("daily_target_hours", 8))
-                weekly = float(request.form.get("weekly_target_hours", 48))
+                values = [float(request.form.get(f"hours_{i}", "")) for i in range(7)]
+                starts = date.fromisoformat(request.form.get("starts", ""))
+            except ValueError:
+                values = starts = None
+            if values is None or not all(math.isfinite(v) and 0 <= v <= 24 for v in values):
+                flash("Enter each day's hours as a number from 0 to 24.", "error")
+                return redirect(url_for("main.settings") + "#targets")
+            if not 2000 <= starts.year <= 2100:
+                flash("Choose the date these hours start from.", "error")
+                return redirect(url_for("main.settings") + "#targets")
+            plan = HoursPlan.query.filter_by(user_id=user.id, starts=starts).first()
+            if plan is None:
+                db.session.add(HoursPlan(user_id=user.id, starts=starts, hours=HoursPlan.pack(values)))
+            else:
+                plan.hours = HoursPlan.pack(values)
+            db.session.commit()
+            flash(f"Hours saved: {logic.fmt_target_hours(sum(values))} a week from {starts:%a %d %b %Y}.", "success")
+            return redirect(url_for("main.settings") + "#targets")
+
+        elif form_type == "hours_remove":
+            plan = HoursPlan.query.filter_by(id=request.form.get("plan_id", type=int), user_id=user.id).first()
+            if plan is not None:
+                label = f"the hours from {plan.starts:%a %d %b %Y}"
+                db.session.delete(plan)
+                db.session.commit()
+                flash(f"Removed {label}.", "success")
+            return redirect(url_for("main.settings") + "#targets")
+
+        elif form_type == "targets":
+            # The old daily and weekly targets and workdays, only when a form
+            # still sends them; Settings now sets each day's hours instead.
+            try:
+                daily = float(request.form.get("daily_target_hours", user.daily_target_hours))
+                weekly = float(request.form.get("weekly_target_hours", user.weekly_target_hours))
             except ValueError:
                 flash("Please enter valid numbers.", "error")
                 return redirect(url_for("main.settings"))
@@ -3061,7 +3096,8 @@ def settings():
             # past midnight rather than mean anything useful.
             user.weekday_break_minutes = min(1440, max(0, weekday_break))
             user.saturday_break_minutes = min(1440, max(0, saturday_break))
-            user.workdays = ",".join(sorted(set(workdays))) if workdays else ""
+            if "workdays" in request.form or "daily_target_hours" in request.form:
+                user.workdays = ",".join(sorted(set(workdays))) if workdays else ""
             user.saturday_login_hint = parse_time_field(request.form.get("saturday_login_hint"))
             db.session.commit()
             flash("Targets updated.", "success")

@@ -12,8 +12,8 @@ def options(page, name):
 
 def test_settings_boxes_offer_choices(client):
     page = client.get("/settings").get_data(as_text=True)
-    assert options(page, "daily_target_hours") == ["6", "7", "7.5", "8", "8.5", "9", "9.5", "10"]
-    assert options(page, "weekly_target_hours")[-3:] == ["48", "50", "54"]
+    for day in range(7):
+        assert options(page, f"hours_{day}") == ["0", "4", "5", "6", "7", "7.5", "8", "8.5", "9", "10"]
     assert options(page, "weekday_break_minutes") == ["0", "15", "30", "45", "60", "75", "90"]
     assert options(page, "long_day_hours") and options(page, "idle_minutes")
     assert options(page, "timesheet_written")[-1] == "100"

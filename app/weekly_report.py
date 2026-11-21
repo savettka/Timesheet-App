@@ -50,7 +50,8 @@ def build_report(user, monday, now):
         TimeEntry.user_id == user.id, TimeEntry.date >= days[0], TimeEntry.date <= days[-1])}
 
     rows, worked_total, break_total, days_worked, open_days = [], 0.0, 0.0, 0, []
-    target = user.weekly_target_hours
+    expected = 0.0
+    target = logic.week_base_hours(user, days[0])
     for d in days:
         entry = entries.get(d)
         if entry is not None and entry.target_override is not None:
@@ -69,6 +70,7 @@ def build_report(user, monday, now):
         worked_total += worked
         break_total += breaks
         days_worked += 1
+        expected += user.target_hours_on(d)
         until = logic.fmt_time(entry.logout_time) if entry.logout_time else "now"
         rows.append({
             "date": d, "label": f"{d:%A, %d %b %Y}", "worked": clock(worked * 3600), "breaks": clock(breaks * 3600),
@@ -77,7 +79,9 @@ def build_report(user, monday, now):
 
     target = max(0.0, target)
     balance = worked_total - target
-    rate = productivity(worked_total, days_worked, user.daily_target_hours)
+    # The days worked at their own standard hours (a short Saturday expects
+    # less), averaged, so the rate reads as the firm's does.
+    rate = productivity(worked_total, days_worked, expected / days_worked if days_worked else 0)
     last = days[-1]
     salary = logic.salary_in(user.salaries, last.year, last.month)
     pay = logic.month_pay(user, salary, last.year, last.month, balance) if salary else None
@@ -131,8 +135,8 @@ def send(user, report):
 # ------------------------------------------------------------- when
 
 def last_workday(user, monday):
-    work = user.workday_set()
-    return monday + timedelta(days=max(work)) if work else None
+    work = [d for d in logic.week_dates(monday) if user.target_hours_on(d) > 0]
+    return work[-1] if work else None
 
 
 def due_at(user, monday, now):

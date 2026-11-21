@@ -19,8 +19,10 @@ This mirrors the logic in the original spreadsheet:
 - **Total hours for a day** = (logout time − login time) − actual break time taken.
   If logout is earlier in the day than login, STM assumes the shift ran past midnight.
 - **Daily target** = 8 hours on workdays (Mon–Sat by default), 0 hours on your rest day
-  (Sun by default). Both the days and the daily target are editable in **Settings**.
-- **Weekly target** = 48 hours (Mon–Sat × 8h) by default, also editable in Settings.
+  (Sun by default). In **Settings** each day of the week can have its own hours (a 4h
+  Saturday, say), from a date you choose: days before that date keep the hours they had,
+  so past months and pay don't change.
+- **Weekly target** = the week's days added up (48 hours, Mon–Sat × 8h, by default).
 - Once your running total for the week reaches the weekly target, STM tells you your
   target is complete — if you're still logged in, it shows a suggested logout time so
   you can leave early instead of working a full extra day.

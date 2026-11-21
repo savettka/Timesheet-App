@@ -86,7 +86,8 @@ def test_one_query_for_the_year(app, user_id, year, clock):
             hm = main.heatmap_view(user, TODAY, clock.now)
         finally:
             event.remove(db.engine, "before_cursor_execute", listen)
-        assert len(seen) == 1
+        # One query for the year's days, plus the user's hours plans once.
+        assert len([s for s in seen if "hours_plan" not in s]) == 1 and len(seen) <= 2
         assert hm["days_worked"] == 4 and hm["total"] == "32h"
 
 

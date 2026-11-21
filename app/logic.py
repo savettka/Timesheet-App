@@ -155,8 +155,19 @@ def unrecorded_break_hours(user, entry_date, entry=None, now=None):
 
 
 def entry_target_hours(user, entry_date):
-    """The default, weekday-based target for a date (ignores any override)."""
-    return user.target_hours_for_weekday(entry_date.weekday())
+    """A date's standard hours (ignores any override): the hours set for its
+    weekday from a date on, or the daily target on a workday before any."""
+    return user.target_hours_on(entry_date)
+
+
+def week_base_hours(user, week_start):
+    """What a whole Mon-Sun week owes before leave and overrides: the sum of
+    its days' standard hours once any of them has hours set, else the old
+    weekly target as set."""
+    days = week_dates(week_start)
+    if any(user.plan_on(d) is not None for d in days):
+        return sum(user.target_hours_on(d) for d in days)
+    return user.weekly_target_hours
 
 
 def target_hours_for(user, entry_date, entry=None):
@@ -267,12 +278,20 @@ def adjusted_month_summary(user, entries_by_date, year, month, today, adjustment
     return summary
 
 
+def month_days(year, month):
+    return [date(year, month, d) for d in range(1, calendar.monthrange(year, month)[1] + 1)]
+
+
 def month_workdays(user, year, month):
-    """How many of the month's days are workdays in Settings: Mon-Sat gives
-    26 in September 2026. Leave days count -- they're paid."""
-    work = user.workday_set()
-    return sum(1 for d in range(1, calendar.monthrange(year, month)[1] + 1)
-               if date(year, month, d).weekday() in work)
+    """How many of the month's days have standard hours: Mon-Sat gives 26 in
+    September 2026. Leave days count -- they're paid."""
+    return sum(1 for d in month_days(year, month) if user.target_hours_on(d) > 0)
+
+
+def month_standard_hours(user, year, month):
+    """The month's standard hours, day by day: its workdays times the daily
+    target under the old rule, or each day's own hours once they're set."""
+    return sum(user.target_hours_on(d) for d in month_days(year, month))
 
 
 def salary_in(salaries, year, month):
@@ -285,13 +304,13 @@ def salary_in(salaries, year, month):
 
 def month_pay(user, salary, year, month, balance_hours):
     """A month's pay as STM estimates it: the salary over the month's working
-    hours (its workdays times the daily target) gives an hourly rate, and
+    hours (each day's standard hours added up) gives an hourly rate, and
     the month's overtime -- its balance, as Calendar shows it -- is paid at
     that rate. A month behind earns no overtime. None without a salary."""
     if not salary:
         return None
     workdays = month_workdays(user, year, month)
-    hours = workdays * user.daily_target_hours
+    hours = month_standard_hours(user, year, month)
     if hours <= 0:
         return None
     rate = salary / hours
@@ -322,7 +341,7 @@ def week_target_hours(user, entries_by_date, week_start, year, month):
     """The weekly target scaled to just the days of this week that belong to
     the given month.
 
-    ``user.weekly_target_hours`` assumes a whole Mon-Sun week, and two things
+    ``week_base_hours`` is a whole Mon-Sun week's, and two things
     move it. A day-off/half-day override shifts it by exactly the difference
     from that day's usual target, so a full day of leave on an 8h day relieves
     8h from what's owed. And when the week straddles a month change, a day
@@ -332,7 +351,7 @@ def week_target_hours(user, entries_by_date, week_start, year, month):
     This is the single place that split is worked out, so the weekly card and
     the Saturday plan can never disagree about what the week owes.
     """
-    total = user.weekly_target_hours
+    total = week_base_hours(user, week_start)
     for d in week_dates(week_start):
         entry = entries_by_date.get(d)
         default_target = entry_target_hours(user, d)

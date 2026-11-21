@@ -95,6 +95,8 @@ class User(UserMixin, db.Model):
                                           cascade="all, delete-orphan")
     holidays = db.relationship("Holiday", backref="user", lazy=True, cascade="all, delete-orphan",
                                order_by="Holiday.date")
+    hours_plans = db.relationship("HoursPlan", backref="user", lazy=True, cascade="all, delete-orphan",
+                                  order_by="HoursPlan.starts.desc()")
 
     PAY_CURRENCIES = {"₹": "₹ Rupee", "£": "£ Pound", "$": "$ Dollar", "€": "€ Euro"}
 
@@ -112,7 +114,25 @@ class User(UserMixin, db.Model):
         return {int(d) for d in self.workdays.split(",") if d != ""}
 
     def target_hours_for_weekday(self, weekday):
+        """The old rule: the daily target on the ticked workdays. Days before
+        the first set of hours (HoursPlan) still use it."""
         return self.daily_target_hours if weekday in self.workday_set() else 0.0
+
+    def plan_on(self, day):
+        """The set of hours in force on a day: the latest starting on or
+        before it, or None before the first."""
+        return next((plan for plan in self.hours_plans if plan.starts <= day), None)
+
+    def day_hours_on(self, day):
+        """Mon-Sun standard hours in force on a day, as seven numbers."""
+        plan = self.plan_on(day)
+        if plan is not None:
+            return plan.day_hours()
+        return [self.target_hours_for_weekday(i) for i in range(7)]
+
+    def target_hours_on(self, day):
+        """A date's standard hours, before any leave or override on it."""
+        return self.day_hours_on(day)[day.weekday()]
 
     def expected_break_hours_for(self, weekday):
         """The break normally taken on this weekday, in hours. Saturday (5)
@@ -251,6 +271,28 @@ class Salary(db.Model):
     amount = db.Column(db.Float, nullable=False)
 
     __table_args__ = (db.UniqueConstraint("user_id", "starts", name="uq_salary_user_starts"),)
+
+
+class HoursPlan(db.Model):
+    """Standard hours for each day of the week (Mon-Sun) from a date on, set
+    in Settings. A day uses the latest set starting on or before it, so a
+    change never rewrites the days before it; days before the first use the
+    old rule (the daily target on the ticked workdays)."""
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    starts = db.Column(db.Date, nullable=False)
+    hours = db.Column(db.String(60), nullable=False)  # "8,8,8,8,8,4,0", Mon first
+
+    __table_args__ = (db.UniqueConstraint("user_id", "starts", name="uq_hours_plan_user_starts"),)
+
+    def day_hours(self):
+        values = [float(v) for v in self.hours.split(",")]
+        return (values + [0.0] * 7)[:7]
+
+    @staticmethod
+    def pack(values):
+        return ",".join(f"{v:g}" for v in values)
 
 
 class PayRecord(db.Model):

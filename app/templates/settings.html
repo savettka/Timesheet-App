@@ -19,37 +19,51 @@
 <div class="settings-grid">
   <section class="card" id="targets" aria-labelledby="targets-heading">
     <h2 id="targets-heading" class="card-title">Hours &amp; targets</h2>
-    <p class="card-note explain">The same rule as your spreadsheet: 8h a day on workdays, nothing on your rest day,
-      48h a week &mdash; change any of it here.</p>
-    <form method="post" class="form">
-      <input type="hidden" name="form_type" value="targets">
-      <div class="field-row">
-        <div class="field">
-          <label for="daily_target_hours">Daily target (hours)</label>
-          <input type="number" id="daily_target_hours" name="daily_target_hours" step="0.25" min="0" data-options="6,7,7.5,8,8.5,9,9.5,10" data-unit="h"
-                 inputmode="decimal" value="{{ '%g'|format(user.daily_target_hours) }}">
-        </div>
-        <div class="field">
-          <label for="weekly_target_hours">Weekly target (hours)</label>
-          <input type="number" id="weekly_target_hours" name="weekly_target_hours" step="0.5" min="0" data-options="36,40,42,44,45,48,50,54" data-unit="h"
-                 inputmode="decimal" value="{{ '%g'|format(user.weekly_target_hours) }}">
-        </div>
-      </div>
-
+    {# Each day's standard hours from a date on: earlier days keep theirs. #}
+    {% set day_names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] %}
+    {% set now_hours = user.day_hours_on(today) %}
+    <form method="post" class="form" autocomplete="off">
+      <input type="hidden" name="form_type" value="hours">
       <fieldset class="fieldset">
-        <legend>Workdays</legend>
-        <div class="chip-row">
-          {% set day_names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] %}
-          {% set active = user.workday_set() %}
+        <legend>Hours each day</legend>
+        <div class="hours-week" data-hours-week>
           {% for i in range(7) %}
-          <label class="check-chip">
-            <input type="checkbox" name="workdays" value="{{ i }}" {{ 'checked' if i in active }}>
-            <span>{{ day_names[i] }}</span>
-          </label>
+          <div class="field hours-day">
+            <label for="hours_{{ i }}">{{ day_names[i] }}</label>
+            <input type="number" id="hours_{{ i }}" name="hours_{{ i }}" step="0.25" min="0" max="24" inputmode="decimal"
+                   data-options="0,4,5,6,7,7.5,8,8.5,9,10" data-unit="h" value="{{ '%g'|format(now_hours[i]) }}" required>
+          </div>
           {% endfor %}
         </div>
+        <p class="hours-total"><b data-hours-total>{{ '%g'|format(now_hours|sum) }}h</b> a week</p>
       </fieldset>
+      <div class="field hours-from">
+        <label for="hours-starts">From</label>
+        <input type="date" id="hours-starts" name="starts" value="{{ today.isoformat() }}" required>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Save hours</button>
+      </div>
+    </form>
+    {% if user.hours_plans %}
+    <ul class="pay-salaries hours-plans">
+      {% for p in user.hours_plans %}
+      {% set label = 'the hours from ' ~ p.starts.strftime('%a %d %b %Y') %}
+      <li>
+        <span class="pay-salary"><b>{{ '%g'|format(p.day_hours()|sum) }}h a week</b> From {{ p.starts.strftime('%a %d %b %Y') }}
+          <span class="hours-plan-days">{% for h in p.day_hours() %}{{ day_names[loop.index0] }} {{ '%g'|format(h) }}{{ ' · ' if not loop.last }}{% endfor %}</span></span>
+        <form method="post" autocomplete="off" data-confirm="Remove {{ label }}?">
+          <input type="hidden" name="form_type" value="hours_remove">
+          <input type="hidden" name="plan_id" value="{{ p.id }}">
+          <button type="submit" class="btn btn-ghost btn-sm" aria-label="Remove {{ label }}">Remove</button>
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
 
+    <form method="post" class="form hours-breaks">
+      <input type="hidden" name="form_type" value="targets">
       <div class="field">
         <label for="saturday_login_hint">Usual Saturday login time <span class="optional">(optional)</span></label>
         <input type="time" id="saturday_login_hint" name="saturday_login_hint"
@@ -75,7 +89,7 @@
         taken it. Your recorded hours only ever use the breaks you actually log.</p>
 
       <div class="form-actions">
-        <button type="submit" class="btn btn-primary">Save targets</button>
+        <button type="submit" class="btn btn-primary">Save breaks</button>
       </div>
     </form>
   </section>

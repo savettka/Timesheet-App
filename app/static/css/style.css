@@ -1614,6 +1614,16 @@ select {
 .pay-salary b { color: var(--text); font-size: 17px; }
 .pay-amount-row { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); }
 
+/* Hours each day, Mon-Sun, from a date on (Settings). */
+.hours-week { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: var(--s2) var(--s3); }
+.hours-day { min-width: 0; }
+.hours-total { margin-top: var(--s3); padding: var(--s2) var(--s4); border-radius: var(--r-md); background: var(--info-bg); color: var(--info-text); font-size: 15px; }
+.hours-total b { font-size: 17px; font-variant-numeric: tabular-nums; }
+.hours-from { max-width: 16rem; }
+.hours-plans { margin: var(--s4) 0 0; }
+.hours-plan-days { display: block; margin-top: 2px; font-size: 14px; color: var(--text-3); }
+.hours-breaks { margin-top: var(--s5); padding-top: var(--s5); border-top: 1px solid var(--line); }
+
 .pay-empty { display: flex; flex-direction: column; align-items: flex-start; gap: var(--s4); }
 .pay-empty .card-title { margin: 0; }
 

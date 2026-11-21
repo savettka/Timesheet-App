@@ -2225,6 +2225,23 @@
     document.addEventListener("animationend", function (e) { if (!pop.contains(e.target)) place(); }, true);
   }
 
+  // ------------------------------------------------------------ hours a week
+  // Settings' seven day boxes: the week's total follows them as they change.
+  function initHoursWeek() {
+    var week = document.querySelector("[data-hours-week]");
+    var total = document.querySelector("[data-hours-total]");
+    if (!week || !total) return;
+    function add() {
+      var sum = [].reduce.call(week.querySelectorAll("input"), function (s, box) {
+        var v = parseFloat(box.value);
+        return s + (isFinite(v) && v > 0 ? v : 0);
+      }, 0);
+      total.textContent = (Math.round(sum * 100) / 100) + "h";
+    }
+    week.addEventListener("input", add);
+    week.addEventListener("change", add);
+  }
+
   // ------------------------------------------------------------ code boxes
   // The emailed sign-in code as six boxes. The one real box sits unseen over
   // them, so typing, pasting ("123 456" too), the phone's code suggestion and
@@ -3287,6 +3304,7 @@
     initPickers();
     initSuggest();
     initCodeBoxes();
+    initHoursWeek();
     initLanding();
     initBoards();
     initAutosave();
