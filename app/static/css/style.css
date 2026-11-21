@@ -2297,6 +2297,11 @@ select {
    ========================================================================== */
 input[type="time"]::-webkit-calendar-picker-indicator,
 input[type="date"]::-webkit-calendar-picker-indicator { display: none; }
+/* A box with a picker (app.js) is only the picker's: no caret and no text
+   selection. (The browser's blue on part of a focused time or date can't be
+   styled away; app.js keeps the mouse's focus out of those boxes instead.) */
+.pk-box { caret-color: transparent; -webkit-user-select: none; user-select: none; }
+.pk-box::selection { background: transparent; }
 input[type="time"], input[type="date"], input[data-options] {
   padding-right: 40px; cursor: pointer;
   background-repeat: no-repeat; background-position: right 12px center; background-size: 18px;

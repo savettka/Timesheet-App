@@ -1708,7 +1708,7 @@
     pop.id = "pk-pop";
     pop.hidden = true;
     document.body.appendChild(pop);
-    var field = null, kind = null, month = null, uid = 0;
+    var field = null, kind = null, month = null, uid = 0, byPointer = false;
 
     function isTime(el) { return el.matches && el.matches('input[type="time"]'); }
     function isDate(el) { return el.matches && el.matches('input[type="date"]'); }
@@ -1770,7 +1770,10 @@
       pop.hidden = true;
       pop.innerHTML = "";
       field = kind = null;
-      if (refocus) was.focus();
+      // Opened with the mouse, a time or date box doesn't take the focus
+      // back: the browser would paint its blue on part of the time, and no
+      // style can stop it. From the keyboard it does -- that's where you are.
+      if (refocus && !(byPointer && (isTime(was) || isDate(was)))) was.focus();
     }
 
     // -- a list, with a Custom box for times and numbers
@@ -1810,7 +1813,11 @@
       place();
       var on = ul.children[Math.max(0, at)];
       if (on) ul.scrollTop = on.offsetTop - ul.clientHeight / 2 + on.offsetHeight / 2;
+      var typeBox = pop.querySelector("#pk-type");
       if (focusList && on) on.focus();
+      // Opened by a click: straight into Custom, the one place to type (not
+      // on a phone, where that would raise the keyboard over the list).
+      else if (typeBox && !coarse) typeBox.focus();
     }
     function chooseOption(li) {
       setValue(li.dataset.value);
@@ -1896,6 +1903,7 @@
     function open(el, byKeys) {
       if (field === el) return;
       close(false);
+      byPointer = !byKeys;
       field = el;
       month = null;
       el.setAttribute("aria-expanded", "true");
@@ -1903,13 +1911,16 @@
       if (isDate(el)) openDate(el, byKeys); else openList(el, byKeys || !!el.pkSelect);
     }
 
-    // Phones: the time and date boxes open only STM's picker.
+    // A box with a picker is only the picker's: it can't be typed into itself
+    // (no caret, no blue part of a time), so one thing is edited -- the
+    // picker's Custom box, or its list.
     function readyBox(el) {
       if (el.pkReady || !pickable(el)) return;
       el.pkReady = true;
       el.setAttribute("aria-haspopup", "dialog");
       el.setAttribute("aria-expanded", "false");
-      if (coarse && (isTime(el) || isDate(el))) el.readOnly = true;
+      el.readOnly = true;
+      el.classList.add("pk-box");
     }
     // Each dropdown: a button in its place, showing its choice; the
     // dropdown itself stays, hidden, for the form to send.
@@ -1960,13 +1971,19 @@
     });
     document.addEventListener("pointerdown", function (e) {
       if (field && !pop.contains(e.target) && e.target !== field) close(false);
+      // Pressing a picker's box opens the picker without putting the focus
+      // (and the browser's blue highlight) into the box itself.
+      var box = e.target.closest && e.target.closest('input[type="time"], input[type="date"], input[data-options]');
+      if (box && pickable(box) && e.button === 0) e.preventDefault();
     }, true);
     document.addEventListener("keydown", function (e) {
       var el = e.target;
-      // From a box: Alt+Down or F4 opens; Down opens a dropdown too.
+      // From a box: Alt+Down or F4 opens, and Enter or Space (the box can't
+      // be typed into); Down opens a dropdown too.
       if (!pop.contains(el)) {
         var openKey = (e.altKey && e.key === "ArrowDown") || e.key === "F4" ||
-          (el.pkSelect && (e.key === "ArrowDown" || e.key === "ArrowUp"));
+          (el.pkSelect && (e.key === "ArrowDown" || e.key === "ArrowUp")) ||
+          (!el.pkSelect && field !== el && (e.key === "Enter" || e.key === " ") && pickable(el));
         if (openKey && (el.pkSelect || pickable(el))) {
           e.preventDefault();
           e.stopImmediatePropagation();
