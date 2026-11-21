@@ -2226,20 +2226,31 @@
   }
 
   // ------------------------------------------------------------ hours a week
-  // Settings' seven day boxes: the week's total follows them as they change.
+  // Settings' week strip: as a day's hours change, its tile turns green (a
+  // full day), amber (shorter than the longest) or grey (off), and the
+  // week's total follows.
   function initHoursWeek() {
     var week = document.querySelector("[data-hours-week]");
     var total = document.querySelector("[data-hours-total]");
     if (!week || !total) return;
-    function add() {
-      var sum = [].reduce.call(week.querySelectorAll("input"), function (s, box) {
-        var v = parseFloat(box.value);
-        return s + (isFinite(v) && v > 0 ? v : 0);
-      }, 0);
+    function hours(box) {
+      var v = parseFloat(box.value);
+      return isFinite(v) && v > 0 ? v : 0;
+    }
+    function draw() {
+      var boxes = [].slice.call(week.querySelectorAll("input"));
+      var longest = Math.max.apply(null, boxes.map(hours));
+      var sum = boxes.reduce(function (s, box) { return s + hours(box); }, 0);
+      boxes.forEach(function (box) {
+        var tile = box.closest(".hours-tile"), h = hours(box);
+        tile.classList.toggle("is-off", h === 0);
+        tile.classList.toggle("is-short", h > 0 && h < longest);
+      });
       total.textContent = (Math.round(sum * 100) / 100) + "h";
     }
-    week.addEventListener("input", add);
-    week.addEventListener("change", add);
+    week.addEventListener("input", draw);
+    week.addEventListener("change", draw);
+    draw();  // a browser may bring back typed values on its own
   }
 
   // ------------------------------------------------------------ code boxes

@@ -1615,11 +1615,33 @@ select {
 .pay-amount-row { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); }
 
 /* Hours each day, Mon-Sun, from a date on (Settings). */
-.hours-week { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: var(--s2) var(--s3); }
-.hours-day { min-width: 0; }
-.hours-total { margin-top: var(--s3); padding: var(--s2) var(--s4); border-radius: var(--r-md); background: var(--info-bg); color: var(--info-text); font-size: 15px; }
-.hours-total b { font-size: 17px; font-variant-numeric: tabular-nums; }
-.hours-from { max-width: 16rem; }
+.hours-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.hours-tile {
+  position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  min-width: 0; min-height: 76px; padding: 8px 0; border-radius: var(--r-md);
+  background: var(--success-bg); color: var(--success-text); cursor: pointer; transition: background-color .15s ease;
+}
+.hours-tile.is-short { background: var(--warn-bg); color: var(--warn-text); }
+.hours-tile.is-off { background: var(--surface-2); color: var(--text-3); }
+.hours-tile:hover { background: color-mix(in srgb, var(--success-bg) 82%, var(--go)); }
+.hours-tile.is-short:hover { background: color-mix(in srgb, var(--warn-bg) 82%, var(--pause)); }
+.hours-tile.is-off:hover { background: var(--surface-3); }
+.hours-tile:focus-within { outline: 3px solid var(--focus); outline-offset: 2px; }
+.hours-tile-day { font-size: 13px; font-weight: 600; }
+.hours-tile input[data-options] {
+  width: 100%; min-height: 34px; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none;
+  color: inherit; font-size: 24px; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums;
+  cursor: pointer; -moz-appearance: textfield;
+}
+.hours-tile input::-webkit-inner-spin-button, .hours-tile input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.hours-tile input:focus { outline: none; box-shadow: none; }
+.hours-tile-off { position: absolute; left: 0; right: 0; bottom: 14px; display: none; text-align: center; font-size: 17px; font-weight: 700; pointer-events: none; }
+.hours-tile.is-off input { color: transparent; }
+.hours-tile.is-off .hours-tile-off { display: block; }
+.hours-foot { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--s3); margin-top: var(--s4); }
+.hours-total { display: flex; align-items: center; gap: 6px; margin: 0; padding: 0 var(--s4); min-height: 50px; border-radius: var(--r-md); background: var(--info-bg); color: var(--info-text); font-size: 15px; }
+.hours-total b { font-size: 18px; font-variant-numeric: tabular-nums; }
+.hours-from { flex: 1 1 12rem; max-width: 16rem; margin: 0; }
 .hours-plans { margin: var(--s4) 0 0; }
 .hours-plan-days { display: block; margin-top: 2px; font-size: 14px; color: var(--text-3); }
 .hours-breaks { margin-top: var(--s5); padding-top: var(--s5); border-top: 1px solid var(--line); }
