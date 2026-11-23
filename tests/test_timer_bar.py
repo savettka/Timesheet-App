@@ -22,7 +22,15 @@ def logged_in(app, user_id, clock):
 
 
 def bar_of(page):
-    return page.split('class="tb tb-bar"', 1)[1].split("</header>", 1)[0]
+    """The top bar: where the day is (under the page's name), and the timer."""
+    return page.split('<header class="topbar">', 1)[1].split("</header>", 1)[0]
+
+
+def test_status_sits_under_the_title_not_in_the_timer(client, logged_in):
+    bar = bar_of(client.get("/reports").get_data(as_text=True))
+    head = bar.split('class="topbar-head"', 1)[1].split('class="cp-open"', 1)[0]
+    assert '<p class="topbar-status">In at 9:00 AM</p>' in head
+    assert "tb-state" not in bar.split('class="tb tb-bar"', 1)[1]
 
 
 @pytest.mark.parametrize("path", ["/reports", "/calendar", "/settings", "/pay", "/boards", "/history"])
@@ -94,6 +102,7 @@ def test_a_forgotten_logout_names_the_day(client, logged_in, clock):
     clock.set(2026, 11, 14, 10, 0)  # Thursday's shift still open on Saturday
     bar = bar_of(client.get("/reports").get_data(as_text=True))
     assert 'data-state="stale"' in bar and ">No logout on Thu 12 Nov<" in bar
+    assert 'class="topbar-status is-stale" href="/entry/2026-11-12"' in bar
 
 
 def test_the_phone_pill_and_sheet(client, logged_in, clock):
