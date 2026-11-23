@@ -923,6 +923,21 @@ def api_palette():
     )
 
 
+def punch_label(state, entry):
+    """Where the day is, in plain words with the real time: "In at 9:30 AM",
+    "Break at 1:15 PM", "Out at 6:30 PM", "Not in yet", "No logout on Sat
+    14 Nov"."""
+    if state == "working":
+        return f"In at {logic.fmt_time(entry.login_time)}"
+    if state == "break":
+        return f"Break at {logic.fmt_time(entry.open_break().break_start)}"
+    if state == "done":
+        return f"Out at {logic.fmt_time(entry.logout_time)}"
+    if state == "stale":
+        return f"No logout on {entry.date:%a %d %b}"
+    return "Not in yet"
+
+
 @main_bp.app_context_processor
 def inject_timer_bar():
     """The timer bar at the top of every signed-in page: what's being timed
@@ -934,7 +949,7 @@ def inject_timer_bar():
     timer = timer_view(current_user, now)
     idle = reminders.settings_for(current_user)["idle"]
     return {"bar": SimpleNamespace(
-        state=state, word=PUNCH_WORDS[state], timer=timer,
+        state=state, word=PUNCH_WORDS[state], label=punch_label(state, entry), timer=timer,
         can_time=state == "working", stale_day=entry.date if state == "stale" else None,
         recent=recent_texts(current_user.id, logic.work_day(entry if state != "done" else None, now)),
         # The idle prompt's wait in minutes, while a timer runs on a shift.

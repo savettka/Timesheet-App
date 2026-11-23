@@ -1819,10 +1819,8 @@ select {
   color: var(--text-2); font-size: 14px; font-weight: 600; text-decoration: none; white-space: nowrap;
 }
 .tb-state:hover { background: var(--surface-2); color: var(--text); }
-.tb-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; background: var(--text-3); }
-[data-state="working"] .tb-dot { background: var(--go); }
-[data-state="break"] .tb-dot { background: var(--pause); }
-[data-state="stale"] .tb-dot { background: var(--stop); }
+/* A forgotten logout is the one state that asks for something: red words. */
+[data-state="stale"] .tb-state { color: var(--stop-text); }
 .tb-run {
   display: flex; align-items: center; gap: var(--s2); min-width: 0;
   padding: 3px 3px 3px var(--s3); border-radius: 999px; background: var(--success-bg);

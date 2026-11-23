@@ -28,8 +28,9 @@ def bar_of(page):
 @pytest.mark.parametrize("path", ["/reports", "/calendar", "/settings", "/pay", "/boards", "/history"])
 def test_on_every_page(client, logged_in, path):
     bar = bar_of(client.get(path).get_data(as_text=True))
-    assert 'data-state="working"' in bar and "Logged in" in bar
+    assert 'data-state="working"' in bar and ">In at 9:00 AM<" in bar
     assert 'name="text"' in bar and "/timer/start" in bar
+    assert "tb-dot" not in bar and "Logged in" not in bar
 
 
 def test_start_on_reports_still_running_on_calendar(client, logged_in, clock, app, user_id):
@@ -71,7 +72,7 @@ def test_the_card_still_goes_back_to_the_timesheet(client, logged_in):
 
 def test_not_logged_in_shows_the_state_and_no_box(client):
     bar = bar_of(client.get("/reports").get_data(as_text=True))
-    assert 'data-state="out"' in bar and "Not logged in" in bar
+    assert 'data-state="out"' in bar and ">Not in yet<" in bar
     assert 'name="text"' not in bar
 
 
@@ -79,14 +80,27 @@ def test_on_a_break(client, logged_in, clock, app, user_id):
     clock.set(2026, 11, 12, 13, 0)
     client.post("/punch/break/start")
     bar = bar_of(client.get("/reports").get_data(as_text=True))
-    assert 'data-state="break"' in bar and "On break" in bar and 'name="text"' not in bar
+    assert 'data-state="break"' in bar and ">Break at 1:00 PM<" in bar and 'name="text"' not in bar
+
+
+def test_logged_out_says_when(client, logged_in, clock):
+    clock.set(2026, 11, 12, 18, 30)
+    client.post("/punch/out")
+    bar = bar_of(client.get("/reports").get_data(as_text=True))
+    assert 'data-state="done"' in bar and ">Out at 6:30 PM<" in bar
+
+
+def test_a_forgotten_logout_names_the_day(client, logged_in, clock):
+    clock.set(2026, 11, 14, 10, 0)  # Thursday's shift still open on Saturday
+    bar = bar_of(client.get("/reports").get_data(as_text=True))
+    assert 'data-state="stale"' in bar and ">No logout on Thu 12 Nov<" in bar
 
 
 def test_the_phone_pill_and_sheet(client, logged_in, clock):
     clock.set(2026, 11, 12, 10, 0)
     client.post("/timer/start", data={"text": "Emails"})
     page = client.get("/reports").get_data(as_text=True)
-    assert re.search(r'class="tb-pill" data-state="working"[^>]*aria-label="Timer: Emails, Logged in"', page)
+    assert re.search(r'class="tb-pill" data-state="working"[^>]*aria-label="Timer: Emails, In at 9:00 AM"', page)
     sheet = page.split('id="tb-sheet"', 1)[1].split("</dialog>", 1)[0]
     assert "Stop the timer: Emails" in sheet and "Switch to" in sheet
 
