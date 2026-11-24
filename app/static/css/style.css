@@ -1278,12 +1278,11 @@ input[type="number"] { -moz-appearance: textfield; }
 .ts-now { justify-content: center; background: var(--accent); color: var(--on-accent); }
 .ts-text { grid-area: text; min-height: 44px; }
 /* A long entry wraps and the box grows (app.js); one line looks as a plain
-   box does. The row's times and buttons stay level with its first line. */
+   box does. The row's times and buttons sit in the middle of a tall box. */
 textarea.ts-text {
   display: block; height: 44px; padding: 9px var(--s4); line-height: 1.4;
   resize: none; overflow: hidden; overflow-wrap: anywhere;
 }
-.ts-line { align-items: start; }
 .ts-acts { grid-area: acts; display: flex; align-items: center; gap: 6px; }
 .ts-acts .btn-icon { width: 44px; height: 44px; min-height: 44px; }
 .ts-copy { min-height: 44px; padding: 0 var(--s3); gap: 6px; background: var(--surface-2); }
