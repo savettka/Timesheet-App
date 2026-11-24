@@ -1084,6 +1084,57 @@
     });
   }
 
+  // ------------------------------------------------------------ long lines
+  // A Timesheet line's words wrap, and the box grows to show all of them.
+  // Enter saves, as it did in the one-line box; a pasted line break becomes
+  // a space, since a line is one line of words.
+  function initGrowText() {
+    var form = document.querySelector(".ts-form");
+    if (!form) return;
+    var boxes = [].slice.call(form.querySelectorAll("textarea.ts-text"));
+    if (!boxes.length) return;
+
+    function fit(box) {
+      var cs = getComputedStyle(box);
+      var edges = parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth);
+      box.style.height = "auto";
+      box.style.height = box.scrollHeight + edges + "px";
+    }
+    function fitAll() { boxes.forEach(fit); }
+
+    form.addEventListener("input", function (e) {
+      var box = e.target;
+      if (!box.matches || !box.matches("textarea.ts-text")) return;
+      if (/[\r\n]/.test(box.value)) {
+        var at = box.selectionStart;
+        box.value = box.value.replace(/\s*[\r\n]+\s*/g, " ");
+        try { box.setSelectionRange(Math.min(at, box.value.length), Math.min(at, box.value.length)); } catch (err) { /* gone */ }
+      }
+      fit(box);
+    });
+    form.addEventListener("keydown", function (e) {
+      var box = e.target;
+      if (e.key !== "Enter" || e.isComposing || e.defaultPrevented || !box.matches || !box.matches("textarea.ts-text")) return;
+      e.preventDefault();
+      var first = form.querySelector('button[type="submit"]');
+      if (form.requestSubmit) form.requestSubmit(first); else if (first) first.click();
+    });
+
+    // Wraps change with the width: fit again when the list's width does.
+    fitAll();
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitAll);
+    var list = form.querySelector(".ts-lines"), lastW = list ? list.clientWidth : 0;
+    if (list && window.ResizeObserver) {
+      new ResizeObserver(function () {
+        if (list.clientWidth === lastW) return;
+        lastW = list.clientWidth;
+        fitAll();
+      }).observe(list);
+    } else {
+      window.addEventListener("resize", fitAll);
+    }
+  }
+
   // ------------------------------------------------------------ slides
   // Each part slides in after the one before it: its place among its
   // siblings, as --i (capped, so a long list doesn't keep you waiting).
@@ -1208,10 +1259,10 @@
       timer = setTimeout(run, ms);
     }
     form.addEventListener("input", function (e) {
-      if (e.target.matches('input[name="text"], input[type="time"]')) soon(AUTOSAVE_PAUSE_MS);
+      if (e.target.matches('[name="text"], input[type="time"]')) soon(AUTOSAVE_PAUSE_MS);
     });
     form.addEventListener("focusout", function (e) {
-      if (timer && e.target.matches('input[name="text"], input[type="time"]')) soon(150);
+      if (timer && e.target.matches('[name="text"], input[type="time"]')) soon(150);
     });
     // Enter, or a Save left on the page: save now, without leaving.
     form.addEventListener("submit", function (e) {
@@ -1491,7 +1542,7 @@
     if (day) {
       // A Day line can be ticked once it has words.
       day.addEventListener("input", function (e) {
-        if (!e.target.matches('input[name="text"]')) return;
+        if (!e.target.matches('[name="text"]')) return;
         var p = e.target.closest(".ts-line").querySelector(".js-pick");
         if (!p) return;
         p.disabled = !e.target.value.trim();
@@ -2069,10 +2120,11 @@
     var field = null, active = -1, picking = false, uid = 0;
 
     // A box with a datalist: the browser's own list goes, the words stay.
+    // A textarea (the Timesheet's words) names its list in data-suggest.
     function ready(el) {
-      if (!el || el.tagName !== "INPUT") return false;
-      if (el.hasAttribute("list")) {
-        el.dataset.suggest = el.getAttribute("list");
+      if (!el || (el.tagName !== "INPUT" && el.tagName !== "TEXTAREA")) return false;
+      if (el.hasAttribute("list") || (el.dataset.suggest && !el.hasAttribute("role"))) {
+        if (el.hasAttribute("list")) el.dataset.suggest = el.getAttribute("list");
         el.removeAttribute("list");
         el.setAttribute("role", "combobox");
         el.setAttribute("aria-autocomplete", "list");
@@ -2186,7 +2238,7 @@
       try { el.setSelectionRange(text.length, text.length); } catch (err) { /* not a text box */ }
     }
 
-    document.querySelectorAll("input[list]").forEach(ready);
+    document.querySelectorAll("input[list], textarea[data-suggest]").forEach(ready);
     document.addEventListener("focusin", function (e) { ready(e.target); });
     document.addEventListener("input", function (e) {
       if (!picking && ready(e.target)) show(e.target);
@@ -2198,7 +2250,7 @@
     document.addEventListener("focusout", function (e) { if (e.target === field) close(); });
     document.addEventListener("keydown", function (e) {
       var el = e.target;
-      if (e.isComposing || !el || el.tagName !== "INPUT" || !el.dataset.suggest) return;
+      if (e.isComposing || !el || (el.tagName !== "INPUT" && el.tagName !== "TEXTAREA") || !el.dataset.suggest) return;
       var open = field === el, n = pop.children.length;
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         if (e.altKey || e.ctrlKey || e.metaKey) return;
@@ -3368,5 +3420,6 @@
     initTimesheetFollow();
     initTimesheetScroll();
     initTimesheetPng();
+    initGrowText();
   });
 })();

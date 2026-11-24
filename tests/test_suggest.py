@@ -51,6 +51,7 @@ def test_each_task_box_has_its_list(app, client, user_id):
         db.session.add(WorkBlock(user_id=user_id, date=THU, start_time=T(9, 0), end_time=T(9, 30), text="VAT return"))
         db.session.commit()
     sheet = client.get("/timesheet").get_data(as_text=True)
-    assert 'list="ts-recent"' in sheet and options(sheet, "ts-recent") == ["VAT return"]
+    # The Timesheet's words are a growing textarea, which names its list in data-suggest.
+    assert 'data-suggest="ts-recent"' in sheet and options(sheet, "ts-recent") == ["VAT return"]
     calendar = client.get("/calendar/week").get_data(as_text=True)
     assert 'list="cg-recent"' in calendar and options(calendar, "cg-recent") == ["VAT return"]

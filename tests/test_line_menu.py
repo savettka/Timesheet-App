@@ -150,7 +150,9 @@ def form_of(page):
     data = {k: [] for k in ("id", "start", "end", "text", "was_start", "was_end", "was_text")}
     for li in re.findall(r'<li class="ts-line[^"]*"[^>]*>(.*?)</li>', page, re.S):
         for k in data:
-            data[k].append(re.search(rf'name="{k}"[^>]*?value="([^"]*)"', li).group(1))
+            # The words sit in a textarea (it grows to show a long entry).
+            box = re.search(rf'<textarea name="{k}"[^>]*>(.*?)</textarea>', li, re.S)
+            data[k].append(box.group(1) if box else re.search(rf'name="{k}"[^>]*?value="([^"]*)"', li).group(1))
     return data
 
 

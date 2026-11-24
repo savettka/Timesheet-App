@@ -113,10 +113,12 @@
           {% if line.is_now %}<span class="badge ts-now">Now</span>
           {%- else %}<span class="ts-len">{{ line.length }}</span>{% endif %}
         </div>
-        <input type="text" name="text" class="ts-text" value="{{ line.text }}" maxlength="{{ max_length }}"
-               autocomplete="off" aria-label="What you worked on, {{ span }}"{{ err_text|safe }}
-               {%- if not line.is_break and recent %} list="ts-recent"{% endif %}
-               {%- if line.placeholder %} placeholder="{{ line.placeholder }}"{% endif %}>
+        {# A long entry wraps and the box grows to show all of it (app.js);
+           Enter still saves, and a line break never goes in. #}
+        <textarea name="text" class="ts-text" rows="1" maxlength="{{ max_length }}"
+                  autocomplete="off" aria-label="What you worked on, {{ span }}"{{ err_text|safe }}
+                  {%- if not line.is_break and recent %} data-suggest="ts-recent"{% endif %}
+                  {%- if line.placeholder %} placeholder="{{ line.placeholder }}"{% endif %}>{{ line.text }}</textarea>
         <div class="ts-acts">
           {% if not line.is_break %}
           {# Shown by app.js: copying needs the script. #}

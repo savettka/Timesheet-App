@@ -1245,7 +1245,8 @@ input[type="number"] { -moz-appearance: textfield; }
    amber for a break, blue for the one in progress. Given room a line is one
    row, with the times in a fixed column so every line's words start level;
    where it's narrow, the words take a row of their own under the times. */
-.ts-card { max-width: 920px; }
+/* The whole width the page has, so the words get the room. */
+.ts-card { max-width: none; }
 .ts-sum { list-style: none; display: flex; flex-wrap: wrap; gap: var(--s2); margin: var(--s4) 0 0; padding: 0; }
 .ts-chip {
   display: inline-flex; align-items: center; gap: 6px;
@@ -1288,6 +1289,13 @@ input[type="number"] { -moz-appearance: textfield; }
 .ts-len { color: var(--text-3); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ts-now { justify-content: center; background: var(--accent); color: var(--on-accent); }
 .ts-text { grid-area: text; min-height: 44px; }
+/* A long entry wraps and the box grows (app.js); one line looks as a plain
+   box does. The row's times and buttons stay level with its first line. */
+textarea.ts-text {
+  display: block; height: 44px; padding: 9px var(--s4); line-height: 1.4;
+  resize: none; overflow: hidden; overflow-wrap: anywhere;
+}
+.ts-line { align-items: start; }
 .ts-acts { grid-area: acts; display: flex; align-items: center; gap: 6px; }
 .ts-acts .btn-icon { width: 44px; height: 44px; min-height: 44px; }
 .ts-copy { min-height: 44px; padding: 0 var(--s3); gap: 6px; background: var(--surface-2); }
