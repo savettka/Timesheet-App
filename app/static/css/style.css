@@ -502,20 +502,8 @@ a.topbar-status.is-stale:hover { color: var(--text); }
 .status-card.state-break { background: var(--tint-break); border-color: color-mix(in srgb, var(--pause) 45%, var(--line)); }
 .status-card.state-stale { background: var(--tint-stale); border-color: color-mix(in srgb, var(--stop) 40%, var(--line)); }
 
-.status-head { display: flex; align-items: flex-start; gap: var(--s3); }
-.status-dot {
-  width: 14px; height: 14px; margin-top: 7px; flex-shrink: 0;
-  border-radius: 50%;
-  background: var(--line-strong);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--line-strong) 22%, transparent);
-}
-.state-working .status-dot { background: var(--go); box-shadow: 0 0 0 4px color-mix(in srgb, var(--go) 22%, transparent); }
-.state-break .status-dot { background: var(--pause); box-shadow: 0 0 0 4px color-mix(in srgb, var(--pause) 28%, transparent); }
-.state-done .status-dot { background: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent); }
-.state-stale .status-dot { background: var(--stop); box-shadow: 0 0 0 4px color-mix(in srgb, var(--stop) 22%, transparent); }
-@media (prefers-reduced-motion: no-preference) {
-  .state-working .status-dot { animation: pulse 2.4s ease-in-out infinite; }
-}
+.status-head { display: flex; flex-direction: column; gap: 2px; }
+.state-stale .status-title { color: var(--stop-text); }
 /* While the next page loads: a small spinning circle in the middle, over a
    lightly dimmed page that can't be pressed meanwhile. The dimming waits a
    moment, so a page that comes straight back doesn't flicker. */
@@ -537,7 +525,7 @@ a.topbar-status.is-stale:hover { color: var(--text); }
 @keyframes pulse { 50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--go) 10%, transparent); } }
 
 .status-title { font-size: 22px; font-weight: 700; }
-.status-sub { margin-top: 2px; font-size: 16px; color: var(--text-2); }
+.status-sub { margin: 0; font-size: 16px; color: var(--text-2); }
 
 .timer { display: flex; flex-direction: column; gap: 2px; }
 .timer-value {
@@ -1591,7 +1579,6 @@ textarea.ts-text {
   .btn, .card, .figure, .day-chip, .choice, .check-chip, .banner, .flash { border: 1px solid CanvasText; }
   .progress { border: 1px solid CanvasText; }
   .progress-fill { background: Highlight; }
-  .status-dot { forced-color-adjust: none; }
 }
 
 /* ==========================================================================

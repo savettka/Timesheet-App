@@ -58,35 +58,36 @@
            data-worked-seconds="{{ shift_worked_seconds }}"
            data-break-seconds="{{ break_elapsed_seconds }}">
 
+    {# Where the day is, as the top bar says it: the fact with its time
+       ("In at 9:30 AM"), and under it the one other thing worth knowing. #}
     <div class="status-head">
-      <span class="status-dot" aria-hidden="true"></span>
-      <div>
-        <h2 id="status-heading" class="status-title">
-          {%- if day_state == 'working' -%} Logged in
-          {%- elif day_state == 'break' -%} On break
-          {%- elif day_state == 'done' -%} Done for today
-          {%- elif day_state == 'stale' -%} Still logged in from {{ open_entry.date.strftime('%a %d %b') }}
-          {%- else -%} Not logged in yet
-          {%- endif -%}
-        </h2>
-        <p class="status-sub">
-          {%- if day_state == 'working' -%}
-            Since {{ fmt_time(open_entry.login_time) }}{% if open_entry.date != today %} on {{ open_entry.date.strftime('%a %d %b') }}{% endif %}
-          {%- elif day_state == 'break' -%}
-            Since {{ fmt_time(open_break.break_start) }} &middot; <span id="break-timer">{{ fmt_duration(break_elapsed_seconds / 3600) }}</span> so far
-          {%- elif day_state == 'done' -%}
-            {{ fmt_time(today_entry.login_time) }} to {{ fmt_time(today_entry.logout_time) }}
-          {%- elif day_state == 'stale' -%}
-            <span class="desk-only">You logged in at {{ fmt_time(open_entry.login_time) }} and it looks like you didn't log out.</span><span class="phone-only">In at {{ fmt_time(open_entry.login_time) }} &middot; no logout</span>
-          {%- elif today_entry and today_entry.is_leave -%}
-            {{ today_entry.leave_label or 'Leave' }} today &middot; {{ fmt_duration(today_target) + ' due' if today_target else 'nothing due' }}
-          {%- elif today_target == 0 -%}
-            It's your rest day &mdash; nothing due.
-          {%- else -%}
-            Today's target is {{ fmt_duration(today_target) }}.
-          {%- endif -%}
-        </p>
-      </div>
+      <h2 id="status-heading" class="status-title">
+        {%- if day_state == 'working' -%} In at {{ fmt_time(open_entry.login_time) }}
+        {%- elif day_state == 'break' -%} Break at {{ fmt_time(open_break.break_start) }}
+        {%- elif day_state == 'done' -%} Out at {{ fmt_time(today_entry.logout_time) }}
+        {%- elif day_state == 'stale' -%} No logout on {{ open_entry.date.strftime('%a %d %b') }}
+        {%- else -%} Not in yet
+        {%- endif -%}
+      </h2>
+      {% if day_state == 'working' and open_entry.date != today %}
+      <p class="status-sub">On {{ open_entry.date.strftime('%a %d %b') }}</p>
+      {% elif day_state == 'break' %}
+      <p class="status-sub"><span id="break-timer">{{ fmt_duration(break_elapsed_seconds / 3600) }}</span> so far</p>
+      {% elif day_state == 'done' %}
+      <p class="status-sub">In at {{ fmt_time(today_entry.login_time) }}</p>
+      {% elif day_state == 'stale' %}
+      <p class="status-sub">In at {{ fmt_time(open_entry.login_time) }}</p>
+      {% elif day_state not in ('working', 'break', 'done', 'stale') %}
+      <p class="status-sub">
+        {%- if today_entry and today_entry.is_leave -%}
+          {{ today_entry.leave_label or 'Leave' }} &middot; {{ fmt_duration(today_target) + ' due' if today_target else 'nothing due' }}
+        {%- elif today_target == 0 -%}
+          Rest day &middot; nothing due
+        {%- else -%}
+          {{ fmt_duration(today_target) }} due today
+        {%- endif -%}
+      </p>
+      {% endif %}
     </div>
 
     {% if day_state != 'stale' %}
