@@ -9,7 +9,6 @@
 <section class="card timer-card" aria-label="Timer"{% if card %} data-card="{{ card }}"{% endif %}{% if hidden %} hidden{% endif %}>
   {% if timer %}
   <div class="timer-run" data-elapsed="{{ timer.elapsed }}">
-    <span class="timer-dot" aria-hidden="true"></span>
     <span class="timer-text">{{ timer.text }}</span>
     <span class="timer-clock">{{ timer.clock }}</span>
     <form method="post" action="{{ url_for('main.timer_stop') }}" class="js-once" autocomplete="off">

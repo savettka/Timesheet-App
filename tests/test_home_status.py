@@ -49,6 +49,15 @@ def test_in_on_a_break_and_out(app, client, user_id, clock):
     assert card(client)[1:] == ("Out at 6:30 PM", "In at 9:00 AM")
 
 
+def test_the_running_timer_card_has_no_dot(app, client, user_id, clock):
+    log_in(app, user_id, clock)
+    clock.set(2026, 11, 12, 10, 0)
+    client.post("/timer/start", data={"text": "Emails"})
+    page = client.get("/dashboard").get_data(as_text=True)
+    run = re.search(r'<div class="timer-run".*?</div>', page, re.S).group(0)
+    assert "Emails" in run and "timer-dot" not in page
+
+
 def test_a_forgotten_logout(app, client, user_id, clock):
     log_in(app, user_id, clock)
     clock.set(2026, 11, 14, 10, 0)  # Thursday's shift still open on Saturday

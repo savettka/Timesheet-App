@@ -522,7 +522,6 @@ a.topbar-status.is-stale:hover { color: var(--text); }
 @keyframes page-wait-in { from { opacity: .4; } }
 @keyframes page-wait-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .page-wait-circle { animation-duration: 2.4s; } }
-@keyframes pulse { 50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--go) 10%, transparent); } }
 
 .status-title { font-size: 22px; font-weight: 700; }
 .status-sub { margin: 0; font-size: 16px; color: var(--text-2); }
@@ -650,8 +649,6 @@ a.topbar-status.is-stale:hover { color: var(--text); }
 .ts-timer .timer-card { margin: 0; }
 .timer-run, .timer-new { display: flex; align-items: center; gap: var(--s3); }
 .timer-run { padding: var(--s2) var(--s2) var(--s2) var(--s4); border-radius: var(--r-md); background: var(--accent-soft); }
-.timer-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--go); flex: none; }
-@media (prefers-reduced-motion: no-preference) { .timer-dot { animation: pulse 2.4s ease-in-out infinite; } }
 .timer-text { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .timer-clock { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
 .timer-input { flex: 1; min-width: 0; }
