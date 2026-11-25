@@ -21,7 +21,7 @@ def test_a_long_entry_is_in_a_growing_box(app, client, user_id, clock):
                                  end_time=dt.time(14, 0), text=LONG))
         db.session.commit()
     page = client.get("/timesheet").get_data(as_text=True)
-    box = re.search(r'<textarea name="text" class="ts-text" rows="1"[^>]*>([^<]*)</textarea>', page)
+    box = re.search(r'<textarea name="text" class="ts-text grow-text" rows="1"[^>]*>([^<]*)</textarea>', page)
     assert box and box.group(1) == LONG  # all of it, no line break before or after
     assert '<input type="text" name="text" class="ts-text"' not in page
 
@@ -40,6 +40,16 @@ def test_words_with_a_line_break_save_as_one_line(app, client, user_id, clock):
 
 def test_the_script_grows_the_box_and_enter_saves():
     js = (ROOT / "app" / "static" / "js" / "app.js").read_text(encoding="utf-8")
-    grow = js[js.index("function initGrowText"):js.index("// ------------------------------------------------------------ slides")]
+    grow = js[js.index("// ------------------------------------------------------------ long lines"):
+              js.index("// ------------------------------------------------------------ slides")]
     assert "scrollHeight" in grow and "requestSubmit" in grow and "initGrowText();" in js
     assert 'textarea[data-suggest]' in js  # suggestions still offered in the box
+
+
+def test_the_calendar_line_box_grows_too(client):
+    page = client.get("/calendar/week").get_data(as_text=True)
+    assert re.search(r'<textarea id="cg-text" name="text" class="grow-text" rows="1" maxlength="300"', page)
+    assert '<input type="text" id="cg-text"' not in page
+    js = (ROOT / "app" / "static" / "js" / "app.js").read_text(encoding="utf-8")
+    opened = js[js.index("function initCalendarGrid"):]
+    assert "fitGrow(words)" in opened[:opened.index('getElementById("cg-cancel")')]

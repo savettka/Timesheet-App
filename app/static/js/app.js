@@ -1085,51 +1085,58 @@
   }
 
   // ------------------------------------------------------------ long lines
-  // A Timesheet line's words wrap, and the box grows to show all of them.
-  // Enter saves, as it did in the one-line box; a pasted line break becomes
-  // a space, since a line is one line of words.
+  // A box for a line's words -- each Timesheet line, the Calendar's "Change
+  // this line" -- wraps, and grows to show all of them. Enter saves, as it
+  // did in a one-line box; a pasted line break becomes a space, since a line
+  // is one line of words.
+  var GROW = "textarea.grow-text";
+
+  function fitGrow(box) {
+    if (!box || !box.getClientRects().length) return;  // hidden: fitted once shown
+    var cs = getComputedStyle(box);
+    var edges = parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth);
+    box.style.height = "auto";
+    box.style.height = box.scrollHeight + edges + "px";
+  }
+
   function initGrowText() {
-    var form = document.querySelector(".ts-form");
-    if (!form) return;
-    var boxes = [].slice.call(form.querySelectorAll("textarea.ts-text"));
+    var boxes = [].slice.call(document.querySelectorAll(GROW));
     if (!boxes.length) return;
+    function fitAll() { boxes.forEach(fitGrow); }
 
-    function fit(box) {
-      var cs = getComputedStyle(box);
-      var edges = parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth);
-      box.style.height = "auto";
-      box.style.height = box.scrollHeight + edges + "px";
-    }
-    function fitAll() { boxes.forEach(fit); }
-
-    form.addEventListener("input", function (e) {
+    document.addEventListener("input", function (e) {
       var box = e.target;
-      if (!box.matches || !box.matches("textarea.ts-text")) return;
+      if (!box.matches || !box.matches(GROW)) return;
       if (/[\r\n]/.test(box.value)) {
         var at = box.selectionStart;
         box.value = box.value.replace(/\s*[\r\n]+\s*/g, " ");
         try { box.setSelectionRange(Math.min(at, box.value.length), Math.min(at, box.value.length)); } catch (err) { /* gone */ }
       }
-      fit(box);
+      fitGrow(box);
     });
-    form.addEventListener("keydown", function (e) {
+    document.addEventListener("keydown", function (e) {
       var box = e.target;
-      if (e.key !== "Enter" || e.isComposing || e.defaultPrevented || !box.matches || !box.matches("textarea.ts-text")) return;
+      if (e.key !== "Enter" || e.isComposing || e.defaultPrevented || !box.matches || !box.matches(GROW) || !box.form) return;
       e.preventDefault();
-      var first = form.querySelector('button[type="submit"]');
-      if (form.requestSubmit) form.requestSubmit(first); else if (first) first.click();
+      var first = box.form.querySelector('button[type="submit"]');
+      if (box.form.requestSubmit) box.form.requestSubmit(first); else if (first) first.click();
     });
 
-    // Wraps change with the width: fit again when the list's width does.
+    // Wraps change with the width, and a box out of sight (a closed window,
+    // a phone's hidden form) has none: fit each again when its width changes.
     fitAll();
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitAll);
-    var list = form.querySelector(".ts-lines"), lastW = list ? list.clientWidth : 0;
-    if (list && window.ResizeObserver) {
-      new ResizeObserver(function () {
-        if (list.clientWidth === lastW) return;
-        lastW = list.clientWidth;
-        fitAll();
-      }).observe(list);
+    if (window.ResizeObserver) {
+      var widths = new WeakMap();
+      var watch = new ResizeObserver(function (entries) {
+        entries.forEach(function (entry) {
+          var w = Math.round(entry.contentRect.width);
+          if (widths.get(entry.target) === w) return;
+          widths.set(entry.target, w);
+          fitGrow(entry.target);
+        });
+      });
+      boxes.forEach(function (box) { watch.observe(box); });
     } else {
       window.addEventListener("resize", fitAll);
     }
@@ -2683,7 +2690,9 @@
       dialog.stmBlock = block || null;
       document.getElementById("cg-open").href = "/timesheet/" + date;
       dialog.showModal();
-      document.getElementById("cg-text").focus();
+      var words = document.getElementById("cg-text");
+      fitGrow(words);  // the line's words in full, however long
+      words.focus();
     }
     document.getElementById("cg-cancel").addEventListener("click", function () { dialog.close(); });
     // On its way: the box steps aside so the loading circle shows.

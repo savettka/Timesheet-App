@@ -115,7 +115,7 @@
         </div>
         {# A long entry wraps and the box grows to show all of it (app.js);
            Enter still saves, and a line break never goes in. #}
-        <textarea name="text" class="ts-text" rows="1" maxlength="{{ max_length }}"
+        <textarea name="text" class="ts-text grow-text" rows="1" maxlength="{{ max_length }}"
                   autocomplete="off" aria-label="What you worked on, {{ span }}"{{ err_text|safe }}
                   {%- if not line.is_break and recent %} data-suggest="ts-recent"{% endif %}
                   {%- if line.placeholder %} placeholder="{{ line.placeholder }}"{% endif %}>{{ line.text }}</textarea>

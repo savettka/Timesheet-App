@@ -88,8 +88,9 @@
     </div>
     <div class="field">
       <label for="cg-text">What you worked on</label>
-      <input type="text" id="cg-text" name="text" maxlength="300" autocomplete="off"
-             {%- if recent %} list="cg-recent"{% endif %}>
+      {# Wraps and grows to show a long line's words in full (app.js). #}
+      <textarea id="cg-text" name="text" class="grow-text" rows="1" maxlength="300" autocomplete="off"
+                {%- if recent %} data-suggest="cg-recent"{% endif %}></textarea>
     </div>
     {% if recent %}<datalist id="cg-recent">{% for text in recent if not bar.timer or text != bar.timer.text %}<option value="{{ text }}">{% endfor %}</datalist>{% endif %}
     <div class="form-actions">

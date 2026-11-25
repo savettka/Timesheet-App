@@ -1277,12 +1277,14 @@ input[type="number"] { -moz-appearance: textfield; }
 .ts-len { color: var(--text-3); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ts-now { justify-content: center; background: var(--accent); color: var(--on-accent); }
 .ts-text { grid-area: text; min-height: 44px; }
-/* A long entry wraps and the box grows (app.js); one line looks as a plain
-   box does. The row's times and buttons sit in the middle of a tall box. */
-textarea.ts-text {
-  display: block; height: 44px; padding: 9px var(--s4); line-height: 1.4;
+/* A line's words wrap and the box grows (app.js, .grow-text); one line
+   looks as a plain box does. On the Timesheet the row's times and buttons
+   sit in the middle of a tall box. */
+textarea.grow-text {
+  display: block; min-height: 50px; height: 50px; padding: 11px var(--s4); line-height: 1.4;
   resize: none; overflow: hidden; overflow-wrap: anywhere;
 }
+textarea.ts-text { min-height: 44px; height: 44px; padding: 9px var(--s4); }
 .ts-acts { grid-area: acts; display: flex; align-items: center; gap: 6px; }
 .ts-acts .btn-icon { width: 44px; height: 44px; min-height: 44px; }
 .ts-copy { min-height: 44px; padding: 0 var(--s3); gap: 6px; background: var(--surface-2); }
