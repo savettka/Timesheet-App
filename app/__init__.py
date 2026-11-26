@@ -226,6 +226,13 @@ def create_app(config_object="config.Config"):
         flash("That image is too large -- please pick one under 8 MB.", "error")
         return redirect(url_for("main.settings"))
 
+    @app.after_request
+    def keep_out_of_search(response):
+        # The app is private. A header covers every page, the sign-in pages
+        # and redirects too, where a meta tag only covers the page it's in.
+        response.headers["X-Robots-Tag"] = "noindex"
+        return response
+
     @app.url_defaults
     def add_static_version(endpoint, values):
         """Stamp every static URL with the file's modification time.
